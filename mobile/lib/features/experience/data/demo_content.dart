@@ -10,7 +10,7 @@ const demoRoute = RouteExperience(
   distanceKm: 2.8,
   difficulty: '轻松',
   theme: '建筑与城市生活',
-  heroImage: 'assets/images/route_wukang.png',
+  heroImage: '',
   contentStatus: 'demo_unverified',
   stops: [
     ExperienceStop(
@@ -24,7 +24,7 @@ const demoRoute = RouteExperience(
       storyTitle: '一栋顺着街角生长的建筑',
       storyBody:
           '先别急着拍下整栋楼。站到街角对面，沿着它最窄的一端慢慢向两侧看：建筑并没有把转角当作障碍，而是把道路的夹角变成了自己的轮廓。城市建筑有时像一本摊开的书，街道决定了书脊的位置。',
-      image: 'assets/images/route_wukang.png',
+      image: '',
       insight: '真正值得观察的并不只是建筑风格，而是建筑如何回应街道。转角、退界与首层店面共同塑造了这里的公共生活。',
       challenge: Challenge(
         id: 'challenge-1',
@@ -45,7 +45,7 @@ const demoRoute = RouteExperience(
       storyTitle: '被树荫留住的安静',
       storyBody:
           '一处住所和城市的关系，往往先由围墙、树木与入口讲出来。观察这里从车流到庭院的层层过渡：喧闹没有突然消失，而是被距离、植物和边界一点点过滤。',
-      image: 'assets/images/route_wukang.png',
+      image: '',
       insight: '深度游不是进入每一栋建筑。仅从公共空间观察边界、树冠和入口，也能理解一处场所如何安排私密与开放。',
       challenge: Challenge(
         id: 'challenge-2',
@@ -66,7 +66,7 @@ const demoRoute = RouteExperience(
       storyTitle: '门洞后面，还有一条城市',
       storyBody:
           '沿街立面只是城市的封面。门洞把公共街道连接到更细小的内部通道，生活、晾晒、邻里往来和出入秩序都在另一层空间里发生。请只在公共区域观察，不进入私人院落。',
-      image: 'assets/images/stop_lane.png',
+      image: '',
       insight: '街区的丰富度来自空间层级：主路、支路、门洞与院落组成了生活网络。观察时也要尊重居住者的边界。',
       challenge: Challenge(
         id: 'challenge-3',
@@ -87,7 +87,7 @@ const demoRoute = RouteExperience(
       storyTitle: '日常空间如何成为记忆',
       storyBody:
           '名人故居容易让人只寻找姓名和年代，但一处创作空间也由采光、窗景、街道声音和日常动线组成。长期居住者每天看到的并不是景点，而是一段不断变化的街景。',
-      image: 'assets/images/stop_lane.png',
+      image: '',
       insight: '人文历史并不只在纪念牌上。把人物放回具体的房间、光线和街道，记忆才从知识点变成生活。',
       challenge: Challenge(
         id: 'challenge-4',
@@ -108,7 +108,7 @@ const demoRoute = RouteExperience(
       storyTitle: '保存，不等于冻结',
       storyBody:
           '走到路线最后，观察老建筑与今天的店铺、展览和公共停留如何共处。街区保护并不意味着把时间停住；更难的问题是，让新的使用方式既维持活力，也不过度挤压原有生活。',
-      image: 'assets/images/route_wukang.png',
+      image: '',
       insight: '一座城市的深度，常常存在于新旧用途的协商之中。好的更新既要让空间继续被使用，也要保留可被理解的历史层次。',
       challenge: Challenge(
         id: 'challenge-5',

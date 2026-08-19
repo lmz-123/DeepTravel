@@ -20,6 +20,16 @@ class Base(DeclarativeBase):
     pass
 
 
+class MediaAssetModel(Base):
+    __tablename__ = "media_assets"
+
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    storage_path: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    mime_type: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class CityModel(Base):
     __tablename__ = "cities"
 

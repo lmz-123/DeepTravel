@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class EditorialImage extends StatelessWidget {
   const EditorialImage({
-    required this.asset,
+    required this.source,
     super.key,
     this.height,
     this.borderRadius = 0,
@@ -10,7 +10,7 @@ class EditorialImage extends StatelessWidget {
     this.heroTag,
   });
 
-  final String asset;
+  final String source;
   final double? height;
   final double borderRadius;
   final Widget? child;
@@ -24,7 +24,24 @@ class EditorialImage extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(asset, fit: BoxFit.cover),
+          if (source.isEmpty)
+            const ColoredBox(color: Color(0xFFB9B6AA))
+          else
+            Image.network(
+              source,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return const ColoredBox(
+                  color: Color(0xFFB9B6AA),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => const ColoredBox(
+                color: Color(0xFFB9B6AA),
+                child: Center(child: Icon(Icons.image_not_supported_outlined)),
+              ),
+            ),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(

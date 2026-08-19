@@ -72,7 +72,7 @@ class _RouteDetail extends ConsumerWidget {
         slivers: [
           SliverToBoxAdapter(
             child: EditorialImage(
-              asset: route.heroImage,
+              source: route.heroImage,
               height: 430,
               heroTag: 'route-${route.slug}',
               child: Padding(

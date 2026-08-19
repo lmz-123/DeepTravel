@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
@@ -109,7 +108,7 @@ class _FeaturedRouteCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 EditorialImage(
-                  asset: route.heroImage,
+                  source: route.heroImage,
                   height: 290,
                   heroTag: 'route-${route.slug}',
                   child: Padding(
@@ -122,9 +121,7 @@ class _FeaturedRouteCard extends StatelessWidget {
                             _GlassPill(label: '本周精选'),
                             const Spacer(),
                             _GlassPill(
-                              label: AppConfig.mode == AppMode.demo
-                                  ? '演示模式'
-                                  : '在线',
+                              label: '后端内容',
                             ),
                           ],
                         ),

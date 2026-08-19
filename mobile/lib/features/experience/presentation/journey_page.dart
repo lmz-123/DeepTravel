@@ -97,7 +97,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     EditorialImage(
-                        asset: stop.image, height: 235, borderRadius: 24),
+                        source: stop.image, height: 235, borderRadius: 24),
                     const SizedBox(height: 24),
                     Text(
                       '第 ${stop.position} 站 · ${stop.kicker}',
@@ -229,10 +229,10 @@ class _ArrivalCard extends StatelessWidget {
             const SizedBox(height: 16),
             Text('站到合适的位置', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            const Text('先看看眼前，再打开这一站的故事。MVP 中可用演示到达完成体验。'),
+            const Text('先看看眼前，再打开这一站的故事。到达确认会使用你当前的定位。'),
             const SizedBox(height: 20),
             PrimaryAction(
-              label: '我已到达（演示）',
+              label: '确认我已到达',
               icon: Icons.location_on_rounded,
               busy: busy,
               onPressed: onArrive,

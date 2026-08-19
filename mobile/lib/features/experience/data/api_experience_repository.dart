@@ -62,11 +62,15 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<JourneySession> arrive(String journeyId, {bool demo = true}) async {
+  Future<JourneySession> arrive(
+    String journeyId, {
+    required double latitude,
+    required double longitude,
+  }) async {
     final response = await _request(
       () => _dio.post(
         '/journeys/$journeyId/arrivals',
-        data: {'demo': demo},
+        data: {'latitude': latitude, 'longitude': longitude},
         options: _authorized,
       ),
     );

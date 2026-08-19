@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.4
+    image: docker.m.daocloud.io/library/mysql:8.4
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-jiandi}
       MYSQL_USER: ${MYSQL_USER:-jiandi}
@@ -24,8 +24,9 @@ services:
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-jiandi}:${MYSQL_PASSWORD:-jiandi_dev}@mysql:3306/${MYSQL_DATABASE:-jiandi}?charset=utf8mb4
       SECRET_KEY: ${SECRET_KEY:-jiandi-local-secret}
       GUEST_TOKEN_TTL_HOURS: ${GUEST_TOKEN_TTL_HOURS:-168}
-      ALLOW_DEMO_ARRIVAL: ${ALLOW_DEMO_ARRIVAL:-true}
+      ALLOW_DEMO_ARRIVAL: ${ALLOW_DEMO_ARRIVAL:-false}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     ports:
       - "5001:5000"
     depends_on:
@@ -39,4 +40,3 @@ services:
 
 volumes:
   jiandi_mysql:
-

@@ -8,7 +8,11 @@ void main() {
     var journey = await repository.startOrResume(route.id);
 
     for (final stop in route.stops) {
-      journey = await repository.arrive(journey.id);
+      journey = await repository.arrive(
+        journey.id,
+        latitude: 31.19967,
+        longitude: 121.43876,
+      );
       expect(journey.arrivedStopId, stop.id);
       final answer = await repository.answer(
         journey.id,

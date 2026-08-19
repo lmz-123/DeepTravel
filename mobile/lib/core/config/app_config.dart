@@ -3,7 +3,7 @@ enum AppMode { demo, api }
 abstract final class AppConfig {
   static const modeValue = String.fromEnvironment(
     'APP_MODE',
-    defaultValue: 'demo',
+    defaultValue: 'api',
   );
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',

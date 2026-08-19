@@ -42,7 +42,11 @@ class DemoExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<JourneySession> arrive(String journeyId, {bool demo = true}) async {
+  Future<JourneySession> arrive(
+    String journeyId, {
+    required double latitude,
+    required double longitude,
+  }) async {
     await _pause();
     final journey = _requireJourney(journeyId);
     final stop = demoRoute.stops[journey.currentStopPosition - 1];

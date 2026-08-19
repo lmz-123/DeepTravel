@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from app.domain.errors import ValidationError
 from app.presentation.api.auth import require_guest
+from app.presentation.api.media import send_media_asset
 from app.presentation.api.serializers import (
     city_to_dict,
     journey_to_dict,
@@ -30,6 +31,11 @@ def health():
     database = current_app.extensions["database"]
     database.session_factory().execute(text("SELECT 1"))
     return jsonify({"data": {"status": "healthy", "database": "up"}})
+
+
+@api.get("/assets/<path:asset_path>")
+def media_asset(asset_path: str):
+    return send_media_asset(asset_path)
 
 
 @api.post("/sessions/guest")

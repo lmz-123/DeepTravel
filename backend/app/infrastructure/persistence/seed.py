@@ -8,12 +8,18 @@ from sqlalchemy.orm import Session
 from app.infrastructure.persistence.models import (
     ChallengeModel,
     CityModel,
+    MediaAssetModel,
     RouteModel,
     StopModel,
 )
 
 CITY_ID = "2b2301c8-d36e-4aa5-a3a8-b1881cb3f001"
 ROUTE_ID = "91608e67-dbad-4d26-889c-dd3089201001"
+
+MEDIA_ASSETS = (
+    {"key": "route_wukang", "storage_path": "images/route_wukang.png", "mime_type": "image/png"},
+    {"key": "stop_lane", "storage_path": "images/stop_lane.png", "mime_type": "image/png"},
+)
 
 
 STOPS = [
@@ -106,15 +112,36 @@ STOPS = [
 
 
 def seed_database(session: Session) -> bool:
-    if session.scalar(select(CityModel).where(CityModel.slug == "shanghai")):
-        return False
+    changed = False
+    now = datetime.now(UTC)
+    for item in MEDIA_ASSETS:
+        if session.get(MediaAssetModel, item["key"]) is None:
+            session.add(MediaAssetModel(created_at=now, updated_at=now, **item))
+            changed = True
+
+    existing_city = session.scalar(select(CityModel).where(CityModel.slug == "shanghai"))
+    if existing_city:
+        existing_city.hero_image = "images/route_wukang.png"
+        existing_route = session.scalar(
+            select(RouteModel).where(RouteModel.slug == "wukang-urban-slices")
+        )
+        if existing_route:
+            existing_route.hero_image = "images/route_wukang.png"
+            for stop in existing_route.stops:
+                stop.image = (
+                    "images/stop_lane.png"
+                    if stop.position in {3, 4}
+                    else "images/route_wukang.png"
+                )
+        session.commit()
+        return changed
 
     city = CityModel(
         id=CITY_ID,
         slug="shanghai",
         name="上海",
         subtitle="从街角开始，读懂城市的层次",
-        hero_image="assets/images/route_wukang.png",
+        hero_image="images/route_wukang.png",
         latitude=31.20534,
         longitude=121.43731,
     )
@@ -129,7 +156,7 @@ def seed_database(session: Session) -> bool:
         distance_km=2.8,
         difficulty="轻松",
         theme="建筑与城市生活",
-        hero_image="assets/images/route_wukang.png",
+        hero_image="images/route_wukang.png",
         is_featured=True,
         content_status="demo_unverified",
         published_at=datetime.now(UTC),
@@ -149,9 +176,9 @@ def seed_database(session: Session) -> bool:
             story_title=item["story_title"],
             story_body=item["story_body"],
             audio_url=None,
-            image="assets/images/stop_lane.png"
+            image="images/stop_lane.png"
             if item["position"] in {3, 4}
-            else "assets/images/route_wukang.png",
+            else "images/route_wukang.png",
             insight=item["insight"],
         )
         stop.challenge = ChallengeModel(

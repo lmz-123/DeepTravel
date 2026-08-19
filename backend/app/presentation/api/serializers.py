@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.domain.models import City, Journey, JourneyStatus, Route, Stop
+from app.presentation.api.media import asset_url
 
 
 def city_to_dict(city: City) -> dict:
@@ -9,7 +10,7 @@ def city_to_dict(city: City) -> dict:
         "slug": city.slug,
         "name": city.name,
         "subtitle": city.subtitle,
-        "hero_image": city.hero_image,
+        "hero_image": asset_url(city.hero_image),
         "latitude": city.latitude,
         "longitude": city.longitude,
     }
@@ -27,7 +28,7 @@ def route_to_dict(route: Route, *, include_stops: bool = True) -> dict:
         "distance_km": route.distance_km,
         "difficulty": route.difficulty,
         "theme": route.theme,
-        "hero_image": route.hero_image,
+        "hero_image": asset_url(route.hero_image),
         "is_featured": route.is_featured,
         "content_status": route.content_status.value,
         "stop_count": len(route.stops),
@@ -50,8 +51,8 @@ def stop_to_dict(stop: Stop) -> dict:
         "arrival_radius_m": stop.arrival_radius_m,
         "story_title": stop.story_title,
         "story_body": stop.story_body,
-        "audio_url": stop.audio_url,
-        "image": stop.image,
+        "audio_url": asset_url(stop.audio_url),
+        "image": asset_url(stop.image),
         "insight": stop.insight,
         "challenge": {
             "id": stop.challenge.id,

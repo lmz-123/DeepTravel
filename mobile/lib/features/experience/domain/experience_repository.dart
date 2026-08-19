@@ -7,7 +7,11 @@ abstract interface class ExperienceRepository {
 
   Future<JourneySession> startOrResume(String routeId);
 
-  Future<JourneySession> arrive(String journeyId, {bool demo = true});
+  Future<JourneySession> arrive(
+    String journeyId, {
+    required double latitude,
+    required double longitude,
+  });
 
   Future<AnswerFeedback> answer(
     String journeyId,

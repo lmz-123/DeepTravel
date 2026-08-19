@@ -17,8 +17,14 @@ def test_health_and_catalog(client):
     detail = client.get("/api/v1/routes/wukang-urban-slices")
     route = detail.get_json()["data"]
     assert route["content_status"] == "demo_unverified"
+    assert route["hero_image"].startswith("http://localhost/api/v1/assets/")
     assert [stop["position"] for stop in route["stops"]] == [1, 2, 3, 4, 5]
     assert "correct_option" not in route["stops"][0]["challenge"]
+
+    media = client.get("/api/v1/assets/images/route_wukang.png")
+    assert media.status_code == 200
+    assert media.content_type == "image/png"
+    assert client.get("/api/v1/assets/../requirements.txt").status_code == 404
 
 
 def test_unknown_city_has_structured_error(client):
@@ -102,6 +108,21 @@ def test_location_rejects_far_position(client, guest_headers):
     )
     assert response.status_code == 409
     assert response.get_json()["error"]["code"] == "too_far_from_stop"
+
+
+def test_location_accepts_real_position(client, guest_headers):
+    route = client.get("/api/v1/routes/wukang-urban-slices").get_json()["data"]
+    journey = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=guest_headers
+    ).get_json()["data"]
+    stop = route["stops"][0]
+    response = client.post(
+        f"/api/v1/journeys/{journey['id']}/arrivals",
+        json={"latitude": stop["latitude"], "longitude": stop["longitude"]},
+        headers=guest_headers,
+    )
+    assert response.status_code == 200
+    assert response.get_json()["data"]["distance_m"] == 0.0
 
 
 def test_seed_is_idempotent(app):
