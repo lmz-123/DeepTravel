@@ -1,0 +1,58 @@
+schema: spec-driven
+
+context: |
+  Product: 见地 (JIAN·DI), a Chinese deep-travel mobile experience.
+  MVP: one Shanghai cultural walking route with five stops, audio storytelling,
+  observation challenges, journey progress, demo positioning, and a completion recap.
+  Backend: Python Flask modular monolith, SQLAlchemy 2, MySQL 8.4, REST JSON API.
+  Mobile: Flutter Material 3, Riverpod, Dio, go_router, feature-first MVVM.
+  Architecture must keep domain/application/infrastructure/presentation boundaries
+  explicit so modules can later become services without rewriting domain rules.
+  Product language is Simplified Chinese. Code, API fields, and tests are English.
+  Demo historical content is not publication-ready and must be marked as such.
+
+rules:
+  proposal:
+    - Always include explicit non-goals and MVP validation goals.
+  design:
+    - Record module boundaries, API contracts, failure behavior, and migration seams.
+    - Prefer a testable modular monolith over premature distributed services.
+  tasks:
+    - Include verification beside the implementation it validates.
+
+operations:
+  apply:
+    guidance:
+      - Keep the app runnable without third-party API keys by providing demo mode.
+      - Never present seed historical copy as publication-verified content.
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

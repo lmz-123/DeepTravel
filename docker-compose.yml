@@ -1,0 +1,42 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-jiandi}
+      MYSQL_USER: ${MYSQL_USER:-jiandi}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-jiandi_dev}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_only}
+    ports:
+      - "3307:3306"
+    volumes:
+      - jiandi_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root_dev_only}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-jiandi}:${MYSQL_PASSWORD:-jiandi_dev}@mysql:3306/${MYSQL_DATABASE:-jiandi}?charset=utf8mb4
+      SECRET_KEY: ${SECRET_KEY:-jiandi-local-secret}
+      GUEST_TOKEN_TTL_HOURS: ${GUEST_TOKEN_TTL_HOURS:-168}
+      ALLOW_DEMO_ARRIVAL: ${ALLOW_DEMO_ARRIVAL:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    ports:
+      - "5001:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  jiandi_mysql:
+
