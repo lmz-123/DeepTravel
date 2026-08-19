@@ -4,32 +4,45 @@
 
 见地是一个“故事 + 现场观察 + 轻解谜”驱动的深度城市探索 MVP。首条演示路线位于上海衡复街区，包含 5 个站点、故事播放器、观察任务、旅程进度和完成回顾。
 
-当前仓库包含完整 Flask API、Flutter 客户端、MySQL Docker 环境、OpenSpec 变更、测试与原创视觉资产。
+当前仓库包含完整 Flask API、Flutter 客户端、MySQL Docker 环境、OpenSpec 变更、测试与后端托管的媒体资产。
 
 ## 快速体验
 
-客户端默认使用内置 Demo Repository，无需后端、地图密钥或账号：
+客户端默认连接后端 API；路线内容和图片由后端数据库及媒体存储提供：
 
 ```bash
 cd mobile
 flutter pub get
-flutter run
+flutter run --dart-define=APP_MODE=api \
+  --dart-define=API_BASE_URL=http://127.0.0.1:5001/api/v1
 ```
 
-从首页进入精选路线，点击“开始这段探索”，即可通过“我已到达（演示）”体验完整五站流程。
+到达确认会请求系统定位，并把经纬度发送到后端进行站点围栏校验。
 
 ## 使用 Flask + MySQL
 
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose up -d --build
 ```
 
 服务就绪后：
 
 - API：`http://localhost:5001/api/v1`
 - 健康检查：`http://localhost:5001/api/v1/health`
+- 媒体资源：`http://localhost:5001/api/v1/assets/images/route_wukang.png`
 - MySQL：`localhost:3307`
+
+部署到服务器时，将 `.env` 中的 `PUBLIC_BASE_URL` 设置为客户端可访问的 API 公网根地址，例如 `https://api.example.com`，然后执行：
+
+```bash
+git clone git@github.com:lmz-123/DeepTravel.git
+cd DeepTravel
+cp .env.example .env
+# 按部署域名修改 PUBLIC_BASE_URL 和数据库密码
+docker compose up -d --build
+curl -f https://api.example.com/api/v1/health
+```
 
 启动 Flutter API 模式：
 
@@ -108,6 +121,7 @@ Travel/
 - `GET /cities`
 - `GET /cities/{slug}/routes`
 - `GET /routes/{slug}`
+- `GET /assets/{path}`
 - `POST /journeys`
 - `GET /journeys/{id}`
 - `POST /journeys/{id}/arrivals`
@@ -131,13 +145,12 @@ Journey 端点需要 `Authorization: Bearer <guest-token>`。错误统一为：
 
 - 当前历史与地点文本是用于验证交互的演示稿，不应直接用于公开运营；
 - 正式发布前需要补充逐条来源、编辑审校、图片与音频授权；
-- 两张路线视觉图由 ImageGen 为本项目原创生成，存放在 `mobile/assets/images/`；
+- 两张路线视觉图由 ImageGen 为本项目原创生成，存放在 `backend/media/images/`，并通过 `media_assets` 数据表登记；
 - MVP 不采集姓名、手机号或精确位置历史；游客 JWT 仅包含随机会话 ID 与过期时间。
 
 ## 已知 MVP 边界
 
 - 播放器目前是可交互的音频形态与文本兜底，尚未绑定正式授权音频；
-- Demo 模式使用显式“演示到达”；API 已实现服务端经纬度距离校验；
+- 开发 Demo Repository 仅用于本地测试；正式 API 模式使用服务端经纬度距离校验，默认关闭演示到达；
 - 未实现后台定位、离线地图瓦片、付费、账户、CMS、AR 和多人同步；
 - 正式在中国大陆使用地图前，需要确定供应商及坐标系转换策略。
-
