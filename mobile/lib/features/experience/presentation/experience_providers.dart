@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/location/location_service.dart';
 import '../data/api_experience_repository.dart';
 import '../data/demo_experience_repository.dart';
 import '../domain/experience_repository.dart';
@@ -26,8 +25,23 @@ final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {
   return DemoExperienceRepository();
 });
 
+final citiesProvider = FutureProvider<List<CityExperience>>((ref) {
+  return ref.watch(experienceRepositoryProvider).cities();
+});
+
+class SelectedCityController extends Notifier<String> {
+  @override
+  String build() => 'shenzhen';
+
+  void select(String citySlug) => state = citySlug;
+}
+
+final selectedCityProvider = NotifierProvider<SelectedCityController, String>(
+    SelectedCityController.new);
+
 final featuredRouteProvider = FutureProvider<RouteExperience>((ref) {
-  return ref.watch(experienceRepositoryProvider).featuredRoute();
+  final citySlug = ref.watch(selectedCityProvider);
+  return ref.watch(experienceRepositoryProvider).featuredRoute(citySlug);
 });
 
 final routeProvider =
@@ -96,14 +110,7 @@ class JourneyController extends Notifier<JourneyUiState> {
     final session = state.session;
     if (session == null) return;
     await _perform(() async {
-      final location = AppConfig.mode == AppMode.demo
-          ? const LocationCoordinates(latitude: 0, longitude: 0)
-          : await ref.read(locationServiceProvider).current();
-      final updated = await _repository.arrive(
-        session.id,
-        latitude: location.latitude,
-        longitude: location.longitude,
-      );
+      final updated = await _repository.arrive(session.id);
       state = state.copyWith(session: updated, isBusy: false, clearError: true);
     });
   }
@@ -160,7 +167,6 @@ class JourneyController extends Notifier<JourneyUiState> {
 
   String _message(Object error) {
     if (error is ExperienceFailure) return error.message;
-    if (error is LocationFailure) return error.message;
     if (error is StateError) return error.message;
     return '刚才的操作没有完成，请再试一次';
   }

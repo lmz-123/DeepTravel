@@ -1,8 +1,25 @@
-class LocationCoordinates {
-  const LocationCoordinates({required this.latitude, required this.longitude});
+class CityExperience {
+  const CityExperience({
+    required this.id,
+    required this.slug,
+    required this.name,
+    required this.subtitle,
+    required this.heroImage,
+  });
 
-  final double latitude;
-  final double longitude;
+  final String id;
+  final String slug;
+  final String name;
+  final String subtitle;
+  final String heroImage;
+
+  factory CityExperience.fromJson(Map<String, dynamic> json) => CityExperience(
+        id: json['id'] as String,
+        slug: json['slug'] as String,
+        name: json['name'] as String,
+        subtitle: json['subtitle'] as String,
+        heroImage: json['hero_image'] as String,
+      );
 }
 
 class Challenge {

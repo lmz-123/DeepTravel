@@ -16,7 +16,7 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   final Dio _dio;
   String? _token;
-  RouteExperience? _cachedRoute;
+  final Map<String, RouteExperience> _cachedRoutes = {};
 
   Future<void> _ensureGuest() async {
     if (_token != null) return;
@@ -28,8 +28,16 @@ class ApiExperienceRepository implements ExperienceRepository {
       Options(headers: {'Authorization': 'Bearer $_token'});
 
   @override
-  Future<RouteExperience> featuredRoute() async {
-    final response = await _request(() => _dio.get('/cities/shanghai/routes'));
+  Future<List<CityExperience>> cities() async {
+    final response = await _request(() => _dio.get('/cities'));
+    return (response.data['data'] as List<dynamic>)
+        .map((item) => CityExperience.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<RouteExperience> featuredRoute(String citySlug) async {
+    final response = await _request(() => _dio.get('/cities/$citySlug/routes'));
     final data = response.data['data'] as Map<String, dynamic>;
     final summaries = data['routes'] as List<dynamic>;
     if (summaries.isEmpty) throw const ExperienceFailure('这座城市还没有可用路线');
@@ -42,12 +50,13 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   @override
   Future<RouteExperience> routeBySlug(String slug) async {
-    if (_cachedRoute?.slug == slug) return _cachedRoute!;
+    if (_cachedRoutes[slug] case final cached?) return cached;
     final response = await _request(() => _dio.get('/routes/$slug'));
-    _cachedRoute = RouteExperience.fromJson(
+    final route = RouteExperience.fromJson(
       response.data['data'] as Map<String, dynamic>,
     );
-    return _cachedRoute!;
+    _cachedRoutes[slug] = route;
+    return route;
   }
 
   @override
@@ -62,15 +71,11 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<JourneySession> arrive(
-    String journeyId, {
-    required double latitude,
-    required double longitude,
-  }) async {
+  Future<JourneySession> arrive(String journeyId) async {
     final response = await _request(
       () => _dio.post(
         '/journeys/$journeyId/arrivals',
-        data: {'latitude': latitude, 'longitude': longitude},
+        data: {'demo': true},
         options: _authorized,
       ),
     );

@@ -8,7 +8,8 @@ def test_health_and_catalog(client):
 
     cities = client.get("/api/v1/cities")
     assert cities.status_code == 200
-    assert cities.get_json()["data"][0]["slug"] == "shanghai"
+    city_slugs = {city["slug"] for city in cities.get_json()["data"]}
+    assert city_slugs == {"shanghai", "shenzhen"}
 
     routes = client.get("/api/v1/cities/shanghai/routes")
     featured = routes.get_json()["data"]["routes"][0]
@@ -25,6 +26,25 @@ def test_health_and_catalog(client):
     assert media.status_code == 200
     assert media.content_type == "image/png"
     assert client.get("/api/v1/assets/../requirements.txt").status_code == 404
+
+
+def test_shenzhen_featured_route_and_media(client):
+    routes = client.get("/api/v1/cities/shenzhen/routes")
+    assert routes.status_code == 200
+    payload = routes.get_json()["data"]
+    assert payload["city"]["name"] == "深圳"
+    assert payload["routes"][0]["slug"] == "nantou-time-layers"
+    assert payload["routes"][0]["stop_count"] == 5
+
+    detail = client.get("/api/v1/routes/nantou-time-layers")
+    route = detail.get_json()["data"]
+    assert route["content_status"] == "demo_unverified"
+    assert [stop["position"] for stop in route["stops"]] == [1, 2, 3, 4, 5]
+    assert route["hero_image"].endswith("/assets/images/route_shenzhen.png")
+
+    media = client.get("/api/v1/assets/images/route_shenzhen.png")
+    assert media.status_code == 200
+    assert media.content_type == "image/png"
 
 
 def test_unknown_city_has_structured_error(client):
@@ -123,6 +143,21 @@ def test_location_accepts_real_position(client, guest_headers):
     )
     assert response.status_code == 200
     assert response.get_json()["data"]["distance_m"] == 0.0
+
+
+def test_demo_arrival_can_be_disabled(app, client, guest_headers):
+    app.extensions["services"]["journeys"].allow_demo_arrival = False
+    route = client.get("/api/v1/routes/wukang-urban-slices").get_json()["data"]
+    journey = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=guest_headers
+    ).get_json()["data"]
+    response = client.post(
+        f"/api/v1/journeys/{journey['id']}/arrivals",
+        json={"demo": True},
+        headers=guest_headers,
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "demo_arrival_disabled"
 
 
 def test_seed_is_idempotent(app):

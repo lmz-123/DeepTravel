@@ -19,7 +19,11 @@ class DiscoveryPage extends ConsumerWidget {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: () => ref.refresh(featuredRouteProvider.future),
+          onRefresh: () async {
+            ref.invalidate(citiesProvider);
+            ref.invalidate(featuredRouteProvider);
+            await ref.read(featuredRouteProvider.future);
+          },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
@@ -62,26 +66,74 @@ class DiscoveryPage extends ConsumerWidget {
   }
 }
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cities = ref.watch(citiesProvider);
+    final selectedSlug = ref.watch(selectedCityProvider);
+    final availableCities = cities.value ?? const <CityExperience>[];
+    String? selectedName;
+    for (final city in availableCities) {
+      if (city.slug == selectedSlug) selectedName = city.name;
+    }
+
     return Row(
       children: [
         const BrandMark(),
         const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.location_on_outlined, size: 16),
-              const SizedBox(width: 5),
-              Text('上海', style: Theme.of(context).textTheme.labelLarge),
-            ],
+        PopupMenuButton<String>(
+          tooltip: '选择城市',
+          initialValue: selectedSlug,
+          enabled: availableCities.isNotEmpty,
+          onSelected: (slug) =>
+              ref.read(selectedCityProvider.notifier).select(slug),
+          itemBuilder: (context) => availableCities
+              .map(
+                (city) => PopupMenuItem<String>(
+                  value: city.slug,
+                  child: Row(
+                    children: [
+                      Icon(
+                        city.slug == selectedSlug
+                            ? Icons.check_circle_rounded
+                            : Icons.circle_outlined,
+                        size: 18,
+                        color: AppColors.moss,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(city.name),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.fromLTRB(12, 8, 9, 8),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.ink.withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.location_on_outlined, size: 16),
+                const SizedBox(width: 5),
+                Text(
+                  selectedName ?? (selectedSlug == 'shenzhen' ? '深圳' : '上海'),
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.expand_more_rounded, size: 18),
+              ],
+            ),
           ),
         ),
       ],
@@ -119,10 +171,6 @@ class _FeaturedRouteCard extends StatelessWidget {
                         Row(
                           children: [
                             _GlassPill(label: '本周精选'),
-                            const Spacer(),
-                            _GlassPill(
-                              label: '后端内容',
-                            ),
                           ],
                         ),
                         const Spacer(),

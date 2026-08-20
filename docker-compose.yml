@@ -24,7 +24,7 @@ services:
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-jiandi}:${MYSQL_PASSWORD:-jiandi_dev}@mysql:3306/${MYSQL_DATABASE:-jiandi}?charset=utf8mb4
       SECRET_KEY: ${SECRET_KEY:-jiandi-local-secret}
       GUEST_TOKEN_TTL_HOURS: ${GUEST_TOKEN_TTL_HOURS:-168}
-      ALLOW_DEMO_ARRIVAL: ${ALLOW_DEMO_ARRIVAL:-false}
+      ALLOW_DEMO_ARRIVAL: ${ALLOW_DEMO_ARRIVAL:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     ports:

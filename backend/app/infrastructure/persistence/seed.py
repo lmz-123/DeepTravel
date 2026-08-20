@@ -13,16 +13,23 @@ from app.infrastructure.persistence.models import (
     StopModel,
 )
 
-CITY_ID = "2b2301c8-d36e-4aa5-a3a8-b1881cb3f001"
-ROUTE_ID = "91608e67-dbad-4d26-889c-dd3089201001"
+SHANGHAI_CITY_ID = "2b2301c8-d36e-4aa5-a3a8-b1881cb3f001"
+SHANGHAI_ROUTE_ID = "91608e67-dbad-4d26-889c-dd3089201001"
+SHENZHEN_CITY_ID = "2b2301c8-d36e-4aa5-a3a8-b1881cb3f002"
+SHENZHEN_ROUTE_ID = "91608e67-dbad-4d26-889c-dd3089201002"
 
 MEDIA_ASSETS = (
     {"key": "route_wukang", "storage_path": "images/route_wukang.png", "mime_type": "image/png"},
     {"key": "stop_lane", "storage_path": "images/stop_lane.png", "mime_type": "image/png"},
+    {
+        "key": "route_shenzhen",
+        "storage_path": "images/route_shenzhen.png",
+        "mime_type": "image/png",
+    },
 )
 
 
-STOPS = [
+SHANGHAI_STOPS = [
     {
         "id": "8fa6c9b1-5e3a-40df-b5c8-100000000001",
         "position": 1,
@@ -111,61 +118,168 @@ STOPS = [
 ]
 
 
-def seed_database(session: Session) -> bool:
+SHENZHEN_STOPS = [
+    {
+        "id": "7a62d937-205d-40e9-bba0-200000000001",
+        "position": 1,
+        "title": "南头古城南门",
+        "kicker": "从一道门读城市的开篇",
+        "address": "南头古城南门公共区域",
+        "latitude": 22.53810,
+        "longitude": 113.92270,
+        "story_title": "城门不是句号，而是一层新的开头",
+        "story_body": "先停在门外，不急着穿过去。观察门洞如何压低视线、收紧脚步，再把人送进更细密的街巷。古城的边界今天不再承担旧时的防御功能，却仍然用尺度提醒人们：这里与门外的城市节奏不同。",
+        "insight": "历史空间未必靠宏大的遗迹被感知。一次由宽到窄、由明到暗的身体变化，也能让边界成为可读的城市记忆。",
+        "prompt": "穿过南门时，最明显的空间变化是什么？",
+        "hint": "留意道路宽度、光线和行走速度。",
+        "options": ["空间收窄并引导人放慢", "道路突然变成高速公路", "建筑完全消失"],
+        "correct_option": 0,
+        "explanation": "门洞通过尺度和明暗变化形成过渡，让人自然从城市道路进入街巷空间。",
+    },
+    {
+        "id": "7a62d937-205d-40e9-bba0-200000000002",
+        "position": 2,
+        "title": "新安县衙展示区",
+        "kicker": "看一座城如何管理自己",
+        "address": "南头古城新安县衙展示区附近",
+        "latitude": 22.53903,
+        "longitude": 113.92314,
+        "story_title": "城市的历史，也藏在日常秩序里",
+        "story_body": "谈起古城，人们容易只寻找战争与名人，但县衙所代表的是税赋、诉讼、文书与地方治理。试着把这里想象成一套日常运转的系统：谁在记录，谁来申诉，消息又如何沿着街道传递。",
+        "insight": "理解城市不能只看建筑年代，还要追问空间曾经承载什么制度。治理方式塑造了道路、市场，也影响普通人的日常。",
+        "prompt": "理解县衙空间时，哪种观察最接近它的历史作用？",
+        "hint": "它不只是一栋好看的老建筑。",
+        "options": ["关注办事、文书与公共秩序", "只寻找最佳自拍角度", "只计算屋顶颜色"],
+        "correct_option": 0,
+        "explanation": "县衙首先是一套地方治理发生的场所，制度和日常活动比外观更接近其核心。",
+    },
+    {
+        "id": "7a62d937-205d-40e9-bba0-200000000003",
+        "position": 3,
+        "title": "报德广场",
+        "kicker": "广场里的公共生活",
+        "address": "南头古城报德广场附近",
+        "latitude": 22.53960,
+        "longitude": 113.92293,
+        "story_title": "留白让街巷拥有共同的客厅",
+        "story_body": "从窄巷走到较开阔的地方，先观察人们如何使用边缘：坐下、等人、聊天、看孩子玩耍。公共空间的价值不只由面积决定，更取决于它是否允许不同的人以自己的节奏停留。",
+        "insight": "好的广场不是被设计得最满的地方，而是能容纳偶遇和临时用途的留白。使用者不断重新定义它。",
+        "prompt": "判断一个小广场是否有活力，最值得观察什么？",
+        "hint": "看看人们是否愿意停下来。",
+        "options": ["停留方式是否多样", "地砖是否只有一种颜色", "招牌是否足够巨大"],
+        "correct_option": 0,
+        "explanation": "坐、站、交谈和穿行等多样行为，说明空间能够支持真实的公共生活。",
+    },
+    {
+        "id": "7a62d937-205d-40e9-bba0-200000000004",
+        "position": 4,
+        "title": "中山南街",
+        "kicker": "旧街巷里的新用途",
+        "address": "南头古城中山南街公共步行区域",
+        "latitude": 22.54015,
+        "longitude": 113.92318,
+        "story_title": "更新不是把时间擦干净",
+        "story_body": "沿街寻找没有被统一抹平的细节：旧墙的肌理、新店的入口、居民使用的窗台。街区更新真正困难的部分，是让新的经营和审美进入之后，原来的生活仍能被看见。",
+        "insight": "保存并不意味着冻结。判断更新质量时，可以观察新旧材料是否有层次、商业空间是否尊重居民边界。",
+        "prompt": "哪种细节更能说明更新保留了时间层次？",
+        "hint": "寻找新材料与旧痕迹之间的关系。",
+        "options": ["新旧痕迹可以同时被辨认", "所有墙面完全一样", "只剩统一的大型广告"],
+        "correct_option": 0,
+        "explanation": "让不同年代的痕迹保持可读，比把街区处理成单一风格更能呈现真实历史。",
+    },
+    {
+        "id": "7a62d937-205d-40e9-bba0-200000000005",
+        "position": 5,
+        "title": "北街口",
+        "kicker": "回望一座仍在生长的古城",
+        "address": "南头古城北侧公共街巷附近",
+        "latitude": 22.54065,
+        "longitude": 113.92335,
+        "story_title": "古与今不是两条分开的时间线",
+        "story_body": "走到路线最后，回头比较刚才经过的门、广场、店铺与居住空间。南头古城的意义不只是保存一个过去，而是让不同年代继续在有限空间里协商。你看到的每一次并置，都是城市仍在生长的证据。",
+        "insight": "深度旅行的收获不是记住更多标签，而是建立一种观察方法：看边界、看用途、看谁在使用，并追问变化如何发生。",
+        "prompt": "完成这段路线后，理解古城更新最合适的方式是什么？",
+        "hint": "不要把历史和当代生活割裂开。",
+        "options": ["观察不同年代如何共存", "只寻找最旧的一块砖", "避开所有日常生活"],
+        "correct_option": 0,
+        "explanation": "古城的价值来自历史痕迹与当代使用的持续关系，而不是某个孤立的旧物。",
+    },
+]
+
+
+def _ensure_city_route(
+    session: Session,
+    *,
+    city_id: str,
+    city_slug: str,
+    city_name: str,
+    city_subtitle: str,
+    city_latitude: float,
+    city_longitude: float,
+    route_id: str,
+    route_slug: str,
+    route_title: str,
+    route_subtitle: str,
+    route_description: str,
+    route_duration_minutes: int,
+    route_distance_km: float,
+    route_theme: str,
+    hero_image: str,
+    stops: list[dict],
+) -> bool:
     changed = False
-    now = datetime.now(UTC)
-    for item in MEDIA_ASSETS:
-        if session.get(MediaAssetModel, item["key"]) is None:
-            session.add(MediaAssetModel(created_at=now, updated_at=now, **item))
-            changed = True
-
-    existing_city = session.scalar(select(CityModel).where(CityModel.slug == "shanghai"))
-    if existing_city:
-        existing_city.hero_image = "images/route_wukang.png"
-        existing_route = session.scalar(
-            select(RouteModel).where(RouteModel.slug == "wukang-urban-slices")
+    city = session.scalar(select(CityModel).where(CityModel.slug == city_slug))
+    if city is None:
+        city = CityModel(
+            id=city_id,
+            slug=city_slug,
+            name=city_name,
+            subtitle=city_subtitle,
+            hero_image=hero_image,
+            latitude=city_latitude,
+            longitude=city_longitude,
         )
-        if existing_route:
-            existing_route.hero_image = "images/route_wukang.png"
-            for stop in existing_route.stops:
-                stop.image = (
-                    "images/stop_lane.png"
-                    if stop.position in {3, 4}
-                    else "images/route_wukang.png"
-                )
-        session.commit()
-        return changed
+        session.add(city)
+        changed = True
+    else:
+        city.hero_image = hero_image
 
-    city = CityModel(
-        id=CITY_ID,
-        slug="shanghai",
-        name="上海",
-        subtitle="从街角开始，读懂城市的层次",
-        hero_image="images/route_wukang.png",
-        latitude=31.20534,
-        longitude=121.43731,
-    )
-    route = RouteModel(
-        id=ROUTE_ID,
-        city_id=CITY_ID,
-        slug="wukang-urban-slices",
-        title="梧桐树下的城市切片",
-        subtitle="从一栋楼、一扇门到一条街的生活史",
-        description="沿武康路缓慢行走，用五次现场观察理解建筑如何顺应街道、边界如何制造安静、里弄如何连接生活，以及旧街区怎样面对新的使用方式。",
-        duration_minutes=70,
-        distance_km=2.8,
-        difficulty="轻松",
-        theme="建筑与城市生活",
-        hero_image="images/route_wukang.png",
-        is_featured=True,
-        content_status="demo_unverified",
-        published_at=datetime.now(UTC),
-    )
-    city.routes.append(route)
-    for item in STOPS:
+    route = session.scalar(select(RouteModel).where(RouteModel.slug == route_slug))
+    if route is None:
+        route = RouteModel(
+            id=route_id,
+            city_id=city_id,
+            slug=route_slug,
+            title=route_title,
+            subtitle=route_subtitle,
+            description=route_description,
+            duration_minutes=route_duration_minutes,
+            distance_km=route_distance_km,
+            difficulty="轻松",
+            theme=route_theme,
+            hero_image=hero_image,
+            is_featured=True,
+            content_status="demo_unverified",
+            published_at=datetime.now(UTC),
+        )
+        session.add(route)
+        changed = True
+    else:
+        route.hero_image = hero_image
+
+    for item in stops:
+        image = (
+            "images/stop_lane.png"
+            if city_slug == "shanghai" and item["position"] in {3, 4}
+            else hero_image
+        )
+        existing_stop = session.get(StopModel, item["id"])
+        if existing_stop:
+            existing_stop.image = image
+            continue
         stop = StopModel(
             id=item["id"],
-            route_id=ROUTE_ID,
+            route_id=route_id,
             position=item["position"],
             title=item["title"],
             kicker=item["kicker"],
@@ -176,13 +290,11 @@ def seed_database(session: Session) -> bool:
             story_title=item["story_title"],
             story_body=item["story_body"],
             audio_url=None,
-            image="images/stop_lane.png"
-            if item["position"] in {3, 4}
-            else "images/route_wukang.png",
+            image=image,
             insight=item["insight"],
         )
         stop.challenge = ChallengeModel(
-            id=f"challenge-{item['position']}",
+            id=f"{city_slug}-challenge-{item['position']}",
             stop_id=item["id"],
             prompt=item["prompt"],
             hint=item["hint"],
@@ -190,7 +302,56 @@ def seed_database(session: Session) -> bool:
             correct_option=item["correct_option"],
             explanation=item["explanation"],
         )
-        route.stops.append(stop)
-    session.add(city)
+        session.add(stop)
+        changed = True
+    return changed
+
+
+def seed_database(session: Session) -> bool:
+    changed = False
+    now = datetime.now(UTC)
+    for item in MEDIA_ASSETS:
+        if session.get(MediaAssetModel, item["key"]) is None:
+            session.add(MediaAssetModel(created_at=now, updated_at=now, **item))
+            changed = True
+
+    changed |= _ensure_city_route(
+        session,
+        city_id=SHANGHAI_CITY_ID,
+        city_slug="shanghai",
+        city_name="上海",
+        city_subtitle="从街角开始，读懂城市的层次",
+        city_latitude=31.20534,
+        city_longitude=121.43731,
+        route_id=SHANGHAI_ROUTE_ID,
+        route_slug="wukang-urban-slices",
+        route_title="梧桐树下的城市切片",
+        route_subtitle="从一栋楼、一扇门到一条街的生活史",
+        route_description="沿武康路缓慢行走，用五次现场观察理解建筑如何顺应街道、边界如何制造安静、里弄如何连接生活，以及旧街区怎样面对新的使用方式。",
+        route_duration_minutes=70,
+        route_distance_km=2.8,
+        route_theme="建筑与城市生活",
+        hero_image="images/route_wukang.png",
+        stops=SHANGHAI_STOPS,
+    )
+    changed |= _ensure_city_route(
+        session,
+        city_id=SHENZHEN_CITY_ID,
+        city_slug="shenzhen",
+        city_name="深圳",
+        city_subtitle="在快速生长的城市里，寻找时间的叠层",
+        city_latitude=22.53940,
+        city_longitude=113.92305,
+        route_id=SHENZHEN_ROUTE_ID,
+        route_slug="nantou-time-layers",
+        route_title="南头古城的时间叠层",
+        route_subtitle="从城门、街巷到公共生活，读懂一座仍在生长的古城",
+        route_description="在南头古城慢慢走过五个空间节点，从门洞的尺度、县衙代表的秩序、广场的公共生活，到旧街新用途之间的协商，观察深圳并不只有速度的一面。",
+        route_duration_minutes=60,
+        route_distance_km=1.6,
+        route_theme="古城更新与公共生活",
+        hero_image="images/route_shenzhen.png",
+        stops=SHENZHEN_STOPS,
+    )
     session.commit()
-    return True
+    return changed

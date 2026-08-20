@@ -1,17 +1,15 @@
 import 'models.dart';
 
 abstract interface class ExperienceRepository {
-  Future<RouteExperience> featuredRoute();
+  Future<List<CityExperience>> cities();
+
+  Future<RouteExperience> featuredRoute(String citySlug);
 
   Future<RouteExperience> routeBySlug(String slug);
 
   Future<JourneySession> startOrResume(String routeId);
 
-  Future<JourneySession> arrive(
-    String journeyId, {
-    required double latitude,
-    required double longitude,
-  });
+  Future<JourneySession> arrive(String journeyId);
 
   Future<AnswerFeedback> answer(
     String journeyId,

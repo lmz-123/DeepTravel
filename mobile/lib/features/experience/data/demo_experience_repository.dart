@@ -12,7 +12,28 @@ class DemoExperienceRepository implements ExperienceRepository {
   Future<void> _pause() => Future<void>.delayed(latency);
 
   @override
-  Future<RouteExperience> featuredRoute() async {
+  Future<List<CityExperience>> cities() async {
+    await _pause();
+    return const [
+      CityExperience(
+        id: 'demo-shenzhen',
+        slug: 'shenzhen',
+        name: '深圳',
+        subtitle: '在快速生长的城市里，寻找时间的叠层',
+        heroImage: '',
+      ),
+      CityExperience(
+        id: 'demo-shanghai',
+        slug: 'shanghai',
+        name: '上海',
+        subtitle: '从街角开始，读懂城市的层次',
+        heroImage: '',
+      ),
+    ];
+  }
+
+  @override
+  Future<RouteExperience> featuredRoute(String citySlug) async {
     await _pause();
     return demoRoute;
   }
@@ -42,11 +63,7 @@ class DemoExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<JourneySession> arrive(
-    String journeyId, {
-    required double latitude,
-    required double longitude,
-  }) async {
+  Future<JourneySession> arrive(String journeyId) async {
     await _pause();
     final journey = _requireJourney(journeyId);
     final stop = demoRoute.stops[journey.currentStopPosition - 1];
