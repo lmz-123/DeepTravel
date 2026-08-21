@@ -1,20 +1,31 @@
-# MVP 验证记录
+# 碎片音频导览验证记录
 
-日期：2026-08-19
+日期：2026-08-22
 
-## 已通过
+## 自动验证
 
-- OpenSpec：`openspec validate build-deep-travel-mvp --strict`
-- 后端：Ruff 无问题，Pytest 8 项通过
-- API：游客鉴权、目录读取、远距离拒绝、幂等开始/答题、五站完整旅程与回顾
-- MySQL：对本机缓存的 MySQL 9.0 运行 Alembic 初始迁移、种子命令、健康检查和路线读取成功
-- Compose：`docker compose config -q` 通过
-- Flutter：`flutter analyze` 无问题，4 项测试通过
-- Flutter Web：Release 构建成功，Wasm dry run 成功
-- 视觉 QA：390×844 视口检查首页、详情、旅程、故事、答题与反馈；无溢出、无控制台错误
+- OpenSpec：`openspec validate add-location-aware-fragment-audio-tour --strict`
+- 后端：Ruff 无问题；Pytest 覆盖旧版五站流程、内容审查门槛、近/远/低精度/重复触发、播放状态、私有照片鉴权与完整重构
+- MySQL：Alembic `20260822_0003` 增量建立新表；Docker API 启动时自动迁移并幂等对账种子数据
+- Docker：API、数据库、公共音频与独立私有证据卷健康检查
+- Flutter：Format、Analyze、单元与 Widget 测试；纯触发引擎覆盖精度、双采样、依赖和一次性确认
+- Android：使用 API 模式构建评审 APK，后端指向 `http://115.29.221.190:5001/api/v1`
 
-## 环境限制
+## 设备矩阵
 
-- Docker Desktop 访问 Docker Hub 时对 `python:3.13-slim` 的 metadata 请求返回 EOF，因此未在本机完成 `docker compose up --build`。Dockerfile、Compose 配置和后端运行路径均已分别验证；在可访问 Docker Hub 的环境执行 README 中命令即可。
-- 本机没有 Android SDK，Xcode 安装不完整，因此无法在当前环境产出 APK/IPA。Android/iOS 工程壳已生成；Flutter Analyze、Widget Test 与 Web Release Build 均已通过。
+以下项目必须在路线提升为 `reviewed` 前于 Android 与 iOS 真机完成。目前自动化只能验证状态机，不能宣称替代系统和现场行为。
 
+| 场景 | 自动化/实现状态 | 真机状态 |
+|---|---|---|
+| 前台→后台→锁屏定位触发 | Android 前台通知、iOS background modes 已配置 | 待测 |
+| 锁屏播放、暂停、跳转、倍速 | 系统 MediaItem 与单队列已实现 | 待测 |
+| 来电/闹钟/导航提示 | AudioSession 中断暂停已实现 | 待测 |
+| 有线/蓝牙耳机断开 | becoming-noisy 暂停已实现 | 待测 |
+| 弱 GPS 与边界抖动 | 精度过滤、双采样、退出半径已自动测试 | 待测 |
+| 离线触发与进程终止 | SQLite 快照、prepared asset、outbox 已实现 | 待测 |
+| 拍照拒绝、失败重试与私有读取 | 状态保留、幂等上传、跨游客拒绝已自动测试 | 待测 |
+| 五个南头点位与安静收听位置 | 标记 `in_review`/`field_audit_required` | 待现场核验 |
+
+## 当前发布决定
+
+代码与评审 APK 可用于内部体验。南头路线不能升级为正式已核验内容：尚缺 Android/iOS 真机矩阵、一次完整南头实地行走、现场实物真实性审计以及正式旁白复核。

@@ -1,5 +1,6 @@
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
+import '../domain/fragment_models.dart';
 import 'demo_content.dart';
 
 class DemoExperienceRepository implements ExperienceRepository {
@@ -140,6 +141,45 @@ class DemoExperienceRepository implements ExperienceRepository {
       }).toList(),
     );
   }
+
+  Never _fragmentOnly() => throw UnsupportedError('内置演示路线不支持碎片音频模式');
+
+  @override
+  Future<void> startActiveTour(String journeyId) async => _fragmentOnly();
+
+  @override
+  Future<void> stopActiveTour(String journeyId) async => _fragmentOnly();
+
+  @override
+  Future<StoryFragment> triggerFragment(String journeyId, String fragmentId,
+          {required String method,
+          required String idempotencyKey,
+          double? latitude,
+          double? longitude,
+          double? accuracyM}) async =>
+      _fragmentOnly();
+
+  @override
+  Future<StoryFragment> acknowledgePlayback(String journeyId, String fragmentId,
+          double progress, String idempotencyKey) async =>
+      _fragmentOnly();
+
+  @override
+  Future<EvidenceRecord> uploadEvidence(String journeyId, String fragmentId,
+          String filePath, String idempotencyKey) async =>
+      _fragmentOnly();
+
+  @override
+  Future<StoryLedger> ledger(String journeyId) async => _fragmentOnly();
+
+  @override
+  Future<ReconstructionResult> reconstruct(
+          String journeyId, List<String> relationships) async =>
+      _fragmentOnly();
+
+  @override
+  Future<FragmentRecap> fragmentRecap(String journeyId) async =>
+      _fragmentOnly();
 
   JourneySession _requireJourney(String journeyId) {
     if (_journey == null || _journey!.id != journeyId) {

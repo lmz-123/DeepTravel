@@ -9,6 +9,10 @@ abstract final class AppConfig {
     'API_BASE_URL',
     defaultValue: 'http://127.0.0.1:5001/api/v1',
   );
+  static const enableDemoTriggers = bool.fromEnvironment(
+    'ENABLE_DEMO_TRIGGERS',
+    defaultValue: true,
+  );
 
   static AppMode get mode => modeValue == 'api' ? AppMode.api : AppMode.demo;
 }

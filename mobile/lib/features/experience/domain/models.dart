@@ -1,3 +1,5 @@
+import 'fragment_models.dart';
+
 class CityExperience {
   const CityExperience({
     required this.id,
@@ -105,6 +107,7 @@ class RouteExperience {
     required this.heroImage,
     required this.contentStatus,
     required this.stops,
+    this.audioTour,
   });
 
   final String id;
@@ -119,6 +122,7 @@ class RouteExperience {
   final String heroImage;
   final String contentStatus;
   final List<ExperienceStop> stops;
+  final AudioTourManifest? audioTour;
 
   bool get isVerified => contentStatus == 'verified';
 
@@ -139,6 +143,11 @@ class RouteExperience {
             .map(
                 (item) => ExperienceStop.fromJson(item as Map<String, dynamic>))
             .toList(),
+        audioTour: json['audio_tour'] is Map<String, dynamic>
+            ? AudioTourManifest.fromJson(
+                json['audio_tour'] as Map<String, dynamic>,
+              )
+            : null,
       );
 }
 

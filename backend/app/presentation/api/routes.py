@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from flask import Blueprint, current_app, g, jsonify, request
+from datetime import datetime
+
+from flask import Blueprint, current_app, g, jsonify, request, send_file
 from sqlalchemy import text
 
 from app.domain.errors import ValidationError
@@ -30,7 +32,17 @@ def _services() -> dict:
 def health():
     database = current_app.extensions["database"]
     database.session_factory().execute(text("SELECT 1"))
-    return jsonify({"data": {"status": "healthy", "database": "up"}})
+    fragment_health = _services()["fragment_tours"].health()
+    status = (
+        "healthy"
+        if all(
+            value == "up"
+            for key, value in fragment_health.items()
+            if key != "narration_asset_count"
+        )
+        else "degraded"
+    )
+    return jsonify({"data": {"status": status, "database": "up", **fragment_health}})
 
 
 @api.get("/assets/<path:asset_path>")
@@ -68,7 +80,7 @@ def list_city_routes(city_slug: str):
         {
             "data": {
                 "city": city_to_dict(city),
-                "routes": [route_to_dict(route, include_stops=False) for route in routes],
+                "routes": [_route_payload(route, include_stops=False) for route in routes],
             }
         }
     )
@@ -77,7 +89,7 @@ def list_city_routes(city_slug: str):
 @api.get("/routes/<route_slug>")
 def get_route(route_slug: str):
     route = _services()["catalog"].get_route(route_slug)
-    return jsonify({"data": route_to_dict(route)})
+    return jsonify({"data": _route_payload(route)})
 
 
 @api.post("/journeys")
@@ -88,6 +100,7 @@ def start_journey():
     if not isinstance(route_id, str) or not route_id:
         raise ValidationError("route_id 为必填字符串")
     journey = _services()["journeys"].start_or_resume(g.guest_session.id, route_id)
+    _services()["fragment_tours"].initialize_journey(journey.id, route_id)
     route = _services()["catalog"].get_route_by_id(route_id)
     return jsonify({"data": journey_to_dict(journey, len(route.stops))}), 201
 
@@ -175,6 +188,11 @@ def advance(journey_id: str):
 @api.get("/journeys/<journey_id>/recap")
 @require_guest
 def recap(journey_id: str):
+    journey = _services()["journeys"].get(g.guest_session.id, journey_id)
+    if _services()["fragment_tours"].public_manifest(journey.route_id) is not None:
+        return jsonify(
+            {"data": _services()["fragment_tours"].recap(g.guest_session.id, journey_id)}
+        )
     journey, route = _services()["journeys"].recap(g.guest_session.id, journey_id)
     answered = {answer.stop_id: answer for answer in journey.answers}
     insights = [
@@ -196,3 +214,119 @@ def recap(journey_id: str):
             }
         }
     )
+
+
+@api.post("/journeys/<journey_id>/active-tour")
+@require_guest
+def start_active_tour(journey_id: str):
+    return jsonify(
+        {"data": _services()["fragment_tours"].start_active_tour(g.guest_session.id, journey_id)}
+    )
+
+
+@api.delete("/journeys/<journey_id>/active-tour")
+@require_guest
+def stop_active_tour(journey_id: str):
+    return jsonify(
+        {"data": _services()["fragment_tours"].stop_active_tour(g.guest_session.id, journey_id)}
+    )
+
+
+@api.post("/journeys/<journey_id>/fragments/<fragment_id>/triggers")
+@require_guest
+def trigger_fragment(journey_id: str, fragment_id: str):
+    return jsonify(
+        {
+            "data": _services()["fragment_tours"].trigger(
+                g.guest_session.id, journey_id, fragment_id, _json_body()
+            )
+        }
+    )
+
+
+@api.post("/journeys/<journey_id>/fragments/<fragment_id>/playback")
+@require_guest
+def fragment_playback(journey_id: str, fragment_id: str):
+    return jsonify(
+        {
+            "data": _services()["fragment_tours"].playback(
+                g.guest_session.id, journey_id, fragment_id, _json_body()
+            )
+        }
+    )
+
+
+@api.post("/journeys/<journey_id>/fragments/<fragment_id>/evidence")
+@require_guest
+def upload_fragment_evidence(journey_id: str, fragment_id: str):
+    file = request.files.get("photo")
+    key = request.form.get("idempotency_key", "")
+    if file is None or not key:
+        raise ValidationError("photo 与 idempotency_key 为必填字段")
+    captured_raw = request.form.get("captured_at")
+    try:
+        captured_at = (
+            datetime.fromisoformat(captured_raw.replace("Z", "+00:00")) if captured_raw else None
+        )
+    except ValueError as exc:
+        raise ValidationError("captured_at 必须为 ISO-8601 时间") from exc
+    evidence = _services()["fragment_tours"].upload_evidence(
+        g.guest_session.id, journey_id, fragment_id, file, key, captured_at
+    )
+    return jsonify({"data": evidence}), 201
+
+
+@api.get("/journeys/<journey_id>/evidence/<evidence_id>")
+@require_guest
+def get_evidence(journey_id: str, evidence_id: str):
+    stream, mime_type = _services()["fragment_tours"].open_evidence(
+        g.guest_session.id, journey_id, evidence_id
+    )
+    return send_file(stream, mimetype=mime_type, download_name=f"evidence-{evidence_id}")
+
+
+@api.delete("/journeys/<journey_id>/evidence/<evidence_id>")
+@require_guest
+def delete_evidence(journey_id: str, evidence_id: str):
+    return jsonify(
+        {
+            "data": _services()["fragment_tours"].delete_evidence(
+                g.guest_session.id, journey_id, evidence_id
+            )
+        }
+    )
+
+
+@api.get("/journeys/<journey_id>/ledger")
+@require_guest
+def story_ledger(journey_id: str):
+    return jsonify({"data": _services()["fragment_tours"].ledger(g.guest_session.id, journey_id)})
+
+
+@api.post("/journeys/<journey_id>/reconstruction")
+@require_guest
+def reconstruct_story(journey_id: str):
+    body = _json_body()
+    relationships = body.get("relationships")
+    if not isinstance(relationships, list) or not all(
+        isinstance(item, str) for item in relationships
+    ):
+        raise ValidationError("relationships 必须是字符串数组")
+    return jsonify(
+        {
+            "data": _services()["fragment_tours"].reconstruct(
+                g.guest_session.id, journey_id, relationships
+            )
+        }
+    )
+
+
+def _route_payload(route, *, include_stops: bool = True) -> dict:
+    payload = route_to_dict(route, include_stops=include_stops)
+    tour = _services()["fragment_tours"].public_manifest(route.id)
+    if tour is not None:
+        payload["audio_tour"] = tour
+        payload["fragment_count"] = tour["fragment_count"]
+        payload["photo_mission_count"] = tour["photo_mission_count"]
+        payload["download_size_bytes"] = tour["download_size_bytes"]
+    return payload

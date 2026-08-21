@@ -2,6 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>在你明确开始路线后，见地使用位置自动唤醒附近的历史故事。</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>行走路线进行中，即使锁屏也需要位置来触发故事；停止路线后立即结束监测。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>用于拍摄你主动收集的现场线索，照片默认保持私密。</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>location</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

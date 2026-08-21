@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/sim
 
 COPY . .
 
-RUN mkdir -p /app/media
+RUN mkdir -p /app/media /app/private-evidence
 
 EXPOSE 5000
 

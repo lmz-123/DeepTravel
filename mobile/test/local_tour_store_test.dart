@@ -1,0 +1,37 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:jiandi/features/experience/data/local_tour_store.dart';
+import 'package:jiandi/features/experience/domain/tour_runtime.dart';
+import 'package:path/path.dart' as paths;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
+  test('snapshot and outbox survive store recreation', () async {
+    final directory =
+        await Directory.systemTemp.createTemp('jiandi-store-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final databasePath = paths.join(directory.path, 'tour.db');
+    final first = SqliteTourStore(databasePath: databasePath);
+    await first.saveJson('active_tour', {'journey_id': 'journey-1'});
+    await first.enqueue(
+      const OutboxEvent(
+        id: 'event-1',
+        type: 'playback',
+        payload: {'progress': 1.0},
+      ),
+    );
+
+    final restored = SqliteTourStore(databasePath: databasePath);
+    expect(
+        (await restored.readJson('active_tour'))?['journey_id'], 'journey-1');
+    expect((await restored.pending()).single.id, 'event-1');
+    await restored.acknowledge('event-1');
+    expect(await restored.pending(), isEmpty);
+  });
+}

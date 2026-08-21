@@ -15,6 +15,7 @@ def app(tmp_path):
             "DATABASE_URL": f"sqlite:///{database_path}",
             "SECRET_KEY": "test-secret",
             "ALLOW_DEMO_ARRIVAL": True,
+            "EVIDENCE_ROOT": str(tmp_path / "private-evidence"),
         }
     )
     database = app.extensions["database"]

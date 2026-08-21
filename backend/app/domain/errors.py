@@ -63,3 +63,17 @@ class RouteNotFoundError(NotFoundError):
 class JourneyNotFoundError(NotFoundError):
     code = "journey_not_found"
     default_message = "旅程不存在"
+
+
+class FragmentOperationError(DomainError):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        status_code: int = 409,
+        details: dict[str, Any] | None = None,
+    ):
+        super().__init__(message, details)
+        self.code = code
+        self.status_code = status_code

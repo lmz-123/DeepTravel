@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.infrastructure.persistence.fragment_seed import seed_fragment_tour
 from app.infrastructure.persistence.models import (
     ChallengeModel,
     CityModel,
@@ -353,5 +354,6 @@ def seed_database(session: Session) -> bool:
         hero_image="images/route_shenzhen.png",
         stops=SHENZHEN_STOPS,
     )
+    changed |= seed_fragment_tour(session, SHENZHEN_ROUTE_ID)
     session.commit()
     return changed
