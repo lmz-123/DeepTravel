@@ -48,7 +48,7 @@ docker compose run --rm api flask --app 'app:create_app' migrate-media
 ## 独立后台部署
 
 ```bash
-cd /root/DeepTravel-Admin
+cd /root/DeepTravel-admin
 git fetch origin main
 git checkout main
 git pull --ff-only origin main
@@ -67,7 +67,7 @@ curl -fsS -H "Authorization: Bearer ${ADMIN_TOKEN}" \
 ```bash
 cd /root/DeepTravel
 set -a
-. /root/DeepTravel-Admin/.env
+. /root/DeepTravel-admin/.env
 set +a
 ADMIN_API_BASE=http://127.0.0.1:5100 \
 python3 tools/publish_content_package.py \
