@@ -16,6 +16,13 @@ class LocationSample {
 
 enum TourLocationPermission { granted, denied, deniedForever, serviceDisabled }
 
+enum TourLocationMode { real, simulated }
+
+abstract interface class LocationModeStore {
+  Future<TourLocationMode> read();
+  Future<void> write(TourLocationMode mode);
+}
+
 abstract interface class LocationTracker {
   Future<TourLocationPermission> requestPermission();
   Stream<LocationSample> samples();

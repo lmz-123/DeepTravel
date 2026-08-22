@@ -14,6 +14,7 @@ import '../domain/fragment_models.dart';
 import '../domain/models.dart';
 import '../domain/tour_runtime.dart';
 import 'experience_providers.dart';
+import 'location_mode_controller.dart';
 
 final tourStoreProvider = Provider<TourStore>((ref) => SqliteTourStore());
 final locationTrackerProvider =
@@ -43,6 +44,7 @@ class ActiveTourState {
     this.position = Duration.zero,
     this.duration,
     this.speed = 1,
+    this.locationMode = TourLocationMode.real,
     this.locationMessage,
     this.errorMessage,
     this.pendingPhotoPath,
@@ -60,6 +62,7 @@ class ActiveTourState {
   final Duration position;
   final Duration? duration;
   final double speed;
+  final TourLocationMode locationMode;
   final String? locationMessage;
   final String? errorMessage;
   final String? pendingPhotoPath;
@@ -78,6 +81,7 @@ class ActiveTourState {
           Duration? position,
           Duration? duration,
           double? speed,
+          TourLocationMode? locationMode,
           String? locationMessage,
           bool clearLocationMessage = false,
           String? errorMessage,
@@ -97,6 +101,7 @@ class ActiveTourState {
         position: position ?? this.position,
         duration: duration ?? this.duration,
         speed: speed ?? this.speed,
+        locationMode: locationMode ?? this.locationMode,
         locationMessage: clearLocationMessage
             ? null
             : locationMessage ?? this.locationMessage,
@@ -138,29 +143,38 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     if (state.session?.id == session.id && state.status != 'idle') return;
     final manifest = route.audioTour;
     if (manifest == null) return;
+    await _stopLocationMonitoring();
+    final locationMode = AppConfig.enableDemoTriggers
+        ? await ref.read(locationModeControllerProvider.future)
+        : TourLocationMode.real;
     state = ActiveTourState(
-        status: 'preparing', route: route, session: session, isBusy: true);
+        status: 'preparing',
+        route: route,
+        session: session,
+        locationMode: locationMode,
+        isBusy: true);
     var prepared = <String, String>{};
     try {
       prepared = await ref.read(preparedRouteServiceProvider).prepare(manifest);
     } catch (_) {
       state = state.copyWith(locationMessage: '部分音频未下载，将在有网络时播放；文字稿仍可使用。');
     }
-    final permission =
-        await ref.read(locationTrackerProvider).requestPermission();
-    final locationMessage = switch (permission) {
-      TourLocationPermission.granted => '定位正常，锁屏后会继续寻找附近线索',
-      TourLocationPermission.serviceDisabled => '系统定位未开启，自动触发暂停',
-      TourLocationPermission.deniedForever => '定位权限已被系统阻止，可到设置开启或使用研究触发',
-      TourLocationPermission.denied => '未获得定位权限，可使用研究触发体验故事',
-    };
+    TourLocationPermission? permission;
+    if (locationMode == TourLocationMode.real) {
+      permission = await ref.read(locationTrackerProvider).requestPermission();
+    }
+    final locationMessage = locationMode == TourLocationMode.simulated
+        ? '模拟定位已开启：不会读取真实位置，请手动模拟到达下一条线索。'
+        : _locationPermissionMessage(permission!);
     try {
       await _repository.startActiveTour(session.id);
       final ledger = await _repository.ledger(session.id);
       state = state.copyWith(
-          status: permission == TourLocationPermission.granted
-              ? 'monitoring'
-              : 'permission_limited',
+          status: locationMode == TourLocationMode.simulated
+              ? 'simulated'
+              : permission == TourLocationPermission.granted
+                  ? 'monitoring'
+                  : 'permission_limited',
           ledger: ledger,
           preparedPaths: prepared,
           isBusy: false,
@@ -170,6 +184,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         'journey_id': session.id,
         'route_slug': route.slug,
         'status': state.status,
+        'location_mode': locationMode.name,
         'script_version': manifest.scriptVersion
       });
       await _store.saveJson('prepared_manifest_${route.slug}', {
@@ -179,12 +194,9 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         'prepared_fragment_ids': prepared.keys.toList(),
       });
       _bindPlayer();
-      if (permission == TourLocationPermission.granted) {
-        _locations = ref.read(locationTrackerProvider).samples().listen(
-            _onLocation,
-            onError: (_) => state = state.copyWith(
-                status: 'recoverable_error',
-                locationMessage: '定位暂时中断，回到应用后会继续尝试'));
+      if (locationMode == TourLocationMode.real &&
+          permission == TourLocationPermission.granted) {
+        _listenToRealLocation();
       }
       unawaited(reconcileOutbox());
     } catch (error) {
@@ -208,7 +220,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> _onLocation(LocationSample sample) async {
-    if (state.status != 'monitoring' || _triggering) return;
+    if (state.locationMode != TourLocationMode.real ||
+        state.status != 'monitoring' ||
+        _triggering) {
+      return;
+    }
     final manifest = state.route?.audioTour;
     final ledger = state.ledger;
     if (manifest == null || ledger == null) return;
@@ -225,7 +241,12 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> triggerNextDemo() async {
-    if (!AppConfig.enableDemoTriggers || _triggering) return;
+    if (!AppConfig.enableDemoTriggers ||
+        state.locationMode != TourLocationMode.simulated ||
+        state.status != 'simulated' ||
+        _triggering) {
+      return;
+    }
     final ledger = state.ledger;
     if (ledger == null) return;
     final collected = ledger.entries
@@ -427,13 +448,56 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> resumeTour() async {
-    state = state.copyWith(status: 'monitoring', clearLocationMessage: true);
+    if (state.locationMode == TourLocationMode.simulated) {
+      state = state.copyWith(
+          status: 'simulated',
+          locationMessage: '模拟定位已开启：不会读取真实位置，请手动模拟到达下一条线索。');
+    } else if (_locations != null) {
+      state = state.copyWith(
+          status: 'monitoring', locationMessage: '定位正常，锁屏后会继续寻找附近线索');
+    } else {
+      await _activateRealLocation();
+    }
     if (state.current != null) await _player.resume();
+  }
+
+  Future<void> setLocationMode(TourLocationMode mode) async {
+    final effectiveMode =
+        AppConfig.enableDemoTriggers ? mode : TourLocationMode.real;
+    await ref
+        .read(locationModeControllerProvider.notifier)
+        .setMode(effectiveMode);
+    await _stopLocationMonitoring();
+
+    final paused = state.status == 'paused';
+    final inactive = state.status == 'idle' || state.status == 'stopped';
+    if (inactive) {
+      state = state.copyWith(locationMode: effectiveMode);
+      return;
+    }
+    if (effectiveMode == TourLocationMode.simulated) {
+      state = state.copyWith(
+          locationMode: effectiveMode,
+          status: paused ? 'paused' : 'simulated',
+          locationMessage: paused
+              ? '已切换为模拟定位；继续导览后可手动模拟到达。'
+              : '模拟定位已开启：不会读取真实位置，请手动模拟到达下一条线索。',
+          clearError: true);
+      await _persistLocationMode();
+      return;
+    }
+
+    state = state.copyWith(
+        locationMode: effectiveMode,
+        locationMessage: paused ? '已切换为真实定位；继续导览时将申请定位权限。' : '正在启用真实定位…',
+        clearError: true);
+    if (!paused) await _activateRealLocation();
+    await _persistLocationMode();
   }
 
   Future<void> stopTour() async {
     final session = state.session;
-    await ref.read(locationTrackerProvider).stop();
+    await _stopLocationMonitoring();
     await _player.stop();
     if (session != null) await _repository.stopActiveTour(session.id);
     state = state.copyWith(
@@ -460,6 +524,64 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<FragmentRecap> loadRecap() =>
       _repository.fragmentRecap(state.session!.id);
+
+  Future<void> _activateRealLocation() async {
+    try {
+      final permission =
+          await ref.read(locationTrackerProvider).requestPermission();
+      state = state.copyWith(
+          locationMode: TourLocationMode.real,
+          status: permission == TourLocationPermission.granted
+              ? 'monitoring'
+              : 'permission_limited',
+          locationMessage: _locationPermissionMessage(permission));
+      if (permission == TourLocationPermission.granted) {
+        _listenToRealLocation();
+      }
+    } catch (error) {
+      state = state.copyWith(
+          status: 'recoverable_error',
+          errorMessage: _message(error),
+          locationMessage: '真实定位暂时无法启动，请稍后重试。');
+    }
+  }
+
+  void _listenToRealLocation() {
+    _locations ??= ref.read(locationTrackerProvider).samples().listen(
+          _onLocation,
+          onError: (_) => state = state.copyWith(
+              status: 'recoverable_error',
+              locationMessage: '定位暂时中断，回到应用后会继续尝试'),
+        );
+  }
+
+  Future<void> _stopLocationMonitoring() async {
+    await _locations?.cancel();
+    _locations = null;
+    await ref.read(locationTrackerProvider).stop();
+  }
+
+  Future<void> _persistLocationMode() async {
+    final session = state.session;
+    final route = state.route;
+    if (session == null || route == null) return;
+    await _store.saveJson('active_tour', {
+      'journey_id': session.id,
+      'route_slug': route.slug,
+      'status': state.status,
+      'location_mode': state.locationMode.name,
+      if (route.audioTour != null)
+        'script_version': route.audioTour!.scriptVersion,
+    });
+  }
+
+  String _locationPermissionMessage(TourLocationPermission permission) =>
+      switch (permission) {
+        TourLocationPermission.granted => '定位正常，锁屏后会继续寻找附近线索',
+        TourLocationPermission.serviceDisabled => '系统定位未开启，自动触发暂停',
+        TourLocationPermission.deniedForever => '定位权限已被系统阻止，可到设置开启或切换模拟定位',
+        TourLocationPermission.denied => '未获得定位权限，可重试或切换模拟定位',
+      };
 
   String _message(Object error) =>
       error is ExperienceFailure ? error.message : '操作未完成，请稍后重试';

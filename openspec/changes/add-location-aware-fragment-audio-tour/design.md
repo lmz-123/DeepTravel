@@ -64,6 +64,10 @@ The active tour is represented by an Android foreground-service notification whe
 
 Alternative rejected: always-on location monitoring. It is unnecessary, harder to explain, and incompatible with location minimization.
 
+The review client also exposes a persisted location mode with `real` and `simulated` values. `real` is the default. In `real` mode the existing permission, platform location adapter, stable-entry engine, and background-continuity rules apply. In `simulated` mode the client must not request location permission or start a real location stream; it labels the active tour as simulated and lets the evaluator advance through the same server-backed fragment flow using configured demo trigger events. Changing mode during an active tour stops the previous location adapter before starting the newly selected behavior. The preference survives app restart but is ignored when the build does not explicitly enable demo triggering.
+
+The mode controller belongs to the Flutter application layer and persists only the enum-like preference through the settings adapter. Presentation widgets may request a mode change but cannot call location or permission plugins directly. This keeps test controls out of the production location engine and allows simulated and real behavior to share all downstream journey, audio, mission, ledger, and reconstruction logic.
+
 ### 3. Evaluate stable geofence entry locally, verify single events on the server
 
 Each fragment trigger region stores center latitude/longitude, entry radius, optional exit radius, maximum acceptable accuracy, minimum qualifying sample count, and cooldown. Initial defaults are configurable rather than hard-coded:

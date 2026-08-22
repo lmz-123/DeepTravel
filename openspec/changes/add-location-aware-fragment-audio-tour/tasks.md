@@ -34,6 +34,7 @@
 - [x] 5.2 Implement the active-tour controller and platform location adapter for monitoring, pause/stop, stale-sample detection, Android foreground notification, iOS background behavior, and configured demo triggers; test permission and lifecycle transitions.
 - [x] 5.3 Implement the single narration queue and audio-session adapter with prepared-file preference, pause/resume/seek/replay/speed, lock-screen controls, transcript fallback, interruption handling, and headset-disconnect pause; add coordinator tests.
 - [x] 5.4 Integrate offline trigger/playback with the outbox so queued acknowledgements reconcile without duplicate collection or surprise replay after reconnect; test process death at each state boundary.
+- [x] 5.5 Add a persisted real/simulated location-mode controller for demo-enabled builds; default to real, skip permission and real monitoring in simulation, support safe runtime switching, clearly label simulation, and test persistence plus both lifecycle paths.
 
 ## 6. Headset-first Flutter experience
 

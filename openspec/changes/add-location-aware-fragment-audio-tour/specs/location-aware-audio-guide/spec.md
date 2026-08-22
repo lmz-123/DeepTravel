@@ -98,7 +98,19 @@ The system SHALL use location for active-tour triggering and diagnostics without
 - **THEN** the backend stores the fragment, journey, trigger time, method, and optional coarse verification result rather than a raw breadcrumb trail
 
 ### Requirement: Controlled demo triggering
-The system SHALL permit manual or synthetic trigger events only when the deployment explicitly enables demo triggering and SHALL identify the trigger method in journey state.
+The system SHALL permit manual or synthetic trigger events only when the deployment explicitly enables demo triggering, SHALL expose a persisted real-or-simulated location choice in that configuration, and SHALL identify the trigger method in journey state. Real location SHALL remain the default.
+
+#### Scenario: Evaluator enables simulated location
+- **WHEN** an evaluator enables simulated location before or during an active tour in a demo-enabled build
+- **THEN** the client stops or skips real location monitoring, does not request location permission, clearly labels the tour as simulated, and exposes manual arrival for the next eligible fragment
+
+#### Scenario: Evaluator restores real location
+- **WHEN** an evaluator disables simulated location
+- **THEN** the client removes the manual arrival control and follows the normal permission, stable-entry, and monitoring lifecycle before claiming that automatic triggering is active
+
+#### Scenario: Location mode survives restart
+- **WHEN** the evaluator selects a location mode and restarts the app
+- **THEN** the client restores that mode for the next tour unless the current build disables demo triggering, in which case it uses real location
 
 #### Scenario: Demo triggering is enabled
 - **WHEN** a configured evaluator manually triggers the current fragment

@@ -53,3 +53,11 @@ The client SHALL make it clear when location monitoring and automatic narration 
 #### Scenario: Traveler pauses active tour
 - **WHEN** the traveler pauses from the notification, lock screen, or app
 - **THEN** new automatic narration is suspended while current progress and queued missions remain available
+
+#### Scenario: Evaluator chooses a location mode
+- **WHEN** demo triggering is configured for the client
+- **THEN** route setup and active-tour status expose an accessible real-or-simulated location switch with concise consequences for permission, automatic arrival, and manual arrival
+
+#### Scenario: Simulated mode is active
+- **WHEN** the active tour runs in simulated location mode
+- **THEN** the client visibly distinguishes simulation from live monitoring and presents a deliberate “simulate arrival at next clue” action without implying that GPS is active

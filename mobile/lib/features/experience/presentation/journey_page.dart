@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/fragment_models.dart';
+import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 
@@ -91,7 +92,8 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
             AnimatedSwitcher(
                 duration: const Duration(milliseconds: 380),
                 child: state.current == null
-                    ? const _ListeningCard(key: ValueKey('listening'))
+                    ? _ListeningCard(
+                        key: const ValueKey('listening'), state: state)
                     : _NarrationCard(
                         key: ValueKey(state.current!.id), state: state)),
             if (ledger != null) ...[
@@ -105,16 +107,17 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                     child: _ReconstructionCard(
                         onPressed: () => _showReconstruction(ledger))),
             ],
-            if (AppConfig.enableDemoTriggers && !manifest.productionReady) ...[
+            if (AppConfig.enableDemoTriggers &&
+                state.locationMode == TourLocationMode.simulated) ...[
               const SizedBox(height: 18),
               OutlinedButton.icon(
-                  onPressed: state.isBusy
+                  onPressed: state.isBusy || state.status != 'simulated'
                       ? null
                       : () => ref
                           .read(activeTourControllerProvider.notifier)
                           .triggerNextDemo(),
-                  icon: const Icon(Icons.science_outlined),
-                  label: const Text('研究模式：模拟靠近下一条线索')),
+                  icon: const Icon(Icons.my_location_rounded),
+                  label: const Text('模拟到达下一条线索')),
             ],
             if (state.errorMessage != null)
               Padding(
@@ -319,9 +322,12 @@ class _StatusPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final monitoring = state.status == 'monitoring';
+    final simulated = state.status == 'simulated';
+    final running = monitoring || simulated;
     final label = switch (state.status) {
       'preparing' => '正在准备离线故事',
       'permission_limited' => '自动定位受限',
+      'simulated' => '模拟定位中 · 不读取 GPS',
       'paused' => '导览已暂停',
       'stopped' => '导览已停止',
       _ => monitoring ? '正在寻找附近的历史线索' : '正在恢复导览'
@@ -336,7 +342,7 @@ class _StatusPanel extends ConsumerWidget {
               width: 10,
               height: 10,
               decoration: BoxDecoration(
-                  color: monitoring ? AppColors.gold : AppColors.terracotta,
+                  color: running ? AppColors.gold : AppColors.terracotta,
                   shape: BoxShape.circle)),
           const SizedBox(width: 10),
           Expanded(
@@ -344,8 +350,8 @@ class _StatusPanel extends ConsumerWidget {
                   style: const TextStyle(
                       color: AppColors.white, fontWeight: FontWeight.w600))),
           IconButton.filledTonal(
-              tooltip: monitoring ? '暂停自动导览' : '继续自动导览',
-              onPressed: monitoring
+              tooltip: running ? '暂停自动导览' : '继续自动导览',
+              onPressed: running
                   ? () => ref
                       .read(activeTourControllerProvider.notifier)
                       .pauseTour()
@@ -370,6 +376,45 @@ class _StatusPanel extends ConsumerWidget {
                       style: TextStyle(
                           color: AppColors.white.withValues(alpha: .72),
                           height: 1.45)))),
+        if (AppConfig.enableDemoTriggers) ...[
+          const SizedBox(height: 12),
+          Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
+          const SizedBox(height: 8),
+          Semantics(
+            label: '模拟定位测试开关',
+            hint: state.locationMode == TourLocationMode.simulated
+                ? '当前忽略真实位置'
+                : '当前使用真实位置',
+            child: Row(children: [
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('模拟定位（测试）',
+                        style: TextStyle(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                        state.locationMode == TourLocationMode.simulated
+                            ? '手动模拟到达，不申请定位权限'
+                            : '读取真实位置，稳定靠近后触发',
+                        style: TextStyle(
+                            color: AppColors.white.withValues(alpha: .66),
+                            fontSize: 12)),
+                  ])),
+              Switch.adaptive(
+                  value: state.locationMode == TourLocationMode.simulated,
+                  onChanged: state.isBusy || state.status == 'preparing'
+                      ? null
+                      : (value) => ref
+                          .read(activeTourControllerProvider.notifier)
+                          .setLocationMode(value
+                              ? TourLocationMode.simulated
+                              : TourLocationMode.real)),
+            ]),
+          ),
+        ],
       ]),
     );
   }
@@ -418,7 +463,8 @@ class _FragmentRail extends StatelessWidget {
 }
 
 class _ListeningCard extends StatelessWidget {
-  const _ListeningCard({super.key});
+  const _ListeningCard({required this.state, super.key});
+  final ActiveTourState state;
   @override
   Widget build(BuildContext context) => Card(
       child: Padding(
@@ -430,7 +476,9 @@ class _ListeningCard extends StatelessWidget {
             const SizedBox(height: 16),
             Text('把手机放进口袋', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            const Text('靠近地点后，需要两次稳定定位才会唤醒故事。耳机断开时音频会先暂停。')
+            Text(state.locationMode == TourLocationMode.simulated
+                ? '当前忽略真实位置。需要推进时，点击“模拟到达下一条线索”；故事、拍照和线索簿仍走完整后端流程。'
+                : '靠近地点后，需要两次稳定定位才会唤醒故事。耳机断开时音频会先暂停。')
           ])));
 }
 
