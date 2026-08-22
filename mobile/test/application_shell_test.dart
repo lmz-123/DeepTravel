@@ -53,6 +53,8 @@ void main() {
     final menuTrigger = find.bySemanticsLabel(RegExp('打开旅行者菜单'));
     expect(menuTrigger, findsOneWidget);
     expect(find.byTooltip('账号'), findsNothing);
+    expect(find.text('见地现场'), findsNothing);
+    expect(find.text('动态'), findsNothing);
     await tester.tap(menuTrigger);
     await tester.pumpAndSettle();
 
@@ -60,6 +62,8 @@ void main() {
     expect(find.text('足迹'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
     expect(find.text('退出登录'), findsOneWidget);
+    expect(find.text('见地现场'), findsNothing);
+    expect(find.text('动态'), findsNothing);
 
     await tester.tap(find.text('足迹'));
     await tester.pumpAndSettle();

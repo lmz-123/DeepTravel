@@ -47,7 +47,7 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0008"
+    assert version == "20260823_0009"
 
 
 def test_narration_voice_migration_backfills_once_and_round_trips(tmp_path):
@@ -104,12 +104,16 @@ def test_narration_voice_migration_backfills_once_and_round_trips(tmp_path):
         profile_count = connection.execute(
             text("SELECT COUNT(*) FROM narration_voice_profiles WHERE is_default = 1")
         ).scalar_one()
-        tracks = connection.execute(
-            text(
-                "SELECT media_path, transcript_hash, script_version "
-                "FROM fragment_narration_tracks"
+        tracks = (
+            connection.execute(
+                text(
+                    "SELECT media_path, transcript_hash, script_version "
+                    "FROM fragment_narration_tracks"
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         singular_path = connection.execute(
             text("SELECT audio_path FROM story_fragments WHERE id = 'voice-fragment'")
         ).scalar_one()
@@ -270,26 +274,71 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
         "ix_journeys_user_route_status_completed",
     } <= {item["name"] for item in inspector.get_indexes("journeys")}
     with engine.begin() as connection:
-        assert connection.execute(
-            text("SELECT status FROM journeys WHERE id = 'history-journey'")
-        ).scalar_one() == "active"
-        assert connection.execute(
-            text("SELECT object_key FROM evidence WHERE id = 'history-evidence'")
-        ).scalar_one() == "private/history.jpg"
+        assert (
+            connection.execute(
+                text("SELECT status FROM journeys WHERE id = 'history-journey'")
+            ).scalar_one()
+            == "active"
+        )
+        assert (
+            connection.execute(
+                text("SELECT object_key FROM evidence WHERE id = 'history-evidence'")
+            ).scalar_one()
+            == "private/history.jpg"
+        )
 
     command.downgrade(config, "20260822_0007")
     assert "vantage_point" not in {
         column["name"] for column in inspect(engine).get_columns("photo_missions")
     }
     with engine.begin() as connection:
-        assert connection.execute(
-            text("SELECT COUNT(*) FROM journeys WHERE id = 'history-journey'")
-        ).scalar_one() == 1
-        assert connection.execute(
-            text("SELECT COUNT(*) FROM evidence WHERE id = 'history-evidence'")
-        ).scalar_one() == 1
+        assert (
+            connection.execute(
+                text("SELECT COUNT(*) FROM journeys WHERE id = 'history-journey'")
+            ).scalar_one()
+            == 1
+        )
+        assert (
+            connection.execute(
+                text("SELECT COUNT(*) FROM evidence WHERE id = 'history-evidence'")
+            ).scalar_one()
+            == 1
+        )
 
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0008"
+    assert version == "20260823_0009"
+
+
+def test_node_community_migration_round_trips_without_touching_existing_data(tmp_path):
+    database_path = tmp_path / "node-community.db"
+    engine = create_engine(f"sqlite:///{database_path}")
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database_path}")
+
+    command.upgrade(config, "20260823_0008")
+    with engine.begin() as connection:
+        before = {
+            table: connection.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar_one()
+            for table in ("users", "journeys", "story_fragments", "evidence")
+        }
+
+    command.upgrade(config, "head")
+    community_tables = {
+        "community_posts",
+        "community_media",
+        "community_post_likes",
+        "community_comments",
+        "community_reports",
+    }
+    assert community_tables <= set(inspect(engine).get_table_names())
+
+    command.downgrade(config, "20260823_0008")
+    assert community_tables.isdisjoint(inspect(engine).get_table_names())
+    with engine.begin() as connection:
+        after = {
+            table: connection.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar_one()
+            for table in ("users", "journeys", "story_fragments", "evidence")
+        }
+    assert after == before

@@ -36,7 +36,7 @@ void main() {
     expect(await restored.read(), TourLocationMode.simulated);
   });
 
-  testWidgets('route setup exposes an explicit simulated location switch',
+  testWidgets('route setup shows read-only mode and keeps editing in settings',
       (tester) async {
     final modeStore = _MemoryLocationModeStore(TourLocationMode.real);
     await tester.pumpWidget(ProviderScope(
@@ -50,14 +50,9 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -520));
     await tester.pumpAndSettle();
 
-    expect(find.text('模拟定位（测试）'), findsOneWidget);
-    expect(find.text('使用 GPS，靠近地点自动触发'), findsOneWidget);
-
-    await tester.tap(find.byType(Switch));
-    await tester.pumpAndSettle();
-
-    expect(modeStore.mode, TourLocationMode.simulated);
-    expect(find.text('忽略 GPS，用按钮模拟到达'), findsOneWidget);
+    expect(find.text('当前使用设置中的真实定位模式'), findsOneWidget);
+    expect(find.byType(Switch), findsNothing);
+    expect(modeStore.mode, TourLocationMode.real);
   });
 
   test('simulated startup skips GPS and runtime switch restores real GPS',
@@ -91,13 +86,21 @@ void main() {
     expect(location.permissionRequests, 0);
     expect(location.sampleSubscriptions, 0);
 
-    await controller.setLocationMode(TourLocationMode.real);
+    await container
+        .read(locationModeControllerProvider.notifier)
+        .setMode(TourLocationMode.real);
+    await _waitUntil(() =>
+        container.read(activeTourControllerProvider).status == 'monitoring');
 
     expect(container.read(activeTourControllerProvider).status, 'monitoring');
     expect(location.permissionRequests, 1);
     expect(location.sampleSubscriptions, 1);
 
-    await controller.setLocationMode(TourLocationMode.simulated);
+    await container
+        .read(locationModeControllerProvider.notifier)
+        .setMode(TourLocationMode.simulated);
+    await _waitUntil(() =>
+        container.read(activeTourControllerProvider).status == 'simulated');
 
     final simulated = container.read(activeTourControllerProvider);
     expect(simulated.status, 'simulated');
@@ -197,17 +200,70 @@ void main() {
     await controller.selectNarrationProfile('voice-default');
     expect(prepared.profileIds, ['voice-warm', 'voice-default']);
     expect(container.read(activeTourControllerProvider).narrationProfileMessage,
-        contains('重播时生效'));
-    expect(player.urls, ['https://example.test/warm.mp3']);
+        contains('进度保持不变'));
+    expect(player.urls.last, 'https://example.test/default.mp3');
 
     await controller.replay();
-    await _waitUntil(() => player.urls.length == 2);
     expect(player.urls.last, 'https://example.test/default.mp3');
     expect(
       await NarrationVoicePreferenceRepository().read(
           const NarrationVoicePreferenceKey(
               userId: 'account-a', routeId: 'voice-route')),
       'voice-default',
+    );
+  });
+
+  test(
+      'failed same-fragment voice replacement restores playable source and preference',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'narration_voice:account-a:voice-route': 'voice-warm',
+    });
+    final store = _MemoryTourStore();
+    final player = _RecordingNarrationPlayer()
+      ..failUrl = 'https://example.test/default.mp3';
+    final container = ProviderContainer(overrides: [
+      authRepositoryProvider.overrideWithValue(_AuthenticatedRepository()),
+      experienceRepositoryProvider
+          .overrideWithValue(_VoiceFragmentRepository()),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_RecordingPreparedRouteService(store)),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+    await controller.start(_voiceRoute, _session);
+    await controller.togglePlayback();
+    await _waitUntil(() => player.urls.isNotEmpty);
+
+    await controller.selectNarrationProfile('voice-default');
+
+    final state = container.read(activeTourControllerProvider);
+    expect(state.narrationProfileId, 'voice-warm');
+    expect(state.errorMessage, contains('已恢复原来的声音'));
+    expect(player.urls, [
+      'https://example.test/warm.mp3',
+      'https://example.test/default.mp3',
+      'https://example.test/warm.mp3',
+    ]);
+    expect(
+      await NarrationVoicePreferenceRepository().read(
+          const NarrationVoicePreferenceKey(
+              userId: 'account-a', routeId: 'voice-route')),
+      'voice-warm',
     );
   });
 
@@ -246,7 +302,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('第二条线索'), findsOneWidget);
-    expect(find.text('模拟定位（测试）'), findsOneWidget);
+    expect(find.text('设置模式：模拟定位'), findsOneWidget);
+    expect(find.byType(Switch), findsNothing);
     expect(find.text('阅读等价文字稿'), findsOneWidget);
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);
     expect(find.text('00:00'), findsOneWidget);
@@ -1458,6 +1515,7 @@ class _SilentNarrationPlayer implements NarrationPlayer {
 class _RecordingNarrationPlayer extends _SilentNarrationPlayer {
   final urls = <String>[];
   final _playing = StreamController<bool>.broadcast(sync: true);
+  String? failUrl;
 
   @override
   Stream<bool> get playingStream => _playing.stream;
@@ -1465,6 +1523,7 @@ class _RecordingNarrationPlayer extends _SilentNarrationPlayer {
   @override
   Future<void> play(StoryFragment fragment, {String? preparedPath}) async {
     urls.add(fragment.audio.url);
+    if (fragment.audio.url == failUrl) throw StateError('replacement failed');
     _playing.add(true);
   }
 

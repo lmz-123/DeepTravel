@@ -3,89 +3,49 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/fragment_models.dart';
 
-class NarrationVoiceSelector extends StatelessWidget {
-  const NarrationVoiceSelector({
+class NarrationVoiceIconButton extends StatelessWidget {
+  const NarrationVoiceIconButton({
     required this.profiles,
     required this.selectedProfileId,
     required this.onSelected,
-    this.dark = false,
-    this.message,
+    this.foregroundColor,
     super.key,
   });
 
   final List<NarrationVoiceProfile> profiles;
   final String? selectedProfileId;
   final ValueChanged<String> onSelected;
-  final bool dark;
-  final String? message;
-
-  NarrationVoiceProfile? get selected {
-    for (final profile in profiles) {
-      if (profile.id == selectedProfileId) return profile;
-    }
-    return profiles.isEmpty ? null : profiles.first;
-  }
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
-    final active = selected;
-    if (active == null) return const SizedBox.shrink();
-    final foreground = dark ? AppColors.white : AppColors.ink;
-    final secondary = foreground.withValues(alpha: .66);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Material(
-        color:
-            dark ? AppColors.white.withValues(alpha: .08) : AppColors.paperDeep,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: profiles.length > 1 ? () => _showPicker(context) : null,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.gold.withValues(alpha: .16),
-                  shape: BoxShape.circle,
-                ),
-                child:
-                    const Icon(Icons.graphic_eq_rounded, color: AppColors.gold),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('讲述音色 · ${active.name}',
-                        style: TextStyle(
-                            color: foreground, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 3),
-                    Text(
-                      active.description.isEmpty
-                          ? '整条路线将保持同一种讲述风格'
-                          : active.description,
-                      style: TextStyle(color: secondary, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              if (profiles.length > 1)
-                Icon(Icons.tune_rounded, color: secondary, size: 21),
-            ]),
-          ),
-        ),
-      ),
-      if (message != null) ...[
-        const SizedBox(height: 7),
-        Text(message!, style: TextStyle(color: secondary, fontSize: 11)),
-      ],
-    ]);
+    if (profiles.length <= 1) return const SizedBox.shrink();
+    final selected = profiles.firstWhere(
+      (item) => item.id == selectedProfileId,
+      orElse: () => profiles.first,
+    );
+    return IconButton(
+      color: foregroundColor,
+      tooltip: '讲述音色：${selected.name}',
+      onPressed: () async {
+        final chosen = await showNarrationVoicePicker(
+          context,
+          profiles: profiles,
+          selectedProfileId: selectedProfileId,
+        );
+        if (chosen != null && chosen != selectedProfileId) onSelected(chosen);
+      },
+      icon: const Icon(Icons.record_voice_over_outlined),
+    );
   }
+}
 
-  Future<void> _showPicker(BuildContext context) async {
-    final chosen = await showModalBottomSheet<String>(
+Future<String?> showNarrationVoicePicker(
+  BuildContext context, {
+  required List<NarrationVoiceProfile> profiles,
+  required String? selectedProfileId,
+}) =>
+    showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -99,10 +59,9 @@ class NarrationVoiceSelector extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall),
             ),
             const SizedBox(height: 8),
-            Align(
+            const Align(
               alignment: Alignment.centerLeft,
-              child: Text('文字内容完全相同，只改变讲述气质。',
-                  style: Theme.of(context).textTheme.bodyMedium),
+              child: Text('文字内容完全相同，只改变讲述气质。'),
             ),
             const SizedBox(height: 16),
             ...profiles.map((profile) => Padding(
@@ -134,6 +93,3 @@ class NarrationVoiceSelector extends StatelessWidget {
         ),
       ),
     );
-    if (chosen != null && chosen != selectedProfileId) onSelected(chosen);
-  }
-}

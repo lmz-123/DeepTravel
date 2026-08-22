@@ -42,3 +42,23 @@ class Config:
     OSS_ACCESS_KEY_ID = os.getenv("OSS_ACCESS_KEY_ID", "")
     OSS_ACCESS_KEY_SECRET = os.getenv("OSS_ACCESS_KEY_SECRET", "")
     OSS_SIGNED_URL_TTL_SECONDS = int(os.getenv("OSS_SIGNED_URL_TTL_SECONDS", "300"))
+    COMMUNITY_ENABLED = _as_bool(os.getenv("COMMUNITY_ENABLED"), True)
+    COMMUNITY_TITLE_MAX_LENGTH = int(os.getenv("COMMUNITY_TITLE_MAX_LENGTH", "60"))
+    COMMUNITY_BODY_MAX_LENGTH = int(os.getenv("COMMUNITY_BODY_MAX_LENGTH", "1200"))
+    COMMUNITY_COMMENT_MAX_LENGTH = int(os.getenv("COMMUNITY_COMMENT_MAX_LENGTH", "300"))
+    COMMUNITY_MAX_MEDIA = int(os.getenv("COMMUNITY_MAX_MEDIA", "4"))
+    COMMUNITY_MEDIA_MAX_BYTES = int(os.getenv("COMMUNITY_MEDIA_MAX_BYTES", str(10 * 1024 * 1024)))
+    COMMUNITY_MEDIA_MAX_EDGE = int(os.getenv("COMMUNITY_MEDIA_MAX_EDGE", "1920"))
+    COMMUNITY_MEDIA_RETENTION_DAYS = int(os.getenv("COMMUNITY_MEDIA_RETENTION_DAYS", "0"))
+    COMMUNITY_MEDIA_ALLOWED_MIME_TYPES = tuple(
+        item.strip()
+        for item in os.getenv(
+            "COMMUNITY_MEDIA_ALLOWED_MIME_TYPES", "image/jpeg,image/png,image/webp"
+        ).split(",")
+        if item.strip()
+    )
+    COMMUNITY_AUTO_HOLD_REPORT_THRESHOLD = int(
+        os.getenv("COMMUNITY_AUTO_HOLD_REPORT_THRESHOLD", "3")
+    )
+    COMMUNITY_CATEGORIES = ("viewpoint", "experience", "fact_supplement", "on_site")
+    COMMUNITY_REPORT_REASONS = ("spam", "abuse", "privacy", "misinformation", "other")

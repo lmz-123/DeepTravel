@@ -1,7 +1,8 @@
 import 'dart:typed_data';
 
-import 'models.dart';
+import 'community_models.dart';
 import 'fragment_models.dart';
+import 'models.dart';
 
 abstract interface class ExperienceRepository {
   Future<List<CityExperience>> cities();
@@ -74,4 +75,52 @@ abstract interface class ExperienceRepository {
   );
 
   Future<FragmentRecap> fragmentRecap(String journeyId);
+
+  Future<CommunityPolicy> communityPolicy();
+
+  Future<CommunityPage<CommunityPostSummary>> communityFeed(
+    String journeyId,
+    String fragmentId, {
+    CommunityCategory? category,
+    String? cursor,
+    int limit = 12,
+  });
+
+  Future<CommunityPostDetail> communityPost(String postId);
+
+  Future<CommunityPage<CommunityAuthor>> communityLikers(
+    String postId, {
+    String? cursor,
+    int limit = 20,
+  });
+
+  Future<CommunityPage<CommunityComment>> communityComments(
+    String postId, {
+    String? cursor,
+    int limit = 20,
+  });
+
+  Future<CommunityPostDetail> createCommunityPost(
+    String journeyId,
+    String fragmentId,
+    CommunityPostDraft draft,
+  );
+
+  Future<Uint8List> communityMediaBytes(CommunityMedia media);
+
+  Future<CommunityLikeResult> setCommunityLike(String postId, bool liked);
+
+  Future<CommunityComment> createCommunityComment(
+    String postId,
+    String body,
+    String idempotencyKey,
+  );
+
+  Future<void> deleteCommunityPost(String postId);
+
+  Future<void> deleteCommunityComment(String commentId);
+
+  Future<void> reportCommunityPost(String postId, String reason);
+
+  Future<void> reportCommunityComment(String commentId, String reason);
 }

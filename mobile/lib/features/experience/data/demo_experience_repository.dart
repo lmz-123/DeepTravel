@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../domain/community_models.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
@@ -11,6 +12,8 @@ class DemoExperienceRepository implements ExperienceRepository {
   final Duration latency;
   JourneySession? _journey;
   final Map<String, AnswerFeedback> _answers = {};
+  final List<CommunityPost> _communityPosts = [];
+  final Map<String, List<CommunityComment>> _communityComments = {};
 
   Future<void> _pause() => Future<void>.delayed(latency);
 
@@ -241,6 +244,146 @@ class DemoExperienceRepository implements ExperienceRepository {
   @override
   Future<FragmentRecap> fragmentRecap(String journeyId) async =>
       _fragmentOnly();
+
+  @override
+  Future<CommunityPolicy> communityPolicy() async => const CommunityPolicy(
+        enabled: true,
+        categories: CommunityCategory.values,
+        titleMaxLength: 60,
+        bodyMaxLength: 1200,
+        commentMaxLength: 300,
+        maxMedia: 4,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        reportReasons: ['spam', 'abuse', 'privacy', 'misinformation', 'other'],
+        privateSourceRemainsPrivate: true,
+        communityCopyIsIndependent: true,
+      );
+
+  @override
+  Future<CommunityPage<CommunityPostSummary>> communityFeed(
+    String journeyId,
+    String fragmentId, {
+    CommunityCategory? category,
+    String? cursor,
+    int limit = 12,
+  }) async {
+    await _pause();
+    final filtered = _communityPosts
+        .where((post) =>
+            post.fragmentId == fragmentId &&
+            (category == null || post.category == category))
+        .take(limit)
+        .toList(growable: false);
+    return CommunityPage(items: filtered);
+  }
+
+  @override
+  Future<CommunityPostDetail> communityPost(String postId) async =>
+      _communityPosts.firstWhere((post) => post.id == postId);
+
+  @override
+  Future<CommunityPage<CommunityAuthor>> communityLikers(
+    String postId, {
+    String? cursor,
+    int limit = 20,
+  }) async =>
+      const CommunityPage(items: []);
+
+  @override
+  Future<CommunityPage<CommunityComment>> communityComments(
+    String postId, {
+    String? cursor,
+    int limit = 20,
+  }) async =>
+      CommunityPage(
+          items: List.unmodifiable(_communityComments[postId] ?? const []));
+
+  @override
+  Future<CommunityPostDetail> createCommunityPost(
+    String journeyId,
+    String fragmentId,
+    CommunityPostDraft draft,
+  ) async {
+    await _pause();
+    final existing = _communityPosts
+        .where((post) => post.id == draft.idempotencyKey)
+        .firstOrNull;
+    if (existing != null) return existing;
+    final post = CommunityPost(
+      id: draft.idempotencyKey,
+      fragmentId: fragmentId,
+      category: draft.category,
+      title: draft.title,
+      body: draft.body ?? '',
+      author: const CommunityAuthor(displayName: '演示旅行者', avatar: 'default'),
+      media: const [],
+      likeCount: 0,
+      commentCount: 0,
+      viewerHasLiked: false,
+      viewerIsAuthor: true,
+      createdAt: DateTime.now(),
+    );
+    _communityPosts.insert(0, post);
+    return post;
+  }
+
+  @override
+  Future<Uint8List> communityMediaBytes(CommunityMedia media) async =>
+      Uint8List(0);
+
+  @override
+  Future<CommunityLikeResult> setCommunityLike(
+      String postId, bool liked) async {
+    final index = _communityPosts.indexWhere((post) => post.id == postId);
+    final current = _communityPosts[index];
+    final count = (current.likeCount + (liked ? 1 : -1)).clamp(0, 999999);
+    _communityPosts[index] =
+        current.copyWith(likeCount: count, viewerHasLiked: liked);
+    return CommunityLikeResult(liked: liked, likeCount: count);
+  }
+
+  @override
+  Future<CommunityComment> createCommunityComment(
+    String postId,
+    String body,
+    String idempotencyKey,
+  ) async {
+    final comments = _communityComments.putIfAbsent(postId, () => []);
+    final existing =
+        comments.where((item) => item.id == idempotencyKey).firstOrNull;
+    if (existing != null) return existing;
+    final comment = CommunityComment(
+      id: idempotencyKey,
+      postId: postId,
+      body: body,
+      author: const CommunityAuthor(displayName: '演示旅行者', avatar: 'default'),
+      viewerIsAuthor: true,
+      createdAt: DateTime.now(),
+    );
+    comments.add(comment);
+    final index = _communityPosts.indexWhere((post) => post.id == postId);
+    _communityPosts[index] =
+        _communityPosts[index].copyWith(commentCount: comments.length);
+    return comment;
+  }
+
+  @override
+  Future<void> deleteCommunityPost(String postId) async {
+    _communityPosts.removeWhere((post) => post.id == postId);
+  }
+
+  @override
+  Future<void> deleteCommunityComment(String commentId) async {
+    for (final comments in _communityComments.values) {
+      comments.removeWhere((comment) => comment.id == commentId);
+    }
+  }
+
+  @override
+  Future<void> reportCommunityPost(String postId, String reason) async {}
+
+  @override
+  Future<void> reportCommunityComment(String commentId, String reason) async {}
 
   JourneySession _requireJourney(String journeyId) {
     if (_journey == null || _journey!.id != journeyId) {

@@ -7,6 +7,10 @@ import pytest
 from PIL import Image
 
 from app.application.media_migration import MediaMigrationService
+from app.infrastructure.community_media_storage import (
+    CommunityMediaInvalidError,
+    CommunityMediaStorage,
+)
 from app.infrastructure.evidence_storage import EvidenceInvalidError, EvidenceStorage
 from app.infrastructure.object_storage import LocalObjectStorage
 from app.infrastructure.persistence.models import CityModel, MediaAssetModel
@@ -49,6 +53,34 @@ def test_evidence_is_normalized_and_user_scoped(tmp_path):
 
     with pytest.raises(EvidenceInvalidError):
         evidence.put(BytesIO(b"not an image"), "image/jpeg", scope="user-a/journey-a")
+
+
+def test_community_media_is_private_normalized_and_independently_deletable(tmp_path):
+    objects = LocalObjectStorage(str(tmp_path))
+    storage = CommunityMediaStorage(objects, 2_000_000, 256, ("image/jpeg",))
+    source = BytesIO()
+    Image.new("RGB", (800, 600), "sienna").save(
+        source, format="JPEG", exif=b"Exif\x00\x00private-gps"
+    )
+    source.seek(0)
+
+    saved = storage.put(source, "image/jpeg", scope="fragment/post")
+
+    assert saved.object_key.startswith("community/fragment/post/")
+    assert saved.width <= 256 and saved.height <= 256
+    assert len(saved.sha256) == 64
+    normalized = storage.open(saved.object_key).read()
+    assert b"private-gps" not in normalized
+    with Image.open(BytesIO(normalized)) as image:
+        assert not image.getexif()
+    storage.delete(saved.object_key)
+    assert not objects.exists(saved.object_key)
+
+    png = BytesIO()
+    Image.new("RGBA", (10, 10), "red").save(png, format="PNG")
+    png.seek(0)
+    with pytest.raises(CommunityMediaInvalidError):
+        storage.put(png, "image/png", scope="fragment/post")
 
 
 def test_media_migration_is_idempotent_and_updates_references(app, tmp_path):

@@ -334,9 +334,7 @@ class FragmentNarrationTrackModel(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     fragment_id: Mapped[str] = mapped_column(ForeignKey("story_fragments.id"), index=True)
-    profile_id: Mapped[str] = mapped_column(
-        ForeignKey("narration_voice_profiles.id"), index=True
-    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("narration_voice_profiles.id"), index=True)
     transcript_hash: Mapped[str] = mapped_column(String(64), index=True)
     script_version: Mapped[str] = mapped_column(String(40))
     media_path: Mapped[str] = mapped_column(String(500))
@@ -464,6 +462,107 @@ class EvidenceModel(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(80))
+
+
+class CommunityPostModel(Base):
+    __tablename__ = "community_posts"
+    __table_args__ = (
+        UniqueConstraint("author_user_id", "idempotency_key", name="uq_community_post_retry"),
+        Index(
+            "ix_community_posts_fragment_status_created",
+            "fragment_id",
+            "status",
+            "created_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    fragment_id: Mapped[str] = mapped_column(ForeignKey("story_fragments.id"), index=True)
+    author_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    category: Mapped[str] = mapped_column(String(40), index=True)
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    body: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="visible", index=True)
+    report_count: Mapped[int] = mapped_column(Integer, default=0)
+    idempotency_key: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CommunityMediaModel(Base):
+    __tablename__ = "community_media"
+    __table_args__ = (UniqueConstraint("post_id", "position", name="uq_community_media_position"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    post_id: Mapped[str] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    storage_provider: Mapped[str] = mapped_column(String(20))
+    object_key: Mapped[str] = mapped_column(String(500), unique=True)
+    canonical_reference: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    mime_type: Mapped[str] = mapped_column(String(80))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    source_kind: Mapped[str] = mapped_column(String(30), default="upload")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CommunityPostLikeModel(Base):
+    __tablename__ = "community_post_likes"
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", name="uq_community_post_like"),
+        Index("ix_community_likes_post_created", "post_id", "created_at", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    post_id: Mapped[str] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CommunityCommentModel(Base):
+    __tablename__ = "community_comments"
+    __table_args__ = (
+        UniqueConstraint("author_user_id", "idempotency_key", name="uq_community_comment_retry"),
+        Index("ix_community_comments_post_status_created", "post_id", "status", "created_at", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    post_id: Mapped[str] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), index=True
+    )
+    author_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="visible", index=True)
+    report_count: Mapped[int] = mapped_column(Integer, default=0)
+    idempotency_key: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CommunityReportModel(Base):
+    __tablename__ = "community_reports"
+    __table_args__ = (
+        UniqueConstraint(
+            "reporter_user_id", "target_type", "target_id", name="uq_community_report_target"
+        ),
+        Index("ix_community_reports_target", "target_type", "target_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    reporter_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    target_type: Mapped[str] = mapped_column(String(20))
+    target_id: Mapped[str] = mapped_column(String(36))
+    reason: Mapped[str] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class NarrationPreviewModel(Base):

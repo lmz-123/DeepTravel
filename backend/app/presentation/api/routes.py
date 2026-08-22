@@ -30,6 +30,16 @@ def _services() -> dict:
     return current_app.extensions["services"]
 
 
+def _page_limit(default: int = 10) -> int:
+    raw = request.args.get("limit")
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValidationError("limit 必须是整数") from exc
+
+
 def _authorization_payload(result) -> dict:
     user, token, expires_at = result
     return {
@@ -155,6 +165,12 @@ def evidence_policy():
             }
         }
     )
+
+
+@api.get("/policies/community")
+@require_user
+def community_policy():
+    return jsonify({"data": _services()["community"].policy()})
 
 
 @api.post("/auth/upgrade-legacy")
@@ -449,6 +465,164 @@ def upload_fragment_evidence(journey_id: str, fragment_id: str):
     return jsonify({"data": evidence}), 201
 
 
+@api.get("/journeys/<journey_id>/fragments/<fragment_id>/community-posts")
+@require_user
+def list_community_posts(journey_id: str, fragment_id: str):
+    return jsonify(
+        {
+            "data": _services()["community"].feed(
+                g.current_user.id,
+                journey_id,
+                fragment_id,
+                category=request.args.get("category"),
+                cursor=request.args.get("cursor"),
+                limit=_page_limit(),
+            )
+        }
+    )
+
+
+@api.post("/journeys/<journey_id>/fragments/<fragment_id>/community-posts")
+@require_user
+def create_community_post(journey_id: str, fragment_id: str):
+    evidence_ids = request.form.getlist("evidence_ids") + request.form.getlist("evidence_ids[]")
+    result = _services()["community"].create_post(
+        g.current_user.id,
+        journey_id,
+        fragment_id,
+        category=request.form.get("category", ""),
+        title=request.form.get("title"),
+        body=request.form.get("body"),
+        idempotency_key=request.form.get("idempotency_key", ""),
+        files=request.files.getlist("photos") + request.files.getlist("photos[]"),
+        evidence_ids=[value for value in evidence_ids if value],
+    )
+    return jsonify({"data": result}), 201
+
+
+@api.get("/community-posts/<post_id>")
+@require_user
+def community_post_detail(post_id: str):
+    return jsonify({"data": _services()["community"].detail(g.current_user.id, post_id)})
+
+
+@api.delete("/community-posts/<post_id>")
+@require_user
+def delete_community_post(post_id: str):
+    return jsonify({"data": _services()["community"].delete_post(g.current_user.id, post_id)})
+
+
+@api.get("/community-posts/<post_id>/likes")
+@require_user
+def community_post_likers(post_id: str):
+    return jsonify(
+        {
+            "data": _services()["community"].likers(
+                g.current_user.id,
+                post_id,
+                cursor=request.args.get("cursor"),
+                limit=_page_limit(),
+            )
+        }
+    )
+
+
+@api.put("/community-posts/<post_id>/like")
+@require_user
+def like_community_post(post_id: str):
+    return jsonify({"data": _services()["community"].set_like(g.current_user.id, post_id, True)})
+
+
+@api.delete("/community-posts/<post_id>/like")
+@require_user
+def unlike_community_post(post_id: str):
+    return jsonify({"data": _services()["community"].set_like(g.current_user.id, post_id, False)})
+
+
+@api.get("/community-posts/<post_id>/comments")
+@require_user
+def list_community_comments(post_id: str):
+    return jsonify(
+        {
+            "data": _services()["community"].comments(
+                g.current_user.id,
+                post_id,
+                cursor=request.args.get("cursor"),
+                limit=_page_limit(),
+            )
+        }
+    )
+
+
+@api.post("/community-posts/<post_id>/comments")
+@require_user
+def create_community_comment(post_id: str):
+    body = _json_body()
+    if body.get("parent_id") is not None:
+        raise ValidationError("首版仅支持一级评论")
+    return (
+        jsonify(
+            {
+                "data": _services()["community"].create_comment(
+                    g.current_user.id,
+                    post_id,
+                    body=str(body.get("body") or ""),
+                    idempotency_key=str(body.get("idempotency_key") or ""),
+                )
+            }
+        ),
+        201,
+    )
+
+
+@api.delete("/community-comments/<comment_id>")
+@require_user
+def delete_community_comment(comment_id: str):
+    return jsonify({"data": _services()["community"].delete_comment(g.current_user.id, comment_id)})
+
+
+@api.post("/community-posts/<post_id>/reports")
+@require_user
+def report_community_post(post_id: str):
+    body = _json_body()
+    return (
+        jsonify(
+            {
+                "data": _services()["community"].report(
+                    g.current_user.id, "post", post_id, str(body.get("reason") or "")
+                )
+            }
+        ),
+        201,
+    )
+
+
+@api.post("/community-comments/<comment_id>/reports")
+@require_user
+def report_community_comment(comment_id: str):
+    body = _json_body()
+    return (
+        jsonify(
+            {
+                "data": _services()["community"].report(
+                    g.current_user.id,
+                    "comment",
+                    comment_id,
+                    str(body.get("reason") or ""),
+                )
+            }
+        ),
+        201,
+    )
+
+
+@api.get("/community-media/<media_id>")
+@require_user
+def get_community_media(media_id: str):
+    stream, mime_type = _services()["community"].open_media(g.current_user.id, media_id)
+    return send_file(stream, mimetype=mime_type, download_name=f"community-{media_id}")
+
+
 @api.get("/journeys/<journey_id>/evidence/<evidence_id>")
 @require_user
 def get_evidence(journey_id: str, evidence_id: str):
@@ -462,11 +636,7 @@ def get_evidence(journey_id: str, evidence_id: str):
 @require_user
 def list_evidence(journey_id: str):
     return jsonify(
-        {
-            "data": _services()["fragment_tours"].list_evidence(
-                g.current_user.id, journey_id
-            )
-        }
+        {"data": _services()["fragment_tours"].list_evidence(g.current_user.id, journey_id)}
     )
 
 

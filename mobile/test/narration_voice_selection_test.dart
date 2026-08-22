@@ -60,11 +60,11 @@ void main() {
         'voice-default:v2');
   });
 
-  testWidgets('single published voice is identified without a false chooser',
+  testWidgets('single published voice hides the compact playback icon',
       (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: NarrationVoiceSelector(
+        body: NarrationVoiceIconButton(
           profiles: const [_defaultProfile],
           selectedProfileId: 'voice-default',
           onSelected: (_) {},
@@ -72,16 +72,16 @@ void main() {
       ),
     ));
 
-    expect(find.text('讲述音色 · 原声纪实'), findsOneWidget);
-    expect(find.byIcon(Icons.tune_rounded), findsNothing);
+    expect(find.byIcon(Icons.record_voice_over_outlined), findsNothing);
   });
 
-  testWidgets('multiple backend voices open an accessible selector',
+  testWidgets(
+      'compact playback icon opens an accessible server-driven selector',
       (tester) async {
     String? selected;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: NarrationVoiceSelector(
+        body: NarrationVoiceIconButton(
           profiles: const [_defaultProfile, _warmProfile],
           selectedProfileId: 'voice-default',
           onSelected: (value) => selected = value,
@@ -89,7 +89,7 @@ void main() {
       ),
     ));
 
-    await tester.tap(find.text('讲述音色 · 原声纪实'));
+    await tester.tap(find.byTooltip('讲述音色：原声纪实'));
     await tester.pumpAndSettle();
     expect(find.text('选择一路陪伴你的声音'), findsOneWidget);
     expect(find.text('文字内容完全相同，只改变讲述气质。'), findsOneWidget);

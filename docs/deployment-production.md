@@ -22,7 +22,10 @@ curl -fsS http://127.0.0.1:5001/api/v1/health
 APP_ENV=production
 TEST_AUTH_ENABLED=false
 PUBLIC_BASE_URL=http://115.29.221.190:5001
+COMMUNITY_ENABLED=true
 ```
+
+社区上线或回滚说明见 [节点内“见地现场”](node-community.md)。如需紧急关闭社区而保留数据，将 `COMMUNITY_ENABLED=false` 后执行 `docker compose up -d --force-recreate api`。
 
 如启用 OSS，将两个 Bucket 分开，数据库只保存对象键、校验和和 URL：
 

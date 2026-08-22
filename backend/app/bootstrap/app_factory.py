@@ -7,6 +7,7 @@ import click
 from flask import Flask
 from flask_cors import CORS
 
+from app.application.community_service import CommunityService
 from app.application.fragment_services import FragmentTourService
 from app.application.historical_content_service import HistoricalContentService
 from app.application.media_migration import MediaMigrationService
@@ -17,6 +18,7 @@ from app.application.services import (
     JourneyService,
 )
 from app.bootstrap.config import Config
+from app.infrastructure.community_media_storage import CommunityMediaStorage
 from app.infrastructure.evidence_storage import EvidenceStorage, LocalEvidenceStorage
 from app.infrastructure.object_storage import AlibabaOssObjectStorage, LocalObjectStorage
 from app.infrastructure.persistence.database import Database
@@ -92,6 +94,13 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
     media_migration = MediaMigrationService(
         database.session_factory, public_storage, str(app.config["MEDIA_ROOT"])
     )
+    community_media_storage = CommunityMediaStorage(
+        private_storage,
+        int(app.config["COMMUNITY_MEDIA_MAX_BYTES"]),
+        int(app.config["COMMUNITY_MEDIA_MAX_EDGE"]),
+        tuple(app.config["COMMUNITY_MEDIA_ALLOWED_MIME_TYPES"]),
+        prefix="community",
+    )
     app.extensions["services"] = {
         "catalog": CatalogService(uow_factory),
         "guest_sessions": GuestSessionService(
@@ -121,6 +130,20 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
             asset_url_builder=asset_url,
         ),
         "historical_content": HistoricalContentService(database.session_factory),
+        "community": CommunityService(
+            database.session_factory,
+            community_media_storage,
+            evidence_storage,
+            enabled=bool(app.config["COMMUNITY_ENABLED"]),
+            secret_key=str(app.config["SECRET_KEY"]),
+            categories=tuple(app.config["COMMUNITY_CATEGORIES"]),
+            report_reasons=tuple(app.config["COMMUNITY_REPORT_REASONS"]),
+            title_max=int(app.config["COMMUNITY_TITLE_MAX_LENGTH"]),
+            body_max=int(app.config["COMMUNITY_BODY_MAX_LENGTH"]),
+            comment_max=int(app.config["COMMUNITY_COMMENT_MAX_LENGTH"]),
+            max_media=int(app.config["COMMUNITY_MAX_MEDIA"]),
+            report_threshold=int(app.config["COMMUNITY_AUTO_HOLD_REPORT_THRESHOLD"]),
+        ),
     }
 
     CORS(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})

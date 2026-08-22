@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../auth/data/auth_repository.dart';
+import '../domain/community_models.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
@@ -358,6 +359,215 @@ class ApiExperienceRepository implements ExperienceRepository {
         () => _dio.get('/journeys/$journeyId/recap', options: _authorized));
     return FragmentRecap.fromJson(
         response.data['data'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<CommunityPolicy> communityPolicy() async {
+    await _ensureAuth();
+    final response = await _request(
+      () => _dio.get('/policies/community', options: _authorized),
+    );
+    return CommunityPolicy.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<CommunityPage<CommunityPostSummary>> communityFeed(
+    String journeyId,
+    String fragmentId, {
+    CommunityCategory? category,
+    String? cursor,
+    int limit = 12,
+  }) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/journeys/$journeyId/fragments/$fragmentId/community-posts',
+          queryParameters: {
+            'limit': limit,
+            if (category != null) 'category': category.id,
+            if (cursor != null) 'cursor': cursor,
+          },
+          options: _authorized,
+        ));
+    return _communityPage(response.data['data'], CommunityPost.fromJson);
+  }
+
+  @override
+  Future<CommunityPostDetail> communityPost(String postId) async {
+    await _ensureAuth();
+    final response = await _request(
+      () => _dio.get('/community-posts/$postId', options: _authorized),
+    );
+    return CommunityPost.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<CommunityPage<CommunityAuthor>> communityLikers(
+    String postId, {
+    String? cursor,
+    int limit = 20,
+  }) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/community-posts/$postId/likes',
+          queryParameters: {
+            'limit': limit,
+            if (cursor != null) 'cursor': cursor,
+          },
+          options: _authorized,
+        ));
+    return _communityPage(response.data['data'], CommunityAuthor.fromJson);
+  }
+
+  @override
+  Future<CommunityPage<CommunityComment>> communityComments(
+    String postId, {
+    String? cursor,
+    int limit = 20,
+  }) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/community-posts/$postId/comments',
+          queryParameters: {
+            'limit': limit,
+            if (cursor != null) 'cursor': cursor,
+          },
+          options: _authorized,
+        ));
+    return _communityPage(response.data['data'], CommunityComment.fromJson);
+  }
+
+  @override
+  Future<CommunityPostDetail> createCommunityPost(
+    String journeyId,
+    String fragmentId,
+    CommunityPostDraft draft,
+  ) async {
+    await _ensureAuth();
+    final form = FormData();
+    form.fields.addAll([
+      MapEntry('category', draft.category.id),
+      MapEntry('idempotency_key', draft.idempotencyKey),
+      if (draft.title != null) MapEntry('title', draft.title!),
+      if (draft.body != null) MapEntry('body', draft.body!),
+      ...draft.evidenceIds.map((id) => MapEntry('evidence_ids[]', id)),
+    ]);
+    for (final path in draft.photoPaths) {
+      form.files.add(MapEntry('photos[]', await MultipartFile.fromFile(path)));
+    }
+    final response = await _request(() => _dio.post(
+          '/journeys/$journeyId/fragments/$fragmentId/community-posts',
+          data: form,
+          options: _authorized.copyWith(
+            contentType: 'multipart/form-data',
+            sendTimeout: const Duration(seconds: 60),
+            receiveTimeout: const Duration(seconds: 60),
+          ),
+        ));
+    return CommunityPost.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<Uint8List> communityMediaBytes(CommunityMedia media) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get<List<int>>(
+          _privateMediaPath(media.url, '/community-media/${media.id}'),
+          options: _authorized.copyWith(responseType: ResponseType.bytes),
+        ));
+    return Uint8List.fromList(response.data ?? const <int>[]);
+  }
+
+  @override
+  Future<CommunityLikeResult> setCommunityLike(
+      String postId, bool liked) async {
+    await _ensureAuth();
+    final response = await _request(() => liked
+        ? _dio.put('/community-posts/$postId/like', options: _authorized)
+        : _dio.delete('/community-posts/$postId/like', options: _authorized));
+    return CommunityLikeResult.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<CommunityComment> createCommunityComment(
+    String postId,
+    String body,
+    String idempotencyKey,
+  ) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.post(
+          '/community-posts/$postId/comments',
+          data: {'body': body, 'idempotency_key': idempotencyKey},
+          options: _authorized,
+        ));
+    return CommunityComment.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<void> deleteCommunityPost(String postId) async {
+    await _ensureAuth();
+    await _request(
+      () => _dio.delete('/community-posts/$postId', options: _authorized),
+    );
+  }
+
+  @override
+  Future<void> deleteCommunityComment(String commentId) async {
+    await _ensureAuth();
+    await _request(
+      () => _dio.delete('/community-comments/$commentId', options: _authorized),
+    );
+  }
+
+  @override
+  Future<void> reportCommunityPost(String postId, String reason) async {
+    await _ensureAuth();
+    await _request(() => _dio.post(
+          '/community-posts/$postId/reports',
+          data: {'reason': reason},
+          options: _authorized,
+        ));
+  }
+
+  @override
+  Future<void> reportCommunityComment(String commentId, String reason) async {
+    await _ensureAuth();
+    await _request(() => _dio.post(
+          '/community-comments/$commentId/reports',
+          data: {'reason': reason},
+          options: _authorized,
+        ));
+  }
+
+  CommunityPage<T> _communityPage<T>(
+    Object? raw,
+    T Function(Map<String, dynamic>) decode,
+  ) {
+    final data = raw as Map<String, dynamic>;
+    final items = (data['items'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => decode(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
+    return CommunityPage<T>(
+      items: items,
+      nextCursor: data['next_cursor'] as String?,
+    );
+  }
+
+  String _privateMediaPath(String value, String fallback) {
+    final uri = Uri.tryParse(value);
+    if (uri != null && uri.hasScheme) return value;
+    const prefix = '/api/v1';
+    if (value.startsWith('$prefix/')) return value.substring(prefix.length);
+    return value.startsWith('/') ? value : fallback;
   }
 
   Future<Response<dynamic>> _request(

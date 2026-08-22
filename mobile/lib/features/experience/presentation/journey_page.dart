@@ -12,6 +12,7 @@ import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'widgets/evidence_photo_widgets.dart';
 import 'widgets/narration_voice_selector.dart';
+import 'widgets/node_community_section.dart';
 
 class JourneyPage extends ConsumerStatefulWidget {
   const JourneyPage({required this.journeyId, super.key});
@@ -97,6 +98,11 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
     }
     final manifest = state.route!.audioTour!;
     final ledger = state.ledger;
+    final userId = ref.watch(currentUserIdProvider);
+    final selectedCommunityFragment = ledger?.entries
+        .where(
+            (entry) => entry.id == state.selectedFragmentId && entry.isRevealed)
+        .firstOrNull;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -137,16 +143,6 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
               const SizedBox(height: 18),
               _FragmentRail(manifest: manifest, ledger: ledger),
               const SizedBox(height: 22),
-              NarrationVoiceSelector(
-                profiles: manifest.narrationProfiles,
-                selectedProfileId: state.narrationProfileId,
-                message: state.narrationProfileMessage,
-                onSelected: (profileId) => ref
-                    .read(activeTourControllerProvider.notifier)
-                    .selectNarrationProfile(profileId),
-              ),
-              if (manifest.narrationProfiles.isNotEmpty)
-                const SizedBox(height: 18),
               AnimatedSwitcher(
                   duration: const Duration(milliseconds: 380),
                   child: state.current == null
@@ -209,6 +205,12 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                     child: Text(state.errorMessage!,
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error))),
+              if (userId != null && selectedCommunityFragment != null)
+                NodeCommunitySection(
+                  userId: userId,
+                  journeyId: widget.journeyId,
+                  fragment: selectedCommunityFragment,
+                ),
             ],
           ),
         ),
@@ -570,45 +572,21 @@ class _StatusPanel extends ConsumerWidget {
                       style: TextStyle(
                           color: AppColors.white.withValues(alpha: .72),
                           height: 1.45)))),
-        if (!revisiting) ...[
-          const SizedBox(height: 12),
-          Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
-          const SizedBox(height: 8),
-          Semantics(
-            label: '模拟定位测试开关',
-            hint: state.locationMode == TourLocationMode.simulated
-                ? '当前忽略真实位置'
-                : '当前使用真实位置',
-            child: Row(children: [
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    const Text('模拟定位（测试）',
-                        style: TextStyle(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(
-                        state.locationMode == TourLocationMode.simulated
-                            ? '手动模拟到达，不申请定位权限'
-                            : '读取真实位置，稳定靠近后触发',
-                        style: TextStyle(
-                            color: AppColors.white.withValues(alpha: .66),
-                            fontSize: 12)),
-                  ])),
-              Switch.adaptive(
-                  value: state.locationMode == TourLocationMode.simulated,
-                  onChanged: state.isBusy || state.status == 'preparing'
-                      ? null
-                      : (value) => ref
-                          .read(activeTourControllerProvider.notifier)
-                          .setLocationMode(value
-                              ? TourLocationMode.simulated
-                              : TourLocationMode.real)),
-            ]),
+        if (!revisiting)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                state.locationMode == TourLocationMode.simulated
+                    ? '设置模式：模拟定位'
+                    : '设置模式：真实定位',
+                style: TextStyle(
+                    color: AppColors.white.withValues(alpha: .62),
+                    fontSize: 12),
+              ),
+            ),
           ),
-        ],
       ]),
     );
   }
@@ -803,7 +781,26 @@ class _NarrationCard extends ConsumerWidget {
                     .toList(),
                 child: Text('${state.speed}x',
                     style: const TextStyle(color: AppColors.white))),
+            NarrationVoiceIconButton(
+              profiles: state.route!.audioTour!.narrationProfiles,
+              selectedProfileId: state.narrationProfileId,
+              foregroundColor: AppColors.white,
+              onSelected: (profileId) => ref
+                  .read(activeTourControllerProvider.notifier)
+                  .selectNarrationProfile(profileId),
+            ),
           ]),
+          if (state.narrationProfileMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                state.narrationProfileMessage!,
+                style: TextStyle(
+                  color: AppColors.white.withValues(alpha: .72),
+                  fontSize: 12,
+                ),
+              ),
+            ),
           if (fragment.transcript != null)
             ExpansionTile(
                 tilePadding: EdgeInsets.zero,

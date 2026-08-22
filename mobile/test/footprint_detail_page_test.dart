@@ -28,8 +28,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('已归档'), findsOneWidget);
-    expect(find.text('旧城线索'), findsOneWidget);
-    expect(find.text('这次没有上传照片，完整足迹仍然保留。'), findsOneWidget);
+    expect(find.text('旧城线索'), findsWidgets);
+    expect(find.text('这条线索没有上传照片，完整足迹仍然保留。'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -217,6 +217,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   StreamSubscription<Duration>? _position;
   StreamSubscription<Duration?>? _duration;
   bool _triggering = false;
+  bool _changingLocationMode = false;
   String? _loadedFragmentId;
   String? _loadedProfileId;
   int _transitionGeneration = 0;
@@ -235,6 +236,17 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       _transitionGeneration += 1;
       _playbackGeneration += 1;
       unawaited(_disposeRuntime(player, locationTracker));
+    });
+    ref.listen(locationModeControllerProvider, (previous, next) {
+      final mode = next.asData?.value;
+      if (mode == null ||
+          mode == state.locationMode ||
+          _changingLocationMode ||
+          state.playbackMode == TourPlaybackMode.revisit ||
+          state.session?.isCompleted == true) {
+        return;
+      }
+      unawaited(_applyLocationMode(mode));
     });
     return const ActiveTourState();
   }
@@ -1167,7 +1179,20 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> setLocationMode(TourLocationMode mode) async {
-    await ref.read(locationModeControllerProvider.notifier).setMode(mode);
+    _changingLocationMode = true;
+    try {
+      await ref.read(locationModeControllerProvider.notifier).setMode(mode);
+      await _applyLocationMode(mode);
+    } finally {
+      _changingLocationMode = false;
+    }
+  }
+
+  Future<void> _applyLocationMode(TourLocationMode mode) async {
+    if (state.playbackMode == TourPlaybackMode.revisit ||
+        state.session?.isCompleted == true) {
+      return;
+    }
     await _stopLocationMonitoring();
 
     final paused = state.status == 'paused';
@@ -1294,11 +1319,74 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       return;
     }
     final key = NarrationVoicePreferenceKey(userId: userId, routeId: route.id);
-    state = state.copyWith(isBusy: true, clearError: true);
+    final current = state.current;
+    final previousProfileId = state.narrationProfileId;
+    final previousPaths = state.preparedPaths;
+    final previousPosition = state.position;
+    final previousDuration = state.duration;
+    final intendedPlaying = state.isPlaying;
+    final fraction = previousDuration == null ||
+            previousDuration <= Duration.zero
+        ? 0.0
+        : (previousPosition.inMilliseconds / previousDuration.inMilliseconds)
+            .clamp(0.0, 1.0);
+    final generation = ++_playbackGeneration;
+    var replacementPosition = previousPosition;
+    state = state.copyWith(
+      isBusy: true,
+      clearError: true,
+      generation: generation,
+      playbackOwner: current == null
+          ? state.playbackOwner
+          : PlaybackOwner(
+              userId: userId,
+              routeId: route.id,
+              journeyId: state.session!.id,
+              fragmentId: current.id,
+              generation: generation,
+            ),
+    );
     try {
       final prepared = await ref
           .read(preparedRouteServiceProvider)
           .prepare(manifest, profileId);
+      if (generation != _playbackGeneration) return;
+      if (current != null) {
+        await _cancelPlayerBindings();
+        await _player.stop();
+        if (generation != _playbackGeneration) return;
+        _loadedFragmentId = current.id;
+        _loadedProfileId = profileId;
+        await _player.play(
+          current.withNarrationProfile(profileId),
+          preparedPath: prepared[current.id],
+        );
+        await _player.pause();
+        if (generation != _playbackGeneration) return;
+        var replacementDuration = previousDuration;
+        try {
+          replacementDuration = await _player.durationStream
+              .firstWhere((value) => value != null && value > Duration.zero)
+              .timeout(
+                const Duration(milliseconds: 800),
+                onTimeout: () => previousDuration,
+              );
+        } on StateError {
+          replacementDuration = previousDuration;
+        }
+        if (generation != _playbackGeneration) return;
+        final target = replacementDuration == null
+            ? previousPosition
+            : Duration(
+                milliseconds:
+                    (replacementDuration.inMilliseconds * fraction).round(),
+              );
+        replacementPosition = target;
+        await _player.seek(target);
+        await _player.setSpeed(state.speed);
+        await _bindPlayer(generation);
+        if (intendedPlaying) await _player.resume();
+      }
       await ref
           .read(narrationVoicePreferenceRepositoryProvider)
           .write(key, profileId);
@@ -1308,13 +1396,41 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         narrationProfileId: profileId,
         preparedPaths: prepared,
         isBusy: false,
-        narrationProfileMessage: state.isPlaying
-            ? '已选择“${profile.name}”；当前片段保持不变，下次播放或重播时生效。'
-            : '已切换为“${profile.name}”，下次播放时生效。',
+        isPlaying: intendedPlaying,
+        position: replacementPosition,
+        narrationProfileMessage: '已切换为“${profile.name}”，当前片段进度保持不变。',
       );
     } catch (error) {
+      if (generation != _playbackGeneration) return;
+      try {
+        if (current != null) {
+          await _cancelPlayerBindings();
+          await _player.stop();
+          _loadedFragmentId = current.id;
+          _loadedProfileId = previousProfileId;
+          await _player.play(
+            current.withNarrationProfile(previousProfileId),
+            preparedPath: previousPaths[current.id],
+          );
+          await _player.pause();
+          await _player.seek(previousPosition);
+          await _player.setSpeed(state.speed);
+          await _bindPlayer(generation);
+          if (intendedPlaying) await _player.resume();
+        }
+      } catch (_) {
+        _loadedFragmentId = null;
+        _loadedProfileId = null;
+      }
       state = state.copyWith(
-          isBusy: false, errorMessage: '音色资源准备失败：${_message(error)}');
+        narrationProfileId: previousProfileId,
+        preparedPaths: previousPaths,
+        position: previousPosition,
+        duration: previousDuration,
+        isPlaying: intendedPlaying,
+        isBusy: false,
+        errorMessage: '音色切换失败，已恢复原来的声音：${_message(error)}',
+      );
     }
   }
 
