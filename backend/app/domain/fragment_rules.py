@@ -47,7 +47,5 @@ def reconstruction_feedback(expected: list[str], submitted: list[str]) -> tuple[
     for index, expected_value in enumerate(expected):
         actual = submitted[index] if index < len(submitted) else None
         if actual != expected_value:
-            feedback.append(
-                {"position": index + 1, "expected_hint": expected_value, "submitted": actual}
-            )
+            feedback.append({"position": index + 1, "submitted": actual})
     return not feedback and len(submitted) == len(expected), feedback

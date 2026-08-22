@@ -237,23 +237,40 @@ class StoryLedger {
       required this.collectedCount,
       required this.totalCount,
       required this.reconstructionUnlocked,
-      required this.entries});
+      required this.entries,
+      this.reconstructionItems = const []});
   final String centralQuestion;
   final int collectedCount;
   final int totalCount;
   final bool reconstructionUnlocked;
   final List<StoryFragment> entries;
+  final List<ReconstructionItem> reconstructionItems;
 
   factory StoryLedger.fromJson(Map<String, dynamic> json) => StoryLedger(
         centralQuestion: json['central_question'] as String,
         collectedCount: json['collected_count'] as int,
         totalCount: json['total_count'] as int,
         reconstructionUnlocked: json['reconstruction_unlocked'] as bool,
+        reconstructionItems:
+            (json['reconstruction_items'] as List<dynamic>? ?? const [])
+                .map((value) =>
+                    ReconstructionItem.fromJson(value as Map<String, dynamic>))
+                .toList(),
         entries: (json['entries'] as List<dynamic>)
             .map((value) =>
                 StoryFragment.fromJson(value as Map<String, dynamic>))
             .toList(),
       );
+}
+
+class ReconstructionItem {
+  const ReconstructionItem({required this.id, required this.text});
+  final String id;
+  final String text;
+
+  factory ReconstructionItem.fromJson(Map<String, dynamic> json) =>
+      ReconstructionItem(
+          id: json['id'] as String, text: json['text'] as String);
 }
 
 class EvidenceRecord {

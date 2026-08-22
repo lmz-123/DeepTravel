@@ -88,8 +88,9 @@ class ExperienceStop {
         storyBody: json['story_body'] as String,
         image: json['image'] as String,
         insight: json['insight'] as String,
-        challenge:
-            Challenge.fromJson(json['challenge'] as Map<String, dynamic>),
+        challenge: json['challenge'] is Map<String, dynamic>
+            ? Challenge.fromJson(json['challenge'] as Map<String, dynamic>)
+            : const Challenge(id: '', prompt: '', hint: '', options: []),
       );
 }
 

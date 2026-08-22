@@ -1,0 +1,595 @@
+{
+  "package_id": "dameisha-remade-coast",
+  "package_version": "2026.08-field.1",
+  "media": [
+    {
+      "key": "shenzhen-city-cover",
+      "storage_path": "images/route_shenzhen.png",
+      "mime_type": "image/png",
+      "sha256": "dcc1f5e0e6de0d935da17f50e525977d213cd3535df4fbbd599e8ef077b30004"
+    },
+    {
+      "key": "dameisha-remade-coast-cover-v1",
+      "storage_path": "images/dameisha-remade-coast-v1.png",
+      "mime_type": "image/png",
+      "sha256": "ed912e5b7dade0468875200eb7a123f3e2a023cfff12d98b4c0b3a7e05f48145"
+    },
+    {
+      "key": "dameisha-fragment-1-v1",
+      "storage_path": "audio/dameisha-fragment-1-dameisha-2026.08-field.1.m4a",
+      "mime_type": "audio/mp4",
+      "sha256": "fb09df61852f2db8dfafbc1d177f624816d1b87cf69c90d94ac5a4f562284370"
+    },
+    {
+      "key": "dameisha-fragment-2-v1",
+      "storage_path": "audio/dameisha-fragment-2-dameisha-2026.08-field.1.m4a",
+      "mime_type": "audio/mp4",
+      "sha256": "8e0ed01a406f57bd692a75c550a615f419a9b25dbb3fc03cd834dcf5ad577fd7"
+    },
+    {
+      "key": "dameisha-fragment-3-v1",
+      "storage_path": "audio/dameisha-fragment-3-dameisha-2026.08-field.1.m4a",
+      "mime_type": "audio/mp4",
+      "sha256": "95ab874896cff5f1ced73ba56382e22be49e8eecbc5498f4478d9fb6765a55a4"
+    },
+    {
+      "key": "dameisha-fragment-4-v1",
+      "storage_path": "audio/dameisha-fragment-4-dameisha-2026.08-field.1.m4a",
+      "mime_type": "audio/mp4",
+      "sha256": "4fe665cab30c84c49617ea65d011f93f03bd68e6bb295fe6033301a0a6d4b0bd"
+    },
+    {
+      "key": "dameisha-fragment-5-v1",
+      "storage_path": "audio/dameisha-fragment-5-dameisha-2026.08-field.1.m4a",
+      "mime_type": "audio/mp4",
+      "sha256": "2f01bd09ae13c1288ba49776de33f0891aa00e3e670d8a8e12524bc9d700ad9a"
+    }
+  ],
+  "city": {
+    "id": "2b2301c8-d36e-4aa5-a3a8-b1881cb3f002",
+    "slug": "shenzhen",
+    "name": "深圳",
+    "subtitle": "在快速生长的城市里，寻找时间的叠层",
+    "hero_image": "images/route_shenzhen.png",
+    "latitude": 22.5394,
+    "longitude": 113.92305
+  },
+  "route": {
+    "id": "91608e67-dbad-4d26-889c-dd3089201003",
+    "slug": "dameisha-remade-coast",
+    "title": "被打开的海湾：大梅沙如何成为公共海岸",
+    "subtitle": "沿着旧村、交通、公共政策、人群与风暴，拼出一片海岸的变化",
+    "description": "戴上耳机，从大梅沙旧村附近向西走入海滨公园。五段位置触发的故事不会把这里讲成一片被发现的天然沙滩，而会追问交通、免费开放、城市人群与灾后重建如何一次次改变海湾的意义。",
+    "duration_minutes": 75,
+    "distance_km": 1.8,
+    "difficulty": "轻松",
+    "theme": "公共海岸与城市变迁",
+    "hero_image": "images/dameisha-remade-coast-v1.png",
+    "is_featured": false
+  },
+  "story_arc": {
+    "id": "dameisha-arc-v1",
+    "title": "被打开的海湾：大梅沙如何成为一座城市的公共海岸",
+    "central_question": "大梅沙是被城市发现的天然海滩，还是被交通、公共政策、人群与风暴反复重造的海岸？",
+    "complete_story": "大梅沙并不是一片等待城市发现的空白海滩。村落、农耕和捕鱼生活早已给梅沙命名；梧桐山隧道和地铁随后改变了海湾与城市的实际距离。1999年的免费海滨公园又把自然岸线转化为公共服务，但开放带来的巨大人流也迫使城市面对安全、交通与生态承载力。2018年台风山竹摧毁部分设施后，重建没有只把旧景复原，而是把生态修复、慢行空间和防灾韧性写进新的海岸。你刚刚走过的不是五个孤立景点，而是同一片海岸被生活、交通、政策、人群和灾害反复赋义的过程。",
+    "causal_model": [
+      {
+        "id": "dameisha-cause-1",
+        "text": "旧村和梅沙地名在旅游公园之前已经存在"
+      },
+      {
+        "id": "dameisha-cause-2",
+        "text": "交通工程改变了海湾与城市的实际距离"
+      },
+      {
+        "id": "dameisha-cause-3",
+        "text": "公共政策把海岸转化为市民共享空间"
+      },
+      {
+        "id": "dameisha-cause-4",
+        "text": "免费开放放大了承载力与安全治理矛盾"
+      },
+      {
+        "id": "dameisha-cause-5",
+        "text": "灾后重建让公共海岸加入韧性与生态目标"
+      }
+    ],
+    "pronunciation_notes": [
+      "大梅沙：dà méi shā",
+      "梧桐山：wú tóng shān",
+      "山竹：台风名称"
+    ],
+    "script_version": "dameisha-2026.08-field.1",
+    "review_state": "in_review",
+    "field_audit_state": "required",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "source_version": "dameisha-sources-2026.08.22",
+    "publication_decision": "field_test"
+  },
+  "required_photo_mission_count": 3,
+  "sources": [
+    {
+      "id": "source-dameisha-archives",
+      "title": "大梅沙村——从偏远村落到网红滨海度假地",
+      "publisher": "深圳市档案馆",
+      "url": "https://www.szdag.gov.cn/gzdt/gzdt/content/post_1185773.html",
+      "source_type": "government_archive",
+      "accessed_at": "2026-08-22T00:00:00+00:00",
+      "review_state": "in_review",
+      "summary": "记录梅沙地名、村落生产方式、梧桐山隧道及轨道交通带来的可达性变化。"
+    },
+    {
+      "id": "source-dameisha-park",
+      "title": "大梅沙海滨公园",
+      "publisher": "深圳政府在线",
+      "url": "https://www.sz.gov.cn/szzt2010/gysz/csgy/content/post_10784356.html",
+      "source_type": "government",
+      "accessed_at": "2026-08-22T00:00:00+00:00",
+      "review_state": "in_review",
+      "summary": "说明公园1999年建设背景、现有尺度与台风山竹后重建。"
+    },
+    {
+      "id": "source-dameisha-capacity",
+      "title": "大梅沙海滨公园限量管理新闻发布资料",
+      "publisher": "深圳市盐田区人民政府",
+      "url": "https://www.yantian.gov.cn/gkmlpt/content/5/5716/mpost_5716246.html",
+      "source_type": "government",
+      "accessed_at": "2026-08-22T00:00:00+00:00",
+      "review_state": "in_review",
+      "summary": "提供免费开放时间、客流高峰、规划容量及限量管理背景。"
+    },
+    {
+      "id": "source-dameisha-rebuild",
+      "title": "大梅沙海滨公园重建工程情况",
+      "publisher": "深圳市盐田区人民政府",
+      "url": "https://www.yantian.gov.cn/cn/zwgk/wgkzl/jggk/lsqkgk/content/post_8532699.html",
+      "source_type": "government",
+      "accessed_at": "2026-08-22T00:00:00+00:00",
+      "review_state": "in_review",
+      "summary": "记录台风山竹破坏、2019年整体重建及生态韧性设计。"
+    },
+    {
+      "id": "source-dameisha-metro",
+      "title": "深圳地铁8号线二期开通运营",
+      "publisher": "深圳政府在线",
+      "url": "https://www.sz.gov.cn/cn/xxgk/zfxxgj/zwdt/content/post_11074906.html",
+      "source_type": "government",
+      "accessed_at": "2026-08-22T00:00:00+00:00",
+      "review_state": "in_review",
+      "summary": "记录2023年12月地铁8号线二期开通及大梅沙站接入。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim-dameisha-name",
+      "canonical_text": "1688年《新安县志》和1866年地图资料已经出现大梅沙、小梅沙地名。",
+      "claim_kind": "dated_record",
+      "certainty": "documented",
+      "review_state": "in_review",
+      "boundary_note": "资料支持地名较早存在，不代表今天可见建筑来自1688年。",
+      "source_ids": [
+        "source-dameisha-archives"
+      ],
+      "support_notes": {
+        "source-dameisha-archives": "档案馆文章列出县志和地图记录。"
+      }
+    },
+    {
+      "id": "claim-dameisha-etymology",
+      "canonical_text": "梅沙可能来自客家话中形容细软沙粒的近音词。",
+      "claim_kind": "interpretation",
+      "certainty": "interpretive",
+      "review_state": "in_review",
+      "boundary_note": "这是档案馆文章引述民俗研究者的解释，不作为唯一确定词源。",
+      "source_ids": [
+        "source-dameisha-archives"
+      ],
+      "support_notes": {
+        "source-dameisha-archives": "文章以民俗解释形式介绍该词源。"
+      }
+    },
+    {
+      "id": "claim-dameisha-tunnel",
+      "canonical_text": "1987年梧桐山隧道通车改变了梅沙地区翻山进城的交通条件。",
+      "claim_kind": "transport_change",
+      "certainty": "documented",
+      "review_state": "in_review",
+      "boundary_note": "交通改善不等于村落生活在同一年立即消失。",
+      "source_ids": [
+        "source-dameisha-archives"
+      ],
+      "support_notes": {
+        "source-dameisha-archives": "档案馆文章将隧道视为地区可达性转折。"
+      }
+    },
+    {
+      "id": "claim-dameisha-metro",
+      "canonical_text": "2023年12月深圳地铁8号线二期开通，大梅沙进入轨道交通网络。",
+      "claim_kind": "transport_change",
+      "certainty": "documented",
+      "review_state": "in_review",
+      "boundary_note": "现场地铁出口只能观察当前接驳，不能单独证明历史变化。",
+      "source_ids": [
+        "source-dameisha-metro",
+        "source-dameisha-archives"
+      ],
+      "support_notes": {
+        "source-dameisha-metro": "官方开通公告支持日期和线路事实。",
+        "source-dameisha-archives": "档案文章说明轨道交通对梅沙可达性的影响。"
+      }
+    },
+    {
+      "id": "claim-dameisha-1999",
+      "canonical_text": "大梅沙海滨公园作为深圳市1999年为民办实事项目建设并免费向公众开放。",
+      "claim_kind": "public_policy",
+      "certainty": "documented",
+      "review_state": "in_review",
+      "boundary_note": "天然岸线与公共海滨公园不是同一概念，后者包含公共投资和服务安排。",
+      "source_ids": [
+        "source-dameisha-park",
+        "source-dameisha-capacity"
+      ],
+      "support_notes": {
+        "source-dameisha-park": "政府公园资料记录建设背景。",
+        "source-dameisha-capacity": "盐田区资料记录1999年5月1日起免费开放。"
+      }
+    },
+    {
+      "id": "claim-dameisha-capacity",
+      "canonical_text": "盐田区公开资料称2009年5月2日大梅沙单日客流约32万人，而规划平均容量约1.2万至3万人。",
+      "claim_kind": "quantitative",
+      "certainty": "reported",
+      "review_state": "in_review",
+      "boundary_note": "这是特定历史日期的公开统计，今天现场人流不能证明该数字。",
+      "source_ids": [
+        "source-dameisha-capacity"
+      ],
+      "support_notes": {
+        "source-dameisha-capacity": "新闻发布资料给出峰值与规划容量区间。"
+      }
+    },
+    {
+      "id": "claim-dameisha-typhoon",
+      "canonical_text": "2018年台风山竹对大梅沙海滨公园造成严重破坏，2019年启动整体重建。",
+      "claim_kind": "disaster_reconstruction",
+      "certainty": "documented",
+      "review_state": "in_review",
+      "boundary_note": "今天可见的新景观不能单独证明灾害发生时间。",
+      "source_ids": [
+        "source-dameisha-park",
+        "source-dameisha-rebuild"
+      ],
+      "support_notes": {
+        "source-dameisha-park": "公园资料概述灾后重建时间。",
+        "source-dameisha-rebuild": "盐田区资料记录破坏和重建工程。"
+      }
+    },
+    {
+      "id": "claim-dameisha-resilience",
+      "canonical_text": "灾后重建把生态修复、慢行空间和海岸韧性纳入新的公园设计。",
+      "claim_kind": "planning_interpretation",
+      "certainty": "documented_and_interpretive",
+      "review_state": "in_review",
+      "boundary_note": "工程目标有官方资料支持，具体现场构件与目标的对应关系仍需实地复核。",
+      "source_ids": [
+        "source-dameisha-park",
+        "source-dameisha-rebuild"
+      ],
+      "support_notes": {
+        "source-dameisha-park": "公园资料描述生态修复园等重建空间。",
+        "source-dameisha-rebuild": "工程资料说明生态与韧性设计方向。"
+      }
+    }
+  ],
+  "fragments": [
+    {
+      "id": "dameisha-fragment-1",
+      "position": 1,
+      "title": "梅沙不是梅花的沙",
+      "safe_preview": "先从旧村与地名开始，听见旅游海滩之前的大梅沙。",
+      "narration_script": "先别急着走向海。你所在的梅沙，早在海滨公园出现以前就已经有了名字。深圳市档案馆整理的资料说，1688年的《新安县志》和1866年的地图中，都能找到大梅沙、小梅沙。这里的村民曾经靠农耕与捕鱼生活。至于梅沙为什么叫梅沙，有一种民俗解释认为，它可能来自客家话里形容沙粒细软的近音词；这是一种解释，不是已经盖棺定论的唯一词源。请看一看旧村公共街巷、老树与今天游客动线怎样挤在一起。眼前的照片只能证明旧村痕迹今天仍然可见，不能证明某棵树或某栋房子来自1688年。第一块线索是：在旅游公园之前，这里已经是一个被生活命名的地方。那么，是什么把这个偏远海湾真正拉进城市？",
+      "transcript": "先别急着走向海。你所在的梅沙，早在海滨公园出现以前就已经有了名字。深圳市档案馆整理的资料说，1688年的《新安县志》和1866年的地图中，都能找到大梅沙、小梅沙。这里的村民曾经靠农耕与捕鱼生活。至于梅沙为什么叫梅沙，有一种民俗解释认为，它可能来自客家话里形容沙粒细软的近音词；这是一种解释，不是已经盖棺定论的唯一词源。请看一看旧村公共街巷、老树与今天游客动线怎样挤在一起。眼前的照片只能证明旧村痕迹今天仍然可见，不能证明某棵树或某栋房子来自1688年。第一块线索是：在旅游公园之前，这里已经是一个被生活命名的地方。那么，是什么把这个偏远海湾真正拉进城市？",
+      "audio_path": "audio/dameisha-fragment-1-dameisha-2026.08-field.1.m4a",
+      "audio_mime_type": "audio/mp4",
+      "audio_size_bytes": 260499,
+      "script_version": "dameisha-2026.08-field.1",
+      "interaction_type": "photo",
+      "completion_threshold": 0.9,
+      "key_claim": "梅沙地名和村落生活早于旅游公园，词源解释需要与确定史实分开。",
+      "answers_question": "旅游公园之前的大梅沙是什么？",
+      "raises_question": "什么改变了海湾与城市的距离？",
+      "authenticity_label": "documented_with_interpretive_etymology",
+      "review_state": "in_review",
+      "claim_ids": [
+        "claim-dameisha-name",
+        "claim-dameisha-etymology"
+      ],
+      "dependency_ids": [],
+      "stop": {
+        "id": "dameisha-stop-1",
+        "title": "大梅沙旧村公共空间",
+        "kicker": "先听见海滩之前的村落",
+        "address": "大梅沙旧村公共步行区域候选点",
+        "latitude": 22.60025,
+        "longitude": 114.304,
+        "arrival_radius_m": 65,
+        "story_title": "梅沙不是梅花的沙",
+        "story_body": "梅沙地名和村落生活早于旅游公园。",
+        "audio_url": "audio/dameisha-fragment-1-dameisha-2026.08-field.1.m4a",
+        "image": "images/dameisha-remade-coast-v1.png",
+        "insight": "现场旧村痕迹只能支持今天仍可观察，不能替代历史文献。"
+      },
+      "trigger_region": {
+        "id": "dameisha-trigger-1",
+        "latitude": 22.60025,
+        "longitude": 114.304,
+        "entry_radius_m": 65,
+        "exit_radius_m": 100,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "in_review",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "mixed_map_inference",
+        "coordinate_source": "深圳档案馆地点描述、公开地图候选点，经WGS-84整理，待现场采样",
+        "field_notes": "只在旧村公共步行空间停留，不进入私人院落；确认老榕树关系。"
+      },
+      "photo_mission": {
+        "id": "dameisha-mission-1",
+        "prompt": "在不拍清他人面部的前提下，让旧村公共街巷或老树与通往海滨的人流同时进入画面。",
+        "field_subject": "旧村空间与当代游客动线的并置",
+        "safety_copy": "不要进入私人院落，不站在车道拍摄；拥挤时先放下手机。",
+        "accessibility_alternative": "可拍公共路牌、街巷入口或稍后补拍，不影响继续听故事。",
+        "authenticity_label": "present_day_observation_only",
+        "required": true,
+        "audit_state": "in_review"
+      }
+    },
+    {
+      "id": "dameisha-fragment-2",
+      "position": 2,
+      "title": "一条隧道把海湾拉进城市",
+      "safe_preview": "在地铁与公园入口之间，听一段关于距离的故事。",
+      "narration_script": "现在留意地铁出口、步行通道和不断抵达的人。今天到大梅沙像一次普通通勤，但档案资料描述的旧日梅沙，与城市之间隔着梧桐山。1987年梧桐山隧道通车，改变了当地人翻山进城的交通条件。交通并没有移动海湾，却重新定义了什么叫远。到了2023年12月，地铁8号线二期开通，大梅沙又进入轨道网络。不要把这段故事听成一条单线进步史：道路和地铁带来便利，也带来更多游客、开发压力和土地价值变化。你眼前的地铁只能证明今天的连接方式，不能单独证明1987年的生活。第二块线索是：交通工程改变了海湾与城市的实际距离。可达性提高以后，大梅沙还需要一次公共政策选择，才会成为全城共享的海滩。",
+      "transcript": "现在留意地铁出口、步行通道和不断抵达的人。今天到大梅沙像一次普通通勤，但档案资料描述的旧日梅沙，与城市之间隔着梧桐山。1987年梧桐山隧道通车，改变了当地人翻山进城的交通条件。交通并没有移动海湾，却重新定义了什么叫远。到了2023年12月，地铁8号线二期开通，大梅沙又进入轨道网络。不要把这段故事听成一条单线进步史：道路和地铁带来便利，也带来更多游客、开发压力和土地价值变化。你眼前的地铁只能证明今天的连接方式，不能单独证明1987年的生活。第二块线索是：交通工程改变了海湾与城市的实际距离。可达性提高以后，大梅沙还需要一次公共政策选择，才会成为全城共享的海滩。",
+      "audio_path": "audio/dameisha-fragment-2-dameisha-2026.08-field.1.m4a",
+      "audio_mime_type": "audio/mp4",
+      "audio_size_bytes": 269135,
+      "script_version": "dameisha-2026.08-field.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "1987年隧道与2023年地铁先后改变梅沙的可达性。",
+      "answers_question": "什么改变了海湾与城市的距离？",
+      "raises_question": "可达的自然岸线如何变成公共海滩？",
+      "authenticity_label": "documented_transport_history",
+      "review_state": "in_review",
+      "claim_ids": [
+        "claim-dameisha-tunnel",
+        "claim-dameisha-metro"
+      ],
+      "dependency_ids": [
+        "dameisha-fragment-1"
+      ],
+      "stop": {
+        "id": "dameisha-stop-2",
+        "title": "大梅沙站与公园入口",
+        "kicker": "一条交通线改变了远近",
+        "address": "大梅沙地铁站公共出口至公园入口步行空间",
+        "latitude": 22.596989,
+        "longitude": 114.303031,
+        "arrival_radius_m": 55,
+        "story_title": "一条隧道把海湾拉进城市",
+        "story_body": "交通没有移动海湾，却改变了城市人抵达它的时间。",
+        "audio_url": "audio/dameisha-fragment-2-dameisha-2026.08-field.1.m4a",
+        "image": "images/dameisha-remade-coast-v1.png",
+        "insight": "距离不仅是公里数，也由交通制度和基础设施定义。"
+      },
+      "trigger_region": {
+        "id": "dameisha-trigger-2",
+        "latitude": 22.596989,
+        "longitude": 114.303031,
+        "entry_radius_m": 55,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "in_review",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "公开地理数据中的大梅沙站坐标，待设备实测",
+        "field_notes": "触发点应在出口外公共铺装面，不停留在闸机或楼梯口。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "dameisha-fragment-3",
+      "position": 3,
+      "title": "免费海滩是一种公共政策",
+      "safe_preview": "站在公共服务空间里，辨认一片海岸如何成为城市产品。",
+      "narration_script": "从这里看海，很容易觉得沙滩一直天然地属于所有人。但自然岸线和免费公共海滨公园不是一回事。深圳政府资料把大梅沙海滨公园列入1999年为民办实事项目；盐田区资料记载，公园从当年5月1日起免费向公众开放。免费不是海水自身的属性，它需要公共投资、清洁、救生、交通、厕所、边界和管理来维持。也正因为这是一项公共服务，大梅沙的价值不能只用门票收入衡量。请观察入口、救生提示、冲洗或环境维护设施：这些不显眼的系统，才让一片岸线能够被大量陌生人共同使用。第三块线索是：公共政策把海岸转化成市民共享空间。但共享并不等于没有上限。当越来越多人同时抵达，会发生什么？",
+      "transcript": "从这里看海，很容易觉得沙滩一直天然地属于所有人。但自然岸线和免费公共海滨公园不是一回事。深圳政府资料把大梅沙海滨公园列入1999年为民办实事项目；盐田区资料记载，公园从当年5月1日起免费向公众开放。免费不是海水自身的属性，它需要公共投资、清洁、救生、交通、厕所、边界和管理来维持。也正因为这是一项公共服务，大梅沙的价值不能只用门票收入衡量。请观察入口、救生提示、冲洗或环境维护设施：这些不显眼的系统，才让一片岸线能够被大量陌生人共同使用。第三块线索是：公共政策把海岸转化成市民共享空间。但共享并不等于没有上限。当越来越多人同时抵达，会发生什么？",
+      "audio_path": "audio/dameisha-fragment-3-dameisha-2026.08-field.1.m4a",
+      "audio_mime_type": "audio/mp4",
+      "audio_size_bytes": 264811,
+      "script_version": "dameisha-2026.08-field.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "1999年的免费海滨公园是公共政策与公共服务，而非自然状态。",
+      "answers_question": "可达的岸线如何变成公共海滩？",
+      "raises_question": "无限需求如何面对有限海岸？",
+      "authenticity_label": "documented_public_policy",
+      "review_state": "in_review",
+      "claim_ids": [
+        "claim-dameisha-1999"
+      ],
+      "dependency_ids": [
+        "dameisha-fragment-2"
+      ],
+      "stop": {
+        "id": "dameisha-stop-3",
+        "title": "中央公共海滨广场",
+        "kicker": "免费背后是一整套公共服务",
+        "address": "大梅沙海滨公园中央陆侧公共铺装区域",
+        "latitude": 22.59439,
+        "longitude": 114.30398,
+        "arrival_radius_m": 55,
+        "story_title": "免费海滩是一种公共政策",
+        "story_body": "自然岸线需要公共投资和管理，才成为可共享的城市空间。",
+        "audio_url": "audio/dameisha-fragment-3-dameisha-2026.08-field.1.m4a",
+        "image": "images/dameisha-remade-coast-v1.png",
+        "insight": "公共性不是没有成本，而是由城市共同承担成本。"
+      },
+      "trigger_region": {
+        "id": "dameisha-trigger-3",
+        "latitude": 22.59439,
+        "longitude": 114.30398,
+        "entry_radius_m": 55,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "in_review",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84_open_map",
+        "coordinate_source": "公开地图海滨公园步行区域候选点，待设备实测",
+        "field_notes": "现场确认中心位于陆侧铺装面，不能在潮线或沙滩深处。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "dameisha-fragment-4",
+      "position": 4,
+      "title": "当三十二万人走进一片沙滩",
+      "safe_preview": "从管理设施与可用空间之间，理解免费开放的另一面。",
+      "narration_script": "现在不要只看海景，看看人从哪里进入、在哪里聚集、管理线怎样组织空间。盐田区公开资料称，2009年5月2日，大梅沙单日客流一度约32万人；而当时资料所列的规划平均容量，大约是1.2万到3万人。这两个数字不是让你想象一个热闹纪录，而是在提醒：公共空间越成功，越可能逼近自己的物理上限。拥挤会同时影响救生、交通、垃圾处理、沙滩生态与人的体验，后来出现限量和预约管理，也正是在免费公共产品与有限承载力之间找平衡。你今天看到的人多人少，都不能证明2009年的数字。请拍下管理设施与公共空间的关系，避开可辨认的人脸。第四块线索是：免费开放放大了承载力与安全治理的矛盾。可即使治理能够控制人流，海岸还会面对一种城市无法预约的力量。",
+      "transcript": "现在不要只看海景，看看人从哪里进入、在哪里聚集、管理线怎样组织空间。盐田区公开资料称，2009年5月2日，大梅沙单日客流一度约32万人；而当时资料所列的规划平均容量，大约是1.2万到3万人。这两个数字不是让你想象一个热闹纪录，而是在提醒：公共空间越成功，越可能逼近自己的物理上限。拥挤会同时影响救生、交通、垃圾处理、沙滩生态与人的体验，后来出现限量和预约管理，也正是在免费公共产品与有限承载力之间找平衡。你今天看到的人多人少，都不能证明2009年的数字。请拍下管理设施与公共空间的关系，避开可辨认的人脸。第四块线索是：免费开放放大了承载力与安全治理的矛盾。可即使治理能够控制人流，海岸还会面对一种城市无法预约的力量。",
+      "audio_path": "audio/dameisha-fragment-4-dameisha-2026.08-field.1.m4a",
+      "audio_mime_type": "audio/mp4",
+      "audio_size_bytes": 300305,
+      "script_version": "dameisha-2026.08-field.1",
+      "interaction_type": "photo",
+      "completion_threshold": 0.9,
+      "key_claim": "历史峰值客流与规划容量差距揭示免费公共海岸的承载力矛盾。",
+      "answers_question": "无限需求如何面对有限海岸？",
+      "raises_question": "风暴之后，海岸是否只需恢复原样？",
+      "authenticity_label": "reported_quantitative_context",
+      "review_state": "in_review",
+      "claim_ids": [
+        "claim-dameisha-capacity"
+      ],
+      "dependency_ids": [
+        "dameisha-fragment-3"
+      ],
+      "stop": {
+        "id": "dameisha-stop-4",
+        "title": "西部管理与公共空间观察点",
+        "kicker": "成功的公共空间也会逼近上限",
+        "address": "大梅沙海滨公园西部公共步行区域",
+        "latitude": 22.592855,
+        "longitude": 114.300787,
+        "arrival_radius_m": 55,
+        "story_title": "当三十二万人走进一片沙滩",
+        "story_body": "免费开放与有限承载力必须由治理持续协调。",
+        "audio_url": "audio/dameisha-fragment-4-dameisha-2026.08-field.1.m4a",
+        "image": "images/dameisha-remade-coast-v1.png",
+        "insight": "人流管理不是公共性的反面，而是维持公共性的条件之一。"
+      },
+      "trigger_region": {
+        "id": "dameisha-trigger-4",
+        "latitude": 22.592855,
+        "longitude": 114.300787,
+        "entry_radius_m": 55,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "in_review",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84_geotag",
+        "coordinate_source": "公开地理照片标记的公园候选点，待设备实测",
+        "field_notes": "确认不在机动车道、临时围挡或潮湿斜坡。"
+      },
+      "photo_mission": {
+        "id": "dameisha-mission-4",
+        "prompt": "拍下入口、分流、救生提示或其他管理设施与可用公共空间的关系，不拍清陌生人的脸。",
+        "field_subject": "承载力管理如何进入公共海岸",
+        "safety_copy": "拥挤时不要逆行或停在通道中央；可以不拍人群。",
+        "accessibility_alternative": "可拍空置分流栏、提示牌或远景，并可稍后完成。",
+        "authenticity_label": "present_day_management_observation",
+        "required": true,
+        "audit_state": "in_review"
+      }
+    },
+    {
+      "id": "dameisha-fragment-5",
+      "position": 5,
+      "title": "风暴没有让海岸回到原样",
+      "safe_preview": "在重建后的步道与植物之间，收起最后一块故事碎片。",
+      "narration_script": "最后，请把注意力从沙滩移到步道、植物、排水和高差。2018年，台风山竹严重破坏大梅沙海滨公园；官方资料记载，2019年启动整体重建。重建并不是把每件东西原封不动放回去。新的工程把生态修复、慢行空间和抵抗风浪的韧性纳入设计，也保留部分早已进入城市记忆的景观符号。这里需要谨慎：官方资料能说明工程目标，但你眼前某一株植物、某一道沟槽是否直接承担防灾功能，还需要现场标识和专业资料确认。请尝试让一个被保留的旧符号与新的景观系统同框。最后一块线索是：灾后重建让公共海岸加入了韧性与生态目标。现在五块线索可以拼在一起了——村落给它名字，交通改变距离，政策创造公共性，人群暴露上限，风暴迫使城市重新设计海岸。",
+      "transcript": "最后，请把注意力从沙滩移到步道、植物、排水和高差。2018年，台风山竹严重破坏大梅沙海滨公园；官方资料记载，2019年启动整体重建。重建并不是把每件东西原封不动放回去。新的工程把生态修复、慢行空间和抵抗风浪的韧性纳入设计，也保留部分早已进入城市记忆的景观符号。这里需要谨慎：官方资料能说明工程目标，但你眼前某一株植物、某一道沟槽是否直接承担防灾功能，还需要现场标识和专业资料确认。请尝试让一个被保留的旧符号与新的景观系统同框。最后一块线索是：灾后重建让公共海岸加入了韧性与生态目标。现在五块线索可以拼在一起了——村落给它名字，交通改变距离，政策创造公共性，人群暴露上限，风暴迫使城市重新设计海岸。",
+      "audio_path": "audio/dameisha-fragment-5-dameisha-2026.08-field.1.m4a",
+      "audio_mime_type": "audio/mp4",
+      "audio_size_bytes": 290764,
+      "script_version": "dameisha-2026.08-field.1",
+      "interaction_type": "photo",
+      "completion_threshold": 0.9,
+      "key_claim": "山竹后的重建不只恢复设施，也加入生态修复与海岸韧性目标。",
+      "answers_question": "风暴之后，海岸是否只需恢复原样？",
+      "raises_question": "五种力量如何共同塑造今天的大梅沙？",
+      "authenticity_label": "documented_rebuild_with_field_interpretation",
+      "review_state": "in_review",
+      "claim_ids": [
+        "claim-dameisha-typhoon",
+        "claim-dameisha-resilience"
+      ],
+      "dependency_ids": [
+        "dameisha-fragment-4"
+      ],
+      "stop": {
+        "id": "dameisha-stop-5",
+        "title": "西部重建海岸公园",
+        "kicker": "恢复原样并不是唯一答案",
+        "address": "大梅沙西部重建滨海公共步道候选点",
+        "latitude": 22.590907,
+        "longitude": 114.299492,
+        "arrival_radius_m": 55,
+        "story_title": "风暴没有让海岸回到原样",
+        "story_body": "灾后重建把生态修复和韧性加入公共海岸。",
+        "audio_url": "audio/dameisha-fragment-5-dameisha-2026.08-field.1.m4a",
+        "image": "images/dameisha-remade-coast-v1.png",
+        "insight": "重建不是回到过去，而是在下一次风险到来前改变系统。"
+      },
+      "trigger_region": {
+        "id": "dameisha-trigger-5",
+        "latitude": 22.590907,
+        "longitude": 114.299492,
+        "entry_radius_m": 55,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "in_review",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84_geotag",
+        "coordinate_source": "公开地理照片标记的西部公园候选点，待设备实测",
+        "field_notes": "确认干燥铺装、护栏与可安全停留位置；不靠近浪溅区。"
+      },
+      "photo_mission": {
+        "id": "dameisha-mission-5",
+        "prompt": "寻找一个旧的景观符号与新的植物、步道、排水或高差设计同框的角度。",
+        "field_subject": "保留记忆与灾后新系统的并置",
+        "safety_copy": "不攀爬护栏，不进入绿化和浪溅区域；雨天只观察不拍摄。",
+        "accessibility_alternative": "可拍任一明确的新旧并置细节，也可以用文字回看代替现场拍照。",
+        "authenticity_label": "interpretive_location_pending_field_audit",
+        "required": true,
+        "audit_state": "in_review"
+      }
+    }
+  ]
+}

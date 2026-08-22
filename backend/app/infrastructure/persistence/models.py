@@ -63,6 +63,8 @@ class RouteModel(Base):
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
     content_status: Mapped[str] = mapped_column(String(40), default="demo_unverified")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    managed_package_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    managed_package_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     city: Mapped[CityModel] = relationship(back_populates="routes")
     stops: Mapped[list[StopModel]] = relationship(
@@ -207,7 +209,7 @@ class StoryArcModel(Base):
     title: Mapped[str] = mapped_column(String(255))
     central_question: Mapped[str] = mapped_column(Text)
     complete_story: Mapped[str] = mapped_column(Text)
-    causal_model_json: Mapped[list[str]] = mapped_column(JSON)
+    causal_model_json: Mapped[list[dict | str]] = mapped_column(JSON)
     pronunciation_notes_json: Mapped[list[str]] = mapped_column(JSON, default=list)
     script_version: Mapped[str] = mapped_column(String(40))
     review_state: Mapped[str] = mapped_column(String(40), default="in_review")
@@ -290,6 +292,10 @@ class TriggerRegionModel(Base):
     sample_window_seconds: Mapped[int] = mapped_column(Integer, default=15)
     cooldown_seconds: Mapped[int] = mapped_column(Integer, default=120)
     audit_state: Mapped[str] = mapped_column(String(40), default="in_review")
+    coordinate_system: Mapped[str] = mapped_column(String(20), default="WGS84")
+    source_coordinate_system: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    coordinate_source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    field_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     fragment: Mapped[StoryFragmentModel] = relationship(back_populates="trigger_region")
 

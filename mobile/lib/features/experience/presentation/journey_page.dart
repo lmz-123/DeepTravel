@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,14 @@ class JourneyPage extends ConsumerStatefulWidget {
 
 class _JourneyPageState extends ConsumerState<JourneyPage> {
   bool _started = false;
+  OverlayEntry? _feedbackOverlay;
+  Timer? _feedbackTimer;
+
+  @override
+  void dispose() {
+    _clearRootFeedback();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -136,6 +145,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                   Padding(
                       padding: const EdgeInsets.only(top: 22),
                       child: _ReconstructionCard(
+                          clueCount: ledger.totalCount,
                           onPressed: () => _showReconstruction(ledger))),
               ],
               if (AppConfig.enableDemoTriggers &&
@@ -194,14 +204,12 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
   }
 
   Future<void> _showReconstruction(StoryLedger ledger) async {
-    const authored = [
-      '行政建置早于现存城垣',
-      '县治迁走，不等于地点失去所有功能',
-      '军事所城后来承载新安县治',
-      '国家政策可以让行政中心和居民生活同时中断',
-      '现代中心迁走后，旧城被重新赋予历史与文化角色',
-    ];
-    var values = List<String>.from(authored.reversed);
+    if (ledger.reconstructionItems.isEmpty) {
+      _showRootFeedback('故事关系还没有从服务器加载完成，请稍后重试。');
+      return;
+    }
+    var values = List<ReconstructionItem>.from(ledger.reconstructionItems);
+    var mismatchPositions = <int>{};
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -215,10 +223,10 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('拼回“中心”的变化',
+                        Text('拼回完整故事',
                             style: Theme.of(context).textTheme.headlineMedium),
                         const SizedBox(height: 8),
-                        const Text('长按拖动，让五种关系形成有解释力的历史链。'),
+                        const Text('长按拖动，让这些关系形成有解释力的历史链。'),
                         const SizedBox(height: 16),
                         Expanded(
                             child: ReorderableListView.builder(
@@ -227,35 +235,69 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                                   setSheetState(() {
                                     values.insert(
                                         newIndex, values.removeAt(oldIndex));
+                                    mismatchPositions = {};
                                   });
                                 },
                                 itemBuilder: (context, index) => Card(
-                                    key: ValueKey(values[index]),
+                                    key: ValueKey(values[index].id),
+                                    color: mismatchPositions.contains(index)
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .errorContainer
+                                        : null,
+                                    shape: RoundedRectangleBorder(
+                                        side: BorderSide(
+                                            color: mismatchPositions
+                                                    .contains(index)
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .error
+                                                : Colors.transparent,
+                                            width: 1.5),
+                                        borderRadius:
+                                            BorderRadius.circular(16)),
                                     child: ListTile(
+                                        key: ValueKey(
+                                            'reconstruction-${values[index].id}'),
                                         leading: CircleAvatar(
                                             backgroundColor: AppColors.ink,
                                             foregroundColor: AppColors.white,
                                             child: Text('${index + 1}')),
-                                        title: Text(values[index]),
-                                        trailing: const Icon(
-                                            Icons.drag_handle_rounded))))),
+                                        title: Text(values[index].text),
+                                        trailing:
+                                            const Icon(Icons.drag_handle_rounded))))),
                         SizedBox(
                             width: double.infinity,
                             child: FilledButton(
                                 onPressed: () async {
-                                  final result = await ref
-                                      .read(
-                                          activeTourControllerProvider.notifier)
-                                      .reconstruct(values);
-                                  if (!context.mounted) return;
-                                  if (!result.correct) {
-                                    if (!mounted) return;
-                                    ScaffoldMessenger.of(this.context)
-                                        .showSnackBar(SnackBar(
-                                            content: Text(
-                                                '还有 ${result.feedback.length} 处关系没有接上。留意行政、军事、人口与现代城市的变化。')));
+                                  ReconstructionResult result;
+                                  try {
+                                    result = await ref
+                                        .read(activeTourControllerProvider
+                                            .notifier)
+                                        .reconstruct(values
+                                            .map((item) => item.id)
+                                            .toList());
+                                  } catch (_) {
+                                    _showRootFeedback(
+                                        '提交失败，当前顺序已经保留，请检查网络后重试。');
                                     return;
                                   }
+                                  if (!context.mounted) return;
+                                  if (!result.correct) {
+                                    setSheetState(() {
+                                      mismatchPositions = result.feedback
+                                          .map((item) => item['position'])
+                                          .whereType<int>()
+                                          .map((position) => position - 1)
+                                          .where((position) => position >= 0)
+                                          .toSet();
+                                    });
+                                    _showRootFeedback(
+                                        '还有 ${result.feedback.length} 处关系没有接上，红色线索的位置需要调整。');
+                                    return;
+                                  }
+                                  _clearRootFeedback();
                                   Navigator.pop(context);
                                   final recap = await ref
                                       .read(
@@ -270,6 +312,63 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                 ),
               )),
     );
+  }
+
+  void _showRootFeedback(String message) {
+    _clearRootFeedback();
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _feedbackOverlay = OverlayEntry(
+        builder: (context) => Positioned(
+              top: MediaQuery.paddingOf(context).top + 14,
+              left: 18,
+              right: 18,
+              child: SafeArea(
+                bottom: false,
+                child: Semantics(
+                  liveRegion: true,
+                  button: true,
+                  label: message,
+                  hint: '轻触关闭',
+                  child: GestureDetector(
+                    onTap: _clearRootFeedback,
+                    child: Material(
+                      key: const ValueKey('reconstruction-feedback-overlay'),
+                      elevation: 16,
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(18),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 14),
+                        child: Row(children: [
+                          Icon(Icons.account_tree_rounded,
+                              color: Theme.of(context).colorScheme.error),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Text(message,
+                                  style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onErrorContainer,
+                                      fontWeight: FontWeight.w600))),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ));
+    overlay.insert(_feedbackOverlay!);
+    _feedbackTimer = Timer(const Duration(seconds: 5), () {
+      _feedbackOverlay?.remove();
+      _feedbackOverlay = null;
+    });
+  }
+
+  void _clearRootFeedback() {
+    _feedbackTimer?.cancel();
+    _feedbackTimer = null;
+    _feedbackOverlay?.remove();
+    _feedbackOverlay = null;
   }
 
   void _showCompleteStory(FragmentRecap recap) {
@@ -778,7 +877,8 @@ class _LedgerEntry extends StatelessWidget {
 }
 
 class _ReconstructionCard extends StatelessWidget {
-  const _ReconstructionCard({required this.onPressed});
+  const _ReconstructionCard({required this.clueCount, required this.onPressed});
+  final int clueCount;
   final VoidCallback onPressed;
   @override
   Widget build(BuildContext context) => Container(
@@ -789,7 +889,7 @@ class _ReconstructionCard extends StatelessWidget {
         const Icon(Icons.account_tree_outlined,
             color: AppColors.white, size: 32),
         const SizedBox(height: 12),
-        Text('五条线索已经齐了',
+        Text('$clueCount 条线索已经齐了',
             style: Theme.of(context)
                 .textTheme
                 .titleLarge

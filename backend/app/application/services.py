@@ -210,6 +210,8 @@ class JourneyService:
                 raise JourneyConflictError("只能回答当前站点的问题")
             if journey.arrived_stop_id != stop_id:
                 raise JourneyConflictError("到达站点后才能回答观察问题")
+            if stop.challenge is None:
+                raise ValidationError("该站点使用碎片导览任务，不提供传统观察问题")
             if selected_option < 0 or selected_option >= len(stop.challenge.options):
                 raise ValidationError("答案选项不存在")
             answer = JourneyAnswer(

@@ -207,6 +207,64 @@ void main() {
     expect(player.playedFragmentIds, ['fragment-2', 'fragment-3']);
     expect(find.text('第三条线索'), findsOneWidget);
   });
+
+  testWidgets(
+      'reconstruction uses server items and shows mismatch above the bottom sheet',
+      (tester) async {
+    final store = _MemoryTourStore();
+    final repository = _ReconstructionRepository();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(_SilentNarrationPlayer()),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(container.dispose);
+
+    await container
+        .read(journeyControllerProvider.notifier)
+        .start(_twoFragmentRoute);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-1')),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(find.text('开始重构故事'),
+        find.byType(ListView).first, const Offset(0, -260));
+    await tester.ensureVisible(find.text('开始重构故事'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('开始重构故事'));
+    await tester.pumpAndSettle();
+    expect(find.text('服务器给出的第二项'), findsOneWidget);
+    expect(find.text('服务器给出的第一项'), findsOneWidget);
+
+    await tester.tap(find.text('提交这条历史因果链'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(repository.submittedIds, ['cause-2', 'cause-1']);
+    final feedback =
+        find.byKey(const ValueKey('reconstruction-feedback-overlay'));
+    expect(feedback, findsOneWidget);
+    expect(find.textContaining('红色线索的位置需要调整'), findsOneWidget);
+    final mismatchedCard = tester.widget<Card>(find.ancestor(
+        of: find.byKey(const ValueKey('reconstruction-cause-2')),
+        matching: find.byType(Card)));
+    expect(mismatchedCard.color, isNotNull);
+    expect(tester.getTopLeft(feedback).dy,
+        lessThan(tester.getTopLeft(find.text('拼回完整故事')).dy));
+
+    await tester.tap(find.text('提交这条历史因果链'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reconstruction-feedback-overlay')),
+        findsNothing);
+    expect(find.text('测试完整故事正文'), findsOneWidget);
+  });
 }
 
 Future<void> _waitUntil(bool Function() condition) async {
@@ -454,6 +512,59 @@ class _ProgressingFragmentRepository extends _FragmentRepository {
       dependencyIds: source.dependencyIds,
     );
   }
+}
+
+class _ReconstructionRepository extends _ProgressingFragmentRepository {
+  _ReconstructionRepository()
+      : super(initialStates: const {
+          'fragment-1': 'collected',
+          'fragment-2': 'collected',
+        });
+
+  List<String> submittedIds = [];
+  int reconstructionAttempts = 0;
+
+  @override
+  Future<StoryLedger> ledger(String journeyId) async {
+    final current = await super.ledger(journeyId);
+    return StoryLedger(
+      centralQuestion: current.centralQuestion,
+      collectedCount: current.collectedCount,
+      totalCount: current.totalCount,
+      reconstructionUnlocked: true,
+      entries: current.entries,
+      reconstructionItems: const [
+        ReconstructionItem(id: 'cause-2', text: '服务器给出的第二项'),
+        ReconstructionItem(id: 'cause-1', text: '服务器给出的第一项'),
+      ],
+    );
+  }
+
+  @override
+  Future<ReconstructionResult> reconstruct(
+      String journeyId, List<String> relationships) async {
+    submittedIds = List<String>.from(relationships);
+    reconstructionAttempts += 1;
+    if (reconstructionAttempts > 1) {
+      return const ReconstructionResult(
+          correct: true, feedback: [], completeStoryUnlocked: true);
+    }
+    return const ReconstructionResult(
+        correct: false,
+        feedback: [
+          {'position': 1, 'submitted': 'cause-2'}
+        ],
+        completeStoryUnlocked: false);
+  }
+
+  @override
+  Future<FragmentRecap> fragmentRecap(String journeyId) async =>
+      const FragmentRecap(
+          title: '测试故事',
+          centralQuestion: '中心为什么迁移？',
+          completeStory: '测试完整故事正文',
+          causalModel: ['第一项', '第二项'],
+          fragments: [_fragment, _secondFragment]);
 }
 
 class _RecordingLocationTracker implements LocationTracker {

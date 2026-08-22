@@ -1,3 +1,4 @@
+from app.infrastructure.persistence.models import RouteModel
 from app.infrastructure.persistence.seed import seed_database
 
 
@@ -165,3 +166,17 @@ def test_seed_is_idempotent(app):
     session = database.session_factory()
     assert seed_database(session) is False
     session.close()
+
+
+def test_legacy_admin_published_status_remains_public(app, client):
+    database = app.extensions["database"]
+    session = database.session_factory()
+    route = session.query(RouteModel).filter_by(slug="nantou-time-layers").one()
+    route.content_status = "published"
+    session.commit()
+    session.close()
+
+    response = client.get("/api/v1/routes/nantou-time-layers")
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["content_status"] == "verified"

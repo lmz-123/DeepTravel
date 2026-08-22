@@ -7,6 +7,11 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.domain.content_graph import (
+    normalize_reconstruction_items,
+    reconstruction_ids,
+    shuffled_reconstruction_items,
+)
 from app.domain.errors import FragmentOperationError, JourneyNotFoundError
 from app.domain.fragment_rules import evaluate_trigger, playback_state, reconstruction_feedback
 from app.infrastructure.persistence.models import (
@@ -460,12 +465,18 @@ class FragmentTourService:
                 else:
                     entries.append({**self._public_fragment(fragment), "state": state.state})
             collected = sum(1 for item in states.values() if item.state == "collected")
+            reconstruction_unlocked = collected == len(entries)
             return {
                 "journey_id": journey_id,
                 "central_question": arc.central_question,
                 "collected_count": collected,
                 "total_count": len(entries),
-                "reconstruction_unlocked": collected == len(entries),
+                "reconstruction_unlocked": reconstruction_unlocked,
+                "reconstruction_items": shuffled_reconstruction_items(
+                    arc.causal_model_json, journey_id=journey_id
+                )
+                if reconstruction_unlocked
+                else [],
                 "entries": entries,
             }
 
@@ -491,7 +502,11 @@ class FragmentTourService:
                         "total_count": len(states),
                     },
                 )
-            correct, feedback = reconstruction_feedback(list(arc.causal_model_json), submitted)
+            items = normalize_reconstruction_items(arc.causal_model_json)
+            expected = reconstruction_ids(arc.causal_model_json)
+            text_to_id = {item["text"]: item["id"] for item in items}
+            submitted_ids = [text_to_id.get(value, value) for value in submitted]
+            correct, feedback = reconstruction_feedback(expected, submitted_ids)
             record = session.scalar(
                 select(ReconstructionModel).where(ReconstructionModel.journey_id == journey_id)
             )
@@ -500,14 +515,14 @@ class FragmentTourService:
                 record = ReconstructionModel(
                     id=str(uuid4()),
                     journey_id=journey_id,
-                    submitted_model_json=submitted,
+                    submitted_model_json=submitted_ids,
                     is_correct=correct,
                     attempt_count=1,
                     completed_at=now if correct else None,
                 )
                 session.add(record)
             else:
-                record.submitted_model_json = submitted
+                record.submitted_model_json = submitted_ids
                 record.is_correct = correct
                 record.attempt_count += 1
                 record.completed_at = now if correct else record.completed_at
@@ -555,7 +570,9 @@ class FragmentTourService:
                 "title": arc.title,
                 "central_question": arc.central_question,
                 "complete_story": arc.complete_story,
-                "causal_model": arc.causal_model_json,
+                "causal_model": [
+                    item["text"] for item in normalize_reconstruction_items(arc.causal_model_json)
+                ],
                 "review_state": arc.review_state,
                 "fragments": [
                     self._revealed_fragment(
@@ -567,7 +584,7 @@ class FragmentTourService:
             }
 
     def health(self) -> dict:
-        assets = list((self.media_root / "audio").glob("nantou-fragment-*.m4a"))
+        assets = list((self.media_root / "audio").glob("*.m4a"))
         return {
             "evidence_storage": "up" if self.evidence_storage.healthy() else "down",
             "narration_assets": "up" if len(assets) >= 5 else "down",

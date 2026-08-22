@@ -32,6 +32,9 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     assert tour["download_size_bytes"] > 0
     assert "transcript" not in tour["fragments"][0]
     assert tour["fragments"][0]["audio"]["url"].endswith(".m4a")
+    audio = client.get("/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-review.1.m4a")
+    assert audio.status_code == 200
+    assert audio.content_type == "audio/mp4"
 
 
 def test_trigger_accuracy_distance_and_idempotency(client, guest_headers, caplog):
@@ -130,6 +133,8 @@ def test_complete_fragment_arc_with_private_evidence_and_reconstruction(client, 
     ]
     assert ledger["collected_count"] == 5
     assert ledger["reconstruction_unlocked"] is True
+    assert len(ledger["reconstruction_items"]) == 5
+    assert all(set(item) == {"id", "text"} for item in ledger["reconstruction_items"])
     expected = [
         "行政建置早于现存城垣",
         "县治迁走，不等于地点失去所有功能",
@@ -144,9 +149,14 @@ def test_complete_fragment_arc_with_private_evidence_and_reconstruction(client, 
     ).get_json()["data"]
     assert wrong["correct"] is False
     assert wrong["feedback"]
+    assert "expected_hint" not in wrong["feedback"][0]
+    configured_order = [
+        next(item["id"] for item in ledger["reconstruction_items"] if item["text"] == text)
+        for text in expected
+    ]
     success = client.post(
         f"/api/v1/journeys/{journey_id}/reconstruction",
-        json={"relationships": expected},
+        json={"relationships": configured_order},
         headers=guest_headers,
     ).get_json()["data"]
     assert success["correct"] is True

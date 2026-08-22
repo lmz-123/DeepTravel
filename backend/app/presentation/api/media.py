@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 from urllib.parse import quote
 
@@ -25,4 +26,11 @@ def send_media_asset(asset_path: str):
         abort(404)
     if not candidate.is_file():
         abort(404)
-    return send_from_directory(media_root, candidate.relative_to(media_root).as_posix())
+    mime_type = mimetypes.guess_type(candidate.name)[0]
+    if candidate.suffix.lower() == ".m4a":
+        mime_type = "audio/mp4"
+    return send_from_directory(
+        media_root,
+        candidate.relative_to(media_root).as_posix(),
+        mimetype=mime_type,
+    )

@@ -24,7 +24,9 @@ from app.infrastructure.persistence.models import (
 )
 
 
-def _challenge_to_domain(model: object) -> Challenge:
+def _challenge_to_domain(model: object | None) -> Challenge | None:
+    if model is None:
+        return None
     return Challenge(
         id=model.id,
         stop_id=model.stop_id,
@@ -57,6 +59,11 @@ def _stop_to_domain(model: StopModel) -> Stop:
 
 
 def _route_to_domain(model: RouteModel, include_stops: bool = True) -> Route:
+    content_status = (
+        ContentStatus.VERIFIED
+        if model.content_status == "published"
+        else ContentStatus(model.content_status)
+    )
     return Route(
         id=model.id,
         city_id=model.city_id,
@@ -70,7 +77,7 @@ def _route_to_domain(model: RouteModel, include_stops: bool = True) -> Route:
         theme=model.theme,
         hero_image=model.hero_image,
         is_featured=model.is_featured,
-        content_status=ContentStatus(model.content_status),
+        content_status=content_status,
         stops=tuple(_stop_to_domain(stop) for stop in model.stops) if include_stops else (),
     )
 

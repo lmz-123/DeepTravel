@@ -43,7 +43,7 @@ class Stop:
     audio_url: str | None
     image: str
     insight: str
-    challenge: Challenge
+    challenge: Challenge | None
 
 
 @dataclass(frozen=True, slots=True)

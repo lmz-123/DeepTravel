@@ -59,7 +59,9 @@ def stop_to_dict(stop: Stop) -> dict:
             "prompt": stop.challenge.prompt,
             "hint": stop.challenge.hint,
             "options": list(stop.challenge.options),
-        },
+        }
+        if stop.challenge
+        else None,
     }
 
 
