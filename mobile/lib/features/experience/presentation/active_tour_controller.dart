@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/logging/runtime_log_reporter.dart';
 import '../application/trigger_engine.dart';
 import '../data/api_experience_repository.dart';
 import '../data/local_tour_store.dart';
@@ -30,6 +31,33 @@ final narrationPlayerProvider = Provider<NarrationPlayer>((ref) {
 final preparedRouteServiceProvider = Provider<PreparedRouteService>((ref) =>
     PreparedRouteService(ref.watch(dioProvider), ref.watch(tourStoreProvider)));
 
+enum EvidenceUploadPhase { captured, uploading, queued, accepted }
+
+class EvidenceUploadState {
+  const EvidenceUploadState({
+    required this.filePath,
+    required this.idempotencyKey,
+    required this.phase,
+    this.evidenceId,
+  });
+
+  final String filePath;
+  final String idempotencyKey;
+  final EvidenceUploadPhase phase;
+  final String? evidenceId;
+
+  EvidenceUploadState copyWith({
+    EvidenceUploadPhase? phase,
+    String? evidenceId,
+  }) =>
+      EvidenceUploadState(
+        filePath: filePath,
+        idempotencyKey: idempotencyKey,
+        phase: phase ?? this.phase,
+        evidenceId: evidenceId ?? this.evidenceId,
+      );
+}
+
 class ActiveTourState {
   const ActiveTourState({
     this.status = 'idle',
@@ -47,7 +75,7 @@ class ActiveTourState {
     this.locationMode = TourLocationMode.real,
     this.locationMessage,
     this.errorMessage,
-    this.pendingPhotoPath,
+    this.evidenceUploads = const {},
   });
 
   final String status;
@@ -65,7 +93,7 @@ class ActiveTourState {
   final TourLocationMode locationMode;
   final String? locationMessage;
   final String? errorMessage;
-  final String? pendingPhotoPath;
+  final Map<String, EvidenceUploadState> evidenceUploads;
 
   ActiveTourState copyWith(
           {String? status,
@@ -86,8 +114,7 @@ class ActiveTourState {
           bool clearLocationMessage = false,
           String? errorMessage,
           bool clearError = false,
-          String? pendingPhotoPath,
-          bool clearPendingPhoto = false}) =>
+          Map<String, EvidenceUploadState>? evidenceUploads}) =>
       ActiveTourState(
         status: status ?? this.status,
         route: route ?? this.route,
@@ -106,10 +133,11 @@ class ActiveTourState {
             ? null
             : locationMessage ?? this.locationMessage,
         errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
-        pendingPhotoPath: clearPendingPhoto
-            ? null
-            : pendingPhotoPath ?? this.pendingPhotoPath,
+        evidenceUploads: evidenceUploads ?? this.evidenceUploads,
       );
+
+  EvidenceUploadState? evidenceUploadFor(String fragmentId) =>
+      evidenceUploads[fragmentId];
 }
 
 class ActiveTourController extends Notifier<ActiveTourState> {
@@ -198,6 +226,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           permission == TourLocationPermission.granted) {
         _listenToRealLocation();
       }
+      await _restorePendingEvidence();
       unawaited(reconcileOutbox());
     } catch (error) {
       state = state.copyWith(
@@ -247,27 +276,42 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         _triggering) {
       return;
     }
+    var next = _nextDemoFragment();
+    if (next == null) {
+      state = state.copyWith(isBusy: true, clearError: true);
+      try {
+        await _refreshLedger();
+        next = _nextDemoFragment();
+      } catch (error) {
+        state = state.copyWith(errorMessage: _message(error));
+      } finally {
+        state = state.copyWith(isBusy: false);
+      }
+      if (next == null) {
+        state = state.copyWith(locationMessage: '照片仍在确认中，确认完成后才能进入下一条线索。');
+        return;
+      }
+    }
+    await _trigger(next, method: 'demo');
+  }
+
+  StoryFragment? _nextDemoFragment() {
     final ledger = state.ledger;
-    if (ledger == null) return;
+    final manifest = state.route?.audioTour;
+    if (ledger == null || manifest == null) return null;
     final collected = ledger.entries
         .where((value) => value.isCollected)
         .map((value) => value.id)
         .toSet();
-    StoryFragment? next;
-    for (final fragment in state.route!.audioTour!.fragments) {
-      final currentState =
-          ledger.entries.firstWhere((value) => value.id == fragment.id).state;
-      if (currentState == 'undiscovered' &&
+    for (final fragment in manifest.fragments) {
+      final entry =
+          ledger.entries.where((value) => value.id == fragment.id).firstOrNull;
+      if (entry?.state == 'undiscovered' &&
           fragment.dependencyIds.every(collected.contains)) {
-        next = fragment;
-        break;
+        return fragment;
       }
     }
-    if (next == null) {
-      state = state.copyWith(locationMessage: '先完成待处理的拍照线索，再继续下一段故事。');
-      return;
-    }
-    await _trigger(next, method: 'demo');
+    return null;
   }
 
   Future<void> _trigger(StoryFragment fragment,
@@ -350,31 +394,134 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       state = state.copyWith(locationMessage: '拍照任务已保留，可以在安全方便时再完成。');
       return;
     }
-    state = state.copyWith(pendingPhotoPath: path);
+    final upload = EvidenceUploadState(
+      filePath: path,
+      idempotencyKey: _uuid.v4(),
+      phase: EvidenceUploadPhase.captured,
+    );
+    state = state.copyWith(evidenceUploads: {
+      ...state.evidenceUploads,
+      fragment.id: upload,
+    });
+    await _persistEvidenceUpload(fragment.id, upload);
     await submitPendingEvidence(fragment);
   }
 
   Future<void> submitPendingEvidence(StoryFragment fragment) async {
     final session = state.session;
-    final path = state.pendingPhotoPath;
-    if (session == null || path == null) return;
-    final key = _uuid.v4();
+    final upload = state.evidenceUploadFor(fragment.id);
+    if (session == null || upload == null) return;
+    _setEvidenceUpload(
+        fragment.id, upload.copyWith(phase: EvidenceUploadPhase.uploading));
     state = state.copyWith(isBusy: true, clearError: true);
     try {
-      await _repository.uploadEvidence(session.id, fragment.id, path, key);
-      state = state.copyWith(
-          isBusy: false,
-          clearPendingPhoto: true,
-          locationMessage: '现场线索已私密保存，故事碎片已收集。');
+      final evidence = await _repository.uploadEvidence(
+          session.id, fragment.id, upload.filePath, upload.idempotencyKey);
       await _refreshLedger();
+      _acceptEvidenceUpload(fragment.id, upload, evidence.id);
+      await _store.saveJson('pending_evidence_${fragment.id}', {
+        'state': 'accepted',
+        'file_path': upload.filePath,
+        'idempotency_key': upload.idempotencyKey,
+        'evidence_id': evidence.id,
+      });
+      state = state.copyWith(
+          isBusy: false, locationMessage: '现场照片已私密保存并完成确认，可以继续寻找下一条线索。');
+      final reporter = ref.read(runtimeLogReporterProvider);
+      if (reporter != null) {
+        unawaited(reporter.info(
+          'evidence',
+          'photo_evidence_accepted',
+          context: {'fragment_id': fragment.id},
+        ));
+      }
     } catch (error) {
-      await _store.enqueue(OutboxEvent(id: key, type: 'evidence', payload: {
+      final accepted = await _confirmEvidenceAfterFailure(fragment.id);
+      if (accepted != null) {
+        _acceptEvidenceUpload(
+            fragment.id, upload, accepted.evidenceId ?? 'confirmed');
+        state = state.copyWith(
+            isBusy: false, locationMessage: '现场照片已由服务器确认，可以继续寻找下一条线索。');
+        return;
+      }
+      final queued = upload.copyWith(phase: EvidenceUploadPhase.queued);
+      _setEvidenceUpload(fragment.id, queued);
+      await _store.enqueue(
+          OutboxEvent(id: upload.idempotencyKey, type: 'evidence', payload: {
         'journey_id': session.id,
         'fragment_id': fragment.id,
-        'file_path': path
+        'file_path': upload.filePath
       }));
+      await _persistEvidenceUpload(fragment.id, queued);
       state = state.copyWith(
-          isBusy: false, errorMessage: '照片已保存在本机，网络恢复后可重试。${_message(error)}');
+          isBusy: false,
+          errorMessage: '照片仍在本机等待上传，确认完成前不会推进下一条线索。${_message(error)}');
+      final reporter = ref.read(runtimeLogReporterProvider);
+      if (reporter != null) {
+        unawaited(reporter.warning(
+          'evidence',
+          'photo_evidence_queued',
+          context: {'fragment_id': fragment.id},
+        ));
+      }
+    }
+  }
+
+  Future<StoryFragment?> _confirmEvidenceAfterFailure(String fragmentId) async {
+    try {
+      await _refreshLedger();
+      return state.ledger?.entries
+          .where((entry) =>
+              entry.id == fragmentId &&
+              entry.isCollected &&
+              entry.evidenceId != null)
+          .firstOrNull;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _acceptEvidenceUpload(
+      String fragmentId, EvidenceUploadState upload, String evidenceId) {
+    _setEvidenceUpload(
+        fragmentId,
+        upload.copyWith(
+            phase: EvidenceUploadPhase.accepted, evidenceId: evidenceId));
+  }
+
+  void _setEvidenceUpload(String fragmentId, EvidenceUploadState upload) {
+    state = state.copyWith(evidenceUploads: {
+      ...state.evidenceUploads,
+      fragmentId: upload,
+    });
+  }
+
+  Future<void> _persistEvidenceUpload(
+      String fragmentId, EvidenceUploadState upload) async {
+    await _store.saveJson('pending_evidence_$fragmentId', {
+      'state': upload.phase.name,
+      'file_path': upload.filePath,
+      'idempotency_key': upload.idempotencyKey,
+      if (upload.evidenceId != null) 'evidence_id': upload.evidenceId,
+    });
+  }
+
+  Future<void> _restorePendingEvidence() async {
+    final pending = await _store.pending();
+    final restored = <String, EvidenceUploadState>{};
+    for (final event in pending.where((item) => item.type == 'evidence')) {
+      final fragmentId = event.payload['fragment_id'] as String?;
+      final filePath = event.payload['file_path'] as String?;
+      if (fragmentId == null || filePath == null) continue;
+      restored[fragmentId] = EvidenceUploadState(
+        filePath: filePath,
+        idempotencyKey: event.id,
+        phase: EvidenceUploadPhase.queued,
+      );
+    }
+    if (restored.isNotEmpty) {
+      state = state
+          .copyWith(evidenceUploads: {...state.evidenceUploads, ...restored});
     }
   }
 
@@ -427,11 +574,16 @@ class ActiveTourController extends Notifier<ActiveTourState> {
               (payload['progress'] as num).toDouble(),
               event.id);
         } else if (event.type == 'evidence') {
-          await _repository.uploadEvidence(
+          final evidence = await _repository.uploadEvidence(
               payload['journey_id'] as String,
               payload['fragment_id'] as String,
               payload['file_path'] as String,
               event.id);
+          final fragmentId = payload['fragment_id'] as String;
+          final upload = state.evidenceUploadFor(fragmentId);
+          if (upload != null) {
+            _acceptEvidenceUpload(fragmentId, upload, evidence.id);
+          }
         }
         await _store.acknowledge(event.id);
       } catch (_) {

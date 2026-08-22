@@ -201,7 +201,11 @@ class ApiExperienceRepository implements ExperienceRepository {
     final response = await _request(() => _dio.post(
           '/journeys/$journeyId/fragments/$fragmentId/evidence',
           data: form,
-          options: _authorized.copyWith(contentType: 'multipart/form-data'),
+          options: _authorized.copyWith(
+            contentType: 'multipart/form-data',
+            sendTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(seconds: 60),
+          ),
         ));
     return EvidenceRecord.fromJson(
         response.data['data'] as Map<String, dynamic>);

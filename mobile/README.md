@@ -16,8 +16,12 @@ flutter run
 flutter run \
   --dart-define=APP_MODE=api \
   --dart-define=API_BASE_URL=http://127.0.0.1:5001/api/v1 \
-  --dart-define=ENABLE_DEMO_TRIGGERS=true
+  --dart-define=ENABLE_DEMO_TRIGGERS=true \
+  --dart-define=RUNTIME_LOG_ENDPOINT=http://127.0.0.1:5100/api/runtime/client-logs \
+  --dart-define=RUNTIME_LOG_TOKEN=DeepTravelClientLogs2026
 ```
+
+客户端会把框架异常、接口失败、照片上传状态和少量生命周期事件写入有上限的本地队列，并发送到独立管理后台。日志不包含照片、令牌、请求正文或精确位置；网络恢复或应用回到前台时会继续发送。
 
 ## 检查
 

@@ -2,13 +2,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/api_experience_repository.dart';
 import '../data/demo_experience_repository.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 
 final dioProvider = Provider<Dio>((ref) {
-  return Dio(
+  final reporter = ref.watch(runtimeLogReporterProvider);
+  final dio = Dio(
     BaseOptions(
       baseUrl: AppConfig.apiBaseUrl,
       connectTimeout: const Duration(seconds: 8),
@@ -16,6 +18,21 @@ final dioProvider = Provider<Dio>((ref) {
       contentType: Headers.jsonContentType,
     ),
   );
+  dio.interceptors.add(InterceptorsWrapper(onError: (error, handler) {
+    final uri = error.requestOptions.uri;
+    reporter?.error(
+      'network',
+      '${error.requestOptions.method} ${uri.path} failed',
+      error: error,
+      context: {
+        'status_code': error.response?.statusCode ?? 0,
+        'failure_type': error.type.name,
+        'host': uri.host,
+      },
+    );
+    handler.next(error);
+  }));
+  return dio;
 });
 
 final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {

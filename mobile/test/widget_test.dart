@@ -55,6 +55,31 @@ void main() {
     expect(find.textContaining('一艘停靠街角的船'), findsOneWidget);
   });
 
+  testWidgets('system back from a journey returns to discovery',
+      (tester) async {
+    appRouter.go('/');
+    final repository = DemoExperienceRepository(latency: Duration.zero);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
+        child: const JiandiApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('梧桐树下的城市切片'));
+    await tester.tap(find.text('梧桐树下的城市切片'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('开始这段探索'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('我已到达，开始观察'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('深圳'), findsOneWidget);
+    expect(find.text('本周精选'), findsOneWidget);
+  });
+
   testWidgets('defaults to Shenzhen and reloads after selecting Shanghai',
       (tester) async {
     appRouter.go('/');

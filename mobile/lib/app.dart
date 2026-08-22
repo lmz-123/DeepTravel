@@ -1,10 +1,43 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'core/logging/runtime_log_reporter.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
-class JiandiApp extends StatelessWidget {
+class JiandiApp extends ConsumerStatefulWidget {
   const JiandiApp({super.key});
+
+  @override
+  ConsumerState<JiandiApp> createState() => _JiandiAppState();
+}
+
+class _JiandiAppState extends ConsumerState<JiandiApp> {
+  AppLifecycleListener? _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    final reporter = ref.read(runtimeLogReporterProvider);
+    if (reporter != null) {
+      _lifecycle = AppLifecycleListener(
+        onResume: () {
+          unawaited(reporter.info('lifecycle', 'application_resumed'));
+          unawaited(reporter.flush());
+        },
+        onPause: () =>
+            unawaited(reporter.info('lifecycle', 'application_paused')),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycle?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
