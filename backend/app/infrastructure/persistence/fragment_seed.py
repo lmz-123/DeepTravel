@@ -295,6 +295,10 @@ COMPLETE_STORY = (
 def seed_fragment_tour(session: Session, route_id: str) -> bool:
     now = datetime.now(UTC)
     changed = False
+    candidate_audio_ready = all(
+        (MEDIA_ROOT / f"audio/{item['id']}-{SCRIPT_VERSION}.m4a").is_file()
+        for item in FRAGMENTS
+    )
     for item in SOURCES:
         if session.get(HistoricalSourceModel, item["id"]) is None:
             session.add(
@@ -327,7 +331,8 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
                 )
             changed = True
     arc = session.get(StoryArcModel, ARC_ID)
-    if arc is None:
+    arc_was_created = arc is None
+    if arc_was_created:
         arc = StoryArcModel(
             id=ARC_ID,
             route_id=route_id,
@@ -355,16 +360,19 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
         ],
         "script_version": SCRIPT_VERSION,
     }
-    for field_name, value in arc_values.items():
-        if getattr(arc, field_name) != value:
-            setattr(arc, field_name, value)
-            changed = True
+    apply_conversational_revision = arc_was_created or candidate_audio_ready
+    if apply_conversational_revision:
+        for field_name, value in arc_values.items():
+            if getattr(arc, field_name) != value:
+                setattr(arc, field_name, value)
+                changed = True
     for item in FRAGMENTS:
         fragment = session.get(StoryFragmentModel, item["id"])
         audio_path = f"audio/{item['id']}-{SCRIPT_VERSION}.m4a"
         audio_file = MEDIA_ROOT / audio_path
         audio_size = audio_file.stat().st_size if audio_file.is_file() else 0
-        if fragment is None:
+        fragment_was_created = fragment is None
+        if fragment_was_created:
             fragment = StoryFragmentModel(
                 id=item["id"],
                 arc_id=ARC_ID,
@@ -413,7 +421,7 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
             for claim_id in item["claims"]:
                 session.add(FragmentClaimModel(fragment_id=item["id"], claim_id=claim_id))
             changed = True
-        else:
+        elif apply_conversational_revision:
             fragment_values = {
                 "position": item["position"],
                 "title": item["title"],
@@ -436,7 +444,7 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
         region = session.scalar(
             select(TriggerRegionModel).where(TriggerRegionModel.fragment_id == item["id"])
         )
-        if region is not None:
+        if region is not None and (fragment_was_created or apply_conversational_revision):
             region_values = {
                 "entry_radius_m": 14,
                 "exit_radius_m": 35,
@@ -494,7 +502,7 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
             )
             changed = True
     route = session.get(RouteModel, route_id)
-    if route is not None:
+    if route is not None and apply_conversational_revision:
         route.title = "深圳把中心搬走以后，为什么又回来找南头？"
         route.subtitle = "戴上耳机，沿着城门与老街听懂一座不断换身份的城"
         route.description = (
