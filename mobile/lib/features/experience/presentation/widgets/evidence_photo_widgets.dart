@@ -13,7 +13,7 @@ class NostalgicPhotoFrame extends StatelessWidget {
   const NostalgicPhotoFrame({
     required this.child,
     this.width,
-    this.aspectRatio = 4 / 3,
+    this.aspectRatio = 1,
     this.tilt = .012,
     super.key,
   });
@@ -30,15 +30,23 @@ class NostalgicPhotoFrame extends StatelessWidget {
       angle: reduceMotion ? 0 : tilt,
       child: RepaintBoundary(
         child: CustomPaint(
-          painter: const _KeepsakePaperPainter(),
+          painter: const _KeepsakeCollectionPainter(),
           child: Container(
             width: width,
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 28),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 30),
             child: AspectRatio(
               aspectRatio: aspectRatio,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: ColoredBox(color: const Color(0xFFD8D0BF), child: child),
+                borderRadius: BorderRadius.circular(7),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD8D0BF),
+                    border: Border.all(
+                      color: const Color(0xFF695B43).withValues(alpha: .55),
+                    ),
+                  ),
+                  child: child,
+                ),
               ),
             ),
           ),
@@ -230,9 +238,25 @@ Future<void> _showPhotoViewer(
                       constraints: const BoxConstraints(maxWidth: 640),
                       child: Padding(
                         padding: const EdgeInsets.all(24),
-                        child: NostalgicPhotoFrame(
-                          tilt: 0,
-                          child: image,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1E7CF),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.gold.withValues(alpha: .55),
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black38,
+                                blurRadius: 20,
+                                offset: Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: image,
+                          ),
                         ),
                       ),
                     ),
@@ -282,47 +306,76 @@ class _UnavailablePhoto extends StatelessWidget {
       );
 }
 
-class _KeepsakePaperPainter extends CustomPainter {
-  const _KeepsakePaperPainter();
+class _KeepsakeCollectionPainter extends CustomPainter {
+  const _KeepsakeCollectionPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(3, 1)
-      ..lineTo(size.width * .22, 2.5)
-      ..lineTo(size.width * .38, 0)
-      ..lineTo(size.width * .62, 2)
-      ..lineTo(size.width * .82, .5)
-      ..lineTo(size.width - 2, 3)
-      ..lineTo(size.width, size.height * .28)
-      ..lineTo(size.width - 2.5, size.height * .49)
-      ..lineTo(size.width, size.height * .74)
-      ..lineTo(size.width - 3, size.height - 1)
-      ..lineTo(size.width * .78, size.height - 2.5)
-      ..lineTo(size.width * .59, size.height)
-      ..lineTo(size.width * .33, size.height - 2)
-      ..lineTo(size.width * .14, size.height)
-      ..lineTo(1, size.height - 3)
-      ..lineTo(2.5, size.height * .72)
-      ..lineTo(0, size.height * .53)
-      ..lineTo(2, size.height * .31)
-      ..close();
-    canvas.drawShadow(path, Colors.black.withValues(alpha: .34), 9, true);
-    canvas.drawPath(path, Paint()..color = const Color(0xFFF2E8D0));
-    canvas.drawPath(
-      path,
+    final card = RRect.fromRectAndRadius(
+      Rect.fromLTWH(2, 2, size.width - 4, size.height - 4),
+      const Radius.circular(13),
+    );
+    canvas.drawShadow(
+      Path()..addRRect(card),
+      Colors.black.withValues(alpha: .32),
+      10,
+      true,
+    );
+    canvas.drawRRect(card, Paint()..color = const Color(0xFFF3E9D1));
+    canvas.drawRRect(
+      card,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = const Color(0xFF7A6542).withValues(alpha: .5),
+    );
+
+    final inner = RRect.fromRectAndRadius(
+      Rect.fromLTWH(7, 7, size.width - 14, size.height - 14),
+      const Radius.circular(9),
+    );
+    canvas.drawRRect(
+      inner,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8
+        ..color = const Color(0xFFC19A52).withValues(alpha: .36),
+    );
+
+    final tape = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(size.width * .76, 8),
+        width: math.min(42, size.width * .25),
+        height: 12,
+      ),
+      const Radius.circular(2),
+    );
+    canvas.save();
+    canvas.translate(size.width * .76, 8);
+    canvas.rotate(-.08);
+    canvas.translate(-size.width * .76, -8);
+    canvas.drawRRect(
+      tape,
+      Paint()..color = const Color(0xFFD7B66A).withValues(alpha: .58),
+    );
+    canvas.restore();
+
+    final stampCenter = Offset(size.width - 24, size.height - 17);
+    canvas.drawCircle(
+      stampCenter,
+      8,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2
-        ..color = const Color(0xFF8E7852).withValues(alpha: .38),
+        ..color = AppColors.terracotta.withValues(alpha: .58),
     );
-    final speckle = Paint()
-      ..color = const Color(0xFF927A51).withValues(alpha: .16);
-    for (var index = 0; index < 18; index += 1) {
-      final x = 7 + ((index * 37) % math.max(8, size.width.floor() - 14));
-      final y = 6 + ((index * 53) % math.max(8, size.height.floor() - 12));
-      canvas.drawCircle(Offset(x.toDouble(), y.toDouble()), .65, speckle);
-    }
+    canvas.drawLine(
+      Offset(14, size.height - 16),
+      Offset(size.width - 40, size.height - 16),
+      Paint()
+        ..strokeWidth = 1
+        ..color = const Color(0xFF8A7148).withValues(alpha: .3),
+    );
   }
 
   @override

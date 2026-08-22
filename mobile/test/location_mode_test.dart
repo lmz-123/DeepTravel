@@ -248,6 +248,15 @@ void main() {
     expect(find.text('第二条线索'), findsOneWidget);
     expect(find.text('模拟定位（测试）'), findsOneWidget);
     expect(find.text('阅读等价文字稿'), findsOneWidget);
+    expect(find.byTooltip('暂停自动导览'), findsOneWidget);
+    expect(find.text('00:00'), findsOneWidget);
+    expect(find.text('--:--'), findsOneWidget);
+    await tester.tap(find.byTooltip('暂停自动导览'));
+    await tester.pump();
+    expect(find.byTooltip('继续自动导览'), findsOneWidget);
+    await tester.tap(find.byTooltip('继续自动导览'));
+    await tester.pump();
+    expect(find.byTooltip('暂停自动导览'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -240));
     await tester.pumpAndSettle();
     await tester.tap(find.text('阅读等价文字稿'));
@@ -258,6 +267,20 @@ void main() {
     await tester.tap(find.byTooltip('继续'));
     await tester.pump();
     expect(player.playedFragmentIds, ['fragment-2']);
+    expect(find.byTooltip('暂停'), findsOneWidget);
+
+    player.emitDuration(const Duration(minutes: 2));
+    player.emitPosition(const Duration(seconds: 30));
+    await tester.pump();
+    expect(find.text('00:30'), findsOneWidget);
+    expect(find.text('02:00'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('暂停'));
+    await tester.pump();
+    expect(find.byTooltip('继续'), findsOneWidget);
+    await tester.tap(find.byTooltip('继续'));
+    await tester.pump();
+    expect(find.byTooltip('暂停'), findsOneWidget);
 
     player.completeNaturally();
     await tester.pumpAndSettle();
@@ -1452,26 +1475,32 @@ class _RecordingNarrationPlayer extends _SilentNarrationPlayer {
 class _ControllableNarrationPlayer implements NarrationPlayer {
   final _completed = StreamController<bool>.broadcast(sync: true);
   final _playing = StreamController<bool>.broadcast(sync: true);
+  final _position = StreamController<Duration>.broadcast(sync: true);
+  final _duration = StreamController<Duration?>.broadcast(sync: true);
   final playedFragmentIds = <String>[];
 
   void completeNaturally() => _completed.add(true);
+  void emitPosition(Duration value) => _position.add(value);
+  void emitDuration(Duration value) => _duration.add(value);
 
   @override
   Stream<bool> get completedStream => _completed.stream;
 
   @override
-  Stream<Duration?> get durationStream => const Stream<Duration?>.empty();
+  Stream<Duration?> get durationStream => _duration.stream;
 
   @override
   Stream<bool> get playingStream => _playing.stream;
 
   @override
-  Stream<Duration> get positionStream => const Stream<Duration>.empty();
+  Stream<Duration> get positionStream => _position.stream;
 
   @override
   Future<void> dispose() async {
     await _completed.close();
     await _playing.close();
+    await _position.close();
+    await _duration.close();
   }
 
   @override

@@ -67,3 +67,11 @@
 - [x] 9.2 Run Dart formatting checks, `flutter analyze`, full `flutter test`, and a production-flavor compile smoke check without secrets; verify drawer, draggable rotating playback orb, cross-attraction automatic stop, replay, settings, and photo viewer on compact and large layouts, including paused and reduced-motion states.
 - [x] 9.3 Run the independent Travel-Admin validation/test/build suite and inspect both Git worktrees so generated caches and unrelated user changes remain uncommitted.
 - [x] 9.4 Run `openspec validate add-traveler-menu-footprints-and-tour-continuity --strict`, update README/API/verification documents with final behavior and manual A/B account checks, and leave production deploy/publish commands as an explicit later operator action.
+
+## 10. Playback, orb, keepsake, and location corrections
+
+- [x] 10.1 Make actual audio state authoritative across play/pause/resume/stop/completion, correct the tour and narration play/pause icons, and add seekable progress plus elapsed/total time with controller and widget regressions.
+- [x] 10.2 Rework the home orb to follow pointer coordinates synchronously during pan, snap left/right by release half while preserving height, persist edge plus height, and prove playing-only rotation including completed-player edge cases.
+- [x] 10.3 Replace the worn irregular frame with a code-native game-collection keepsake card, use consistent 1:1 cover crops for thumbnails and uncropped original-ratio viewing, and update representative-size/reduced-motion tests.
+- [x] 10.4 Allow real-location processing to consider every undiscovered geographic node regardless of dependencies, deterministically select the nearest qualified node, keep simulated dependency order unchanged, and add client/API out-of-order and idempotency tests.
+- [x] 10.5 Run focused backend and Flutter tests, full static analysis/suites, production-flavor Android compile smoke, and strict OpenSpec validation; record any unrelated pre-existing failures without masking them.

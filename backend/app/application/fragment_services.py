@@ -226,29 +226,30 @@ class FragmentTourService:
             if duplicate is not None:
                 return duplicate
             fragment, state = self._fragment_state(session, journey, fragment_id)
-            dependencies = set(
-                session.scalars(
-                    select(FragmentDependencyModel.required_fragment_id).where(
-                        FragmentDependencyModel.fragment_id == fragment_id
-                    )
-                )
-            )
-            collected = set(
-                session.scalars(
-                    select(JourneyFragmentModel.fragment_id).where(
-                        JourneyFragmentModel.journey_id == journey_id,
-                        JourneyFragmentModel.state == "collected",
-                    )
-                )
-            )
-            missing = dependencies - collected
-            if missing:
-                raise FragmentOperationError(
-                    "fragment_locked",
-                    "上一段故事尚未收集，请先沿路线寻找前一条线索",
-                    details={"missing_count": len(missing)},
-                )
             method = str(payload.get("method") or "location")
+            if method == "demo":
+                dependencies = set(
+                    session.scalars(
+                        select(FragmentDependencyModel.required_fragment_id).where(
+                            FragmentDependencyModel.fragment_id == fragment_id
+                        )
+                    )
+                )
+                collected = set(
+                    session.scalars(
+                        select(JourneyFragmentModel.fragment_id).where(
+                            JourneyFragmentModel.journey_id == journey_id,
+                            JourneyFragmentModel.state == "collected",
+                        )
+                    )
+                )
+                missing = dependencies - collected
+                if missing:
+                    raise FragmentOperationError(
+                        "fragment_locked",
+                        "上一段故事尚未收集，请先沿路线寻找前一条线索",
+                        details={"missing_count": len(missing)},
+                    )
             region = session.scalar(
                 select(TriggerRegionModel).where(TriggerRegionModel.fragment_id == fragment_id)
             )

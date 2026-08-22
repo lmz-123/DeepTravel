@@ -101,7 +101,10 @@ class JustAudioNarrationPlayer implements NarrationPlayer {
   @override
   Stream<Duration?> get durationStream => _player.durationStream;
   @override
-  Stream<bool> get playingStream => _player.playingStream;
+  Stream<bool> get playingStream => _player.playerStateStream
+      .map((state) =>
+          state.playing && state.processingState != ProcessingState.completed)
+      .distinct();
   @override
   Stream<bool> get completedStream => _player.playerStateStream
       .map((state) => state.processingState == ProcessingState.completed)
@@ -118,7 +121,10 @@ class JustAudioNarrationPlayer implements NarrationPlayer {
             album: '见地 · ${fragment.position}/5',
             title: fragment.title ?? fragment.safePreview,
             artist: '南头古城碎片导览')));
-    await _player.play();
+    // just_audio's play Future completes when playback pauses, stops, or
+    // finishes. Do not await that lifecycle Future here: callers need control
+    // back as soon as playback has started so they can bind live state.
+    unawaited(_player.play().catchError((Object _, StackTrace __) {}));
   }
 
   @override

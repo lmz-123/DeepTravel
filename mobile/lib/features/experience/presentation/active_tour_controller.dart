@@ -520,7 +520,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         sample,
         manifest.fragments,
         ledger.entries
-            .where((value) => value.isCollected)
+            .where((value) => value.isRevealed)
             .map((value) => value.id)
             .toSet());
     if (candidate == null) return;
@@ -1142,8 +1142,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> pauseTour() async {
     await _player.pause();
-    state =
-        state.copyWith(status: 'paused', locationMessage: '自动故事已暂停，线索和照片不会丢失。');
+    state = state.copyWith(
+      status: 'paused',
+      isPlaying: false,
+      locationMessage: '自动故事已暂停，线索和照片不会丢失。',
+    );
   }
 
   Future<void> resumeTour() async {
@@ -1157,7 +1160,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     } else {
       await _activateRealLocation();
     }
-    if (state.current != null) await _player.resume();
+    if (state.current != null && _loadedFragmentId == state.current!.id) {
+      await _player.resume();
+      state = state.copyWith(isPlaying: true);
+    }
   }
 
   Future<void> setLocationMode(TourLocationMode mode) async {
@@ -1242,11 +1248,13 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       return;
     }
     await _player.replay();
+    state = state.copyWith(isPlaying: true, position: Duration.zero);
   }
 
   Future<void> togglePlayback() async {
     if (state.isPlaying) {
       await _player.pause();
+      state = state.copyWith(isPlaying: false);
       return;
     }
     final current = state.current;
@@ -1256,7 +1264,17 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       unawaited(_playNarration(current));
       return;
     }
-    await _player.resume();
+    final duration = state.duration;
+    final completed = duration != null &&
+        duration > Duration.zero &&
+        state.position >= duration;
+    if (completed) {
+      await _player.replay();
+      state = state.copyWith(isPlaying: true, position: Duration.zero);
+    } else {
+      await _player.resume();
+      state = state.copyWith(isPlaying: true);
+    }
   }
 
   Future<void> setSpeed(double speed) async {

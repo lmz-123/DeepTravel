@@ -64,12 +64,12 @@ Completed footprint detail SHALL group available evidence by clue and SHALL allo
 - **WHEN** a route was completed without optional evidence
 - **THEN** the footprint remains complete and shows a tasteful no-photo state rather than a missing-task warning
 
-### Requirement: Restrained nostalgic frame treatment
-Photo thumbnails and footprint photo cards SHALL use a consistent warm paper frame with a subtle irregular or worn edge, restrained shadow, and optional small rotation while preserving image aspect ratio, legibility, minimum touch targets, and reduced-motion behavior. Decorative treatment MUST NOT obscure the photograph or imply that the original evidence bytes were modified.
+### Requirement: Game-collection keepsake frame treatment
+Photo thumbnails and footprint photo cards SHALL use a consistent game-collection keepsake frame with a near-square 1:1 image window, warm layered card stock, restrained shadow, and limited tape, corner, or stamp accents. Source photos SHALL use center-cropped cover presentation inside the thumbnail window so portrait and landscape uploads share the same grid format. The dedicated viewer SHALL retain the uncropped source aspect ratio and original evidence bytes. Decorative treatment MUST preserve legibility, minimum touch targets, and reduced-motion behavior and MUST NOT imply that the stored evidence was modified.
 
 #### Scenario: Render a framed photo card
 - **WHEN** a private photo thumbnail is available
-- **THEN** the client renders the photo inside the nostalgic frame while keeping the full card identifiable and tappable
+- **THEN** the client renders a consistent square crop inside the keepsake card while keeping the full card identifiable and tappable, and opening it reveals the uncropped photo
 
 #### Scenario: Reduced motion is enabled
 - **WHEN** the platform requests reduced motion

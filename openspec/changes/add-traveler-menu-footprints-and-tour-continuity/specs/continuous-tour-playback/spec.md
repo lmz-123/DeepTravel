@@ -5,7 +5,7 @@
 ## ADDED Requirements
 
 ### Requirement: Home-page rotating playback orb
-While a tour narration is loaded and the tour has not been stopped, the discovery page SHALL show a vinyl-style circular playback orb whose default position is at the right safe edge. The traveler SHALL be able to drag it freely within the discovery page's safe movable region and leave it at the released position. The client SHALL persist normalized orb coordinates locally per account, restore and clamp them after relaunch or layout changes, and distinguish a drag from a tap so repositioning does not open the journey. The visible orb SHALL be 56–64 logical pixels in diameter with a touch target of at least 72 logical pixels, use server-provided route artwork or a neutral brand fallback at its center, and show playback progress in its outer ring. It SHALL rotate only while audio is playing, remain visually still while paused, and avoid continuous rotation when reduced motion is requested. Activating the orb SHALL navigate directly to the owning journey and selected clue. The client MUST NOT replace this orb with a horizontal mini-player bar or crowd it with route text and playback controls.
+While a tour narration is loaded and the tour has not been stopped, the discovery page SHALL show a vinyl-style circular playback orb whose default position is at the right safe edge. During a drag the orb SHALL track the pointer synchronously within the safe movable region. On release it SHALL preserve the released vertical position and snap horizontally to the left safe edge when its center is in the left half, or to the right safe edge when its center is in the right half. The client SHALL persist the edge and normalized vertical position locally per account, restore and clamp them after relaunch or layout changes, and distinguish a drag from a tap so repositioning does not open the journey. The visible orb SHALL be 56–64 logical pixels in diameter with a touch target of at least 72 logical pixels, use server-provided route artwork or a neutral brand fallback at its center, and show playback progress in its outer ring. It SHALL rotate only while audio is actually playing; it SHALL be visually still while paused, completed, stopped, or otherwise not playing, and avoid continuous rotation when reduced motion is requested. Activating the orb SHALL navigate directly to the owning journey and selected clue. The client MUST NOT replace this orb with a horizontal mini-player bar or crowd it with route text and playback controls.
 
 #### Scenario: Return home during playback
 - **WHEN** the traveler leaves the journey page while narration is playing
@@ -17,7 +17,7 @@ While a tour narration is loaded and the tour has not been stopped, the discover
 
 #### Scenario: Reposition the playback orb
 - **WHEN** the traveler drags the orb to another valid point on the discovery page and releases it
-- **THEN** the orb follows the pointer, remains at the released point without opening the journey, and the normalized position is restored for that account on the next discovery visit
+- **THEN** the orb follows each pointer update without lag, keeps the released height, snaps to the nearest left or right safe edge without opening the journey, and that edge and height are restored for the account on the next discovery visit
 
 #### Scenario: Layout bounds change
 - **WHEN** orientation, window size, safe-area insets, or fixed navigation bounds change after a position was saved
@@ -26,6 +26,10 @@ While a tour narration is loaded and the tour has not been stopped, the discover
 #### Scenario: Narration is paused on the home page
 - **WHEN** the loaded narration becomes paused while the discovery page is visible
 - **THEN** the orb stops rotating, preserves its progress ring, exposes a paused state to assistive technology, and remains tappable to return to the journey
+
+#### Scenario: Narration reaches completion
+- **WHEN** the loaded narration reaches the completed processing state
+- **THEN** the orb stops rotating immediately even if the underlying player retains a stale playing flag, and it does not rotate again until playback actually resumes or replays
 
 #### Scenario: Reduced motion is requested
 - **WHEN** the operating system or application requests reduced motion while narration is playing
@@ -79,6 +83,36 @@ The client SHALL expose every revealed collected clue as an accessible, selectab
 #### Scenario: Tap a locked node
 - **WHEN** the traveler taps an undiscovered locked node
 - **THEN** the client does not switch playback and communicates that the clue must first be found
+
+### Requirement: Truthful tour and narration transport controls
+The journey page SHALL derive its tour pause/resume icon from the tour monitoring state and its narration play/pause icon from the actual audio playback state. The narration control SHALL show a seekable progress indicator with elapsed and total time, update while playing and seeking, and converge to paused/completed state after pause, stop, replacement, or natural completion.
+
+#### Scenario: Pause and resume tour monitoring
+- **WHEN** the traveler pauses a running tour and then resumes it
+- **THEN** the tour control changes from pause to play while paused and back to pause while monitoring or simulating, independently of whether narration is playing
+
+#### Scenario: Pause and resume narration
+- **WHEN** the traveler pauses playing narration and presses the control again
+- **THEN** the narration icon changes to play while paused, changes back to pause after playback resumes, and the home orb follows the same actual state
+
+#### Scenario: Inspect or seek narration progress
+- **WHEN** narration duration is available
+- **THEN** the client displays elapsed and total time, updates the progress indicator from player position, and lets the traveler seek within the valid duration without writing clue completion merely because of the seek
+
+### Requirement: Real-location clues unlock by proximity out of sequence
+In real-location mode, the client and API SHALL allow valid location evidence to trigger any undiscovered clue whose own geographic trigger conditions are satisfied, regardless of its authored position or unmet narrative dependency. Entry and exit radii, accuracy, qualifying samples, sample window, cooldown, ownership, and idempotency SHALL still apply independently to each clue. Authored dependencies MAY continue to order simulated next-clue progression, but MUST NOT gate an authentic location trigger.
+
+#### Scenario: Reach a later clue first
+- **WHEN** the traveler enters the valid trigger region for clue 4 before collecting clues 1–3
+- **THEN** clue 4 is revealed once, its narration may play, and clues 1–3 remain independently discoverable rather than being auto-collected
+
+#### Scenario: Multiple trigger regions qualify
+- **WHEN** one location sample contributes to multiple undiscovered trigger regions
+- **THEN** the client deterministically chooses the nearest fully qualified clue, triggers at most one clue for that evaluation, and leaves the others eligible for subsequent samples
+
+#### Scenario: Simulated next remains predictable
+- **WHEN** the tester uses 下一条线索 in simulated mode
+- **THEN** the client continues choosing the next dependency-eligible authored clue rather than applying the real-location out-of-order rule
 
 ### Requirement: Simulated next-clue audio handoff
 In simulated location mode, activating 下一条线索 SHALL stop the current narration, idempotently acknowledge its completion when needed, refresh the ledger, and trigger the next eligible clue. Photo absence MUST NOT block this test progression. Real-location mode SHALL continue to require a valid location trigger for the next clue.

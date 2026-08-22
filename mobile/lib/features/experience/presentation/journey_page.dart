@@ -551,8 +551,9 @@ class _StatusPanel extends ConsumerWidget {
                       : () => ref
                           .read(activeTourControllerProvider.notifier)
                           .resumeTour(),
-              icon: Icon(
-                  monitoring ? Icons.pause_rounded : Icons.play_arrow_rounded)),
+              icon: Icon((revisiting ? state.isPlaying : running)
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded)),
           IconButton(
               tooltip: '停止自动导览',
               color: AppColors.white,
@@ -750,6 +751,26 @@ class _NarrationCard extends ConsumerWidget {
                   : (value) => ref
                       .read(activeTourControllerProvider.notifier)
                       .seek(Duration(milliseconds: (total * value).round()))),
+          Row(
+            children: [
+              Text(
+                _formatAudioTime(state.position),
+                style: TextStyle(
+                  color: AppColors.white.withValues(alpha: .72),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                total == 0 ? '--:--' : _formatAudioTime(state.duration!),
+                style: TextStyle(
+                  color: AppColors.white.withValues(alpha: .72),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
           Row(children: [
             IconButton(
                 color: AppColors.white,
@@ -803,6 +824,17 @@ class _NarrationCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _formatAudioTime(Duration value) {
+  final safeSeconds = value.inSeconds.clamp(0, 359999);
+  final hours = safeSeconds ~/ 3600;
+  final minutes = (safeSeconds % 3600) ~/ 60;
+  final seconds = safeSeconds % 60;
+  String two(int number) => number.toString().padLeft(2, '0');
+  return hours > 0
+      ? '$hours:${two(minutes)}:${two(seconds)}'
+      : '${two(minutes)}:${two(seconds)}';
 }
 
 class _MissionCard extends ConsumerWidget {

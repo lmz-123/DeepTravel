@@ -16,13 +16,14 @@ class StableTriggerEngine {
   final Map<String, List<DateTime>> _qualifying = {};
 
   TriggerCandidate? process(LocationSample sample,
-      List<StoryFragment> fragments, Set<String> collectedIds) {
+      List<StoryFragment> fragments, Set<String> revealedIds) {
+    final qualified = <({StoryFragment fragment, double distance})>[];
     for (final fragment in fragments) {
       if (_presence[fragment.id] == RegionPresence.acknowledged ||
-          fragment.isCollected) {
+          fragment.isCollected ||
+          revealedIds.contains(fragment.id)) {
         continue;
       }
-      if (!fragment.dependencyIds.every(collectedIds.contains)) continue;
       final region = fragment.triggerRegion;
       final distance = _distance(
           sample.latitude, sample.longitude, region.latitude, region.longitude);
@@ -45,9 +46,15 @@ class StableTriggerEngine {
         continue;
       }
       _presence[fragment.id] = RegionPresence.inside;
-      return TriggerCandidate(fragment: fragment, sample: sample);
+      qualified.add((fragment: fragment, distance: distance));
     }
-    return null;
+    if (qualified.isEmpty) return null;
+    qualified.sort((left, right) {
+      final byDistance = left.distance.compareTo(right.distance);
+      if (byDistance != 0) return byDistance;
+      return left.fragment.position.compareTo(right.fragment.position);
+    });
+    return TriggerCandidate(fragment: qualified.first.fragment, sample: sample);
   }
 
   void acknowledge(String fragmentId) {

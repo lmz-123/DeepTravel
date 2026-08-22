@@ -80,13 +80,15 @@ Flutter 目前由 `JourneyController` 启动路线，并由全局但只在旅程
 
 `ActiveTourController` 仍是唯一播放器 owner，不在 shell 新建第二个 audio player。圆球只 watch 播放状态和进度，把 tap 转发为旅程导航，把 pan 转发为位置更新；播放/暂停、进度拖动和停止仍留在完整旅程页，避免在小尺寸圆球内堆叠控制。交互采用“浮动播放气泡 + 旋转唱片”的成熟隐喻：圆形中心显示服务端路线封面（缺失时用中性品牌图形），外圈绘制进度和克制的 ink/gold 唱片纹理；播放时连续旋转，暂停时停在当前角度，`MediaQuery.disableAnimations`/无障碍减少动态效果时完全静止并保留状态指示。
 
-圆球视觉直径为 56–64 logical pixels，透明语义命中区至少 72 logical pixels，通过首页 `Stack/Positioned` 放置。首次默认在右侧；`GestureDetector` 的 pan 手势允许用户在扣除 safe area、固定 header、底部导航和系统手势区后的矩形内自由移动，达到拖动阈值后取消 tap，松手不强制吸边。位置保存为可移动区域内的归一化 `(x, y)`，使用 `user.{id}.playbackOrbPosition` 本地键隔离；重进首页、重启、旋转或窗口变化时恢复并 clamp 到新边界。Semantics 提供上/下/左/右分步移动动作作为自由拖动的无障碍替代。在紧凑/大屏布局、滚动冲突和 drag-versus-tap widget tests 中验证。
+圆球视觉直径为 56–64 logical pixels，透明语义命中区至少 72 logical pixels，通过首页 `Stack/Positioned` 放置。首次默认在右侧；pan start 记录指针与圆球的像素偏移，pan update 直接用每次全局指针位置更新本地像素坐标，使圆球逐帧同步跟手且不在拖动中写偏好。拖动达到阈值后取消 tap；pan end 只保留垂直位置，并按圆球中心落在屏幕左/右半区选择 `x=0` 或 `x=1`，用短时可减弱动画吸附到对应安全侧边。位置保存为 `(edge, normalizedY)`，兼容读取旧 `(x, y)` 后按 `x < 0.5` 归左、否则归右；重进首页、重启、旋转或窗口变化时恢复并 clamp 到新边界。Semantics 的左右动作直接切换吸附侧，上下动作调整归一化高度。在紧凑/大屏布局、滚动冲突、连续拖动跟手、左右半区吸附和 drag-versus-tap widget tests 中验证。
 
 离开首页时不渲染圆球但不停止当前音频；回到首页立即从同一 controller 恢复位置、角度状态、进度和语义。显式停止、退出登录或鉴权过期时移除圆球。Material 3 navigation drawer 的层级和触控行为继续作为侧边菜单基线。
 
 播放器所有权显式表示为 `(userId, routeId, journeyId, fragmentId, generation)`。同一路线切换节点沿用 replay/live 规则；当任意页面请求不同 `routeId` 的音频时，controller 先递增 generation，使旧 position/completion/trigger callback 失效，再依次 stop player、清空 autoplay queue、停止旧 route 的 location subscription，最后装载新 owner 并按用户动作播放。旧 journey 在服务器仍保持原 active/completed 状态，之后可以从首页或足迹恢复。新媒体加载失败时旧音频保持 stopped，不自动回滚或形成双声道；UI 展示新景点的可重试错误。圆球只反映当前 owner，交接完成后封面和点击目标同时切换，不能短暂指向旧旅程却播放新声音。
 
-`ActiveTourState` 增加显式 `mode = live | revisit`、`progressFragmentId`（服务端推进目标）和 `selectedFragmentId`（当前播放/展示）。当前 `current` 逐步替换为从 ledger 派生的 selected fragment。离开 JourneyPage 不 stop controller；只有显式停止、正确完成后选择停止、账号过期/退出时清理。completed journey 以 revisit 初始化，只加载 ledger/音频，不调用 active-tour API 或 location tracker。
+`ActiveTourState` 增加显式 `mode = live | revisit`、`progressFragmentId`（服务端推进目标）和 `selectedFragmentId`（当前播放/展示）。当前 `current` 逐步替换为从 ledger 派生的 selected fragment。播放器状态以 `playing && processingState != completed` 为唯一“实际播放”真相：load、play、pause、resume、stop、completion 都显式收敛 UI 状态，旧 generation 的 player stream 不能反转新状态。离开 JourneyPage 不 stop controller；只有显式停止、正确完成后选择停止、账号过期/退出时清理。completed journey 以 revisit 初始化，只加载 ledger/音频，不调用 active-tour API 或 location tracker。
+
+旅程页把“导览运行状态”和“当前语音播放状态”分开呈现。导览总控依据 `paused` 与 `monitoring/simulated` 切换播放/暂停图标；语音按钮依据实际 player 状态切换，旁边使用 position/duration stream 驱动可 seek 的进度条以及 `mm:ss / mm:ss` 时间。duration 未就绪时禁用 seek 并显示占位，完成时位置停在结尾且按钮回到播放/重播语义。
 
 ### 6. 路线选择先看账号 journey index
 
@@ -105,17 +107,23 @@ Flutter 目前由 `JourneyController` 启动路线，并由全局但只在旅程
 
 `selectFragmentForReplay(id)` 的顺序为 player.stop → 清空自动触发 queue 中与用户选择冲突的播放项 → 设置 selected id/position → 按用户动作开始播放。完成回调先检查是否为 replay；replay 不调用 playback API，live 才进行 idempotent acknowledge。`progressFragmentId` 始终由 ledger 未完成状态派生，所以重听不会把定位/依赖游标带回旧节点。用户可点当前进度节点返回 live 叙事。
 
-### 8. 照片 viewer 与怀旧画框复用同一展示组件
+### 8. 照片 viewer 与游戏收藏册画框复用同一展示组件
 
 创建 presentation-level `EvidencePhotoButton`、`EvidencePhotoViewer` 和 `KeepsakeFrame`：
 
 - 优先显示仍存在的本地 capture 文件，否则加载鉴权 server bytes；
 - 点击始终通过显式图片按钮打开独立全屏/大 sheet viewer，不把手势偷偷绑在普通 image view 上；
-- frame 使用 code-native `CustomClipper/CustomPainter` 生成轻微不规则纸边、内层暖白留边和克制阴影，稳定 seed 决定每张卡的微小旋转，避免列表重建抖动；
-- 大图 viewer 不加毛边裁剪，保留原比例、缩放与清晰度；frame 只是 UI 外壳，不修改证据文件；
+- 缩略卡采用统一 1:1 图像窗口与 `BoxFit.cover` 居中裁剪，外层用 code-native `CustomPainter` 生成分层暖白卡纸、细内框、克制阴影和少量胶带/角标/印章细节，稳定 seed 只决定轻微旋转和装饰位置，避免列表重建抖动；
+- 大图 viewer 使用原始证据 bytes、`BoxFit.contain` 和缩放，不沿用缩略图裁剪，也不修改或重编码证据文件；画框只是类似游戏相册/图鉴的收藏 UI 外壳；
 - `MediaQuery.disableAnimations` 时旋转/入场动画关闭。
 
-这比引入网络纹理或逐路线位图框更小、更清晰，也避免过度装饰。足迹和 JourneyPage 共享相同 evidence metadata/provider/viewer，确保重启后的行为一致。
+设计参考成熟游戏照片收藏的共同信息层级：照片主体优先、统一网格、轻量个性化框饰和独立大图查看；不直接复制任何游戏素材。它比引入网络纹理或逐路线位图框更小、更清晰，也避免“随机撕破纸边”显得脏乱。足迹和 JourneyPage 共享相同 evidence metadata/provider/viewer，确保重启后的行为一致。
+
+### 10. 真实定位按空间邻近解锁，不按叙事序号设门
+
+真实环境中，`TriggerEngine` 每次收到合格位置样本时遍历全部尚未收集、具有有效触发区域的节点，而不是先用 `dependencyIds` 排除后序节点；候选按“已连续满足样本数、距离触发中心、内容 position”稳定排序，只触发一个最近节点。客户端仍对每个节点保留进入半径、离开半径、精度门槛、连续样本、窗口和冷却，服务端继续复算距离、精度、owner 和幂等键。因此乱序只放开内容先后关系，不降低现场真实性。
+
+后端 location trigger 不以 dependency completion 拒绝合法位置证据；demo trigger 仍按 `dependencyIds` 和 position 选择“下一条”，从而保持测试按钮可预测。ledger/reconstruction 只统计 collected 集合，不假设连续前缀；完成条件仍是全部节点 collected。播放器正在播 A 时到达 B，沿用现有单播放器队列，不重叠；用户先到 B 并完成后再到 A，二者各自只收集一次。内容图中的依赖继续用于叙事排序、模拟推进及后台内容质量检查，但不作为真实地理围栏的运行时 gate。
 
 ### 9. 设置本地按 user id 命名空间隔离
 

@@ -26,6 +26,8 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
   NormalizedOrbPosition? _position;
   String? _loadedUserId;
   bool _rotationScheduled = false;
+  bool _isDragging = false;
+  Offset? _dragOffset;
 
   @override
   void initState() {
@@ -56,9 +58,10 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
     final stored = ref.watch(orbPositionProvider(userId)).value;
     if (_loadedUserId != userId) {
       _loadedUserId = userId;
-      _position = stored;
+      _position = _edgePosition(stored ?? const NormalizedOrbPosition(1, .72));
     } else {
-      _position ??= stored;
+      _position ??=
+          _edgePosition(stored ?? const NormalizedOrbPosition(1, .72));
     }
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     final rotating = state.isPlaying && !reducedMotion;
@@ -81,16 +84,19 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
       final offset = origin + normalized.resolve(available, _hitSize);
       return Stack(
         children: [
-          Positioned(
+          AnimatedPositioned(
             left: offset.dx,
             top: offset.dy,
             width: _hitSize.width,
             height: _hitSize.height,
+            duration:
+                _isDragging ? Duration.zero : const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
             child: Semantics(
               button: true,
               label:
-                  '正在播放 ${state.route!.title}，${state.current!.title ?? '第 ${state.current!.position} 条线索'}',
-              hint: '双击回到正在播放的旅程；也可以拖动到屏幕其他位置',
+                  '${state.isPlaying ? '正在播放' : '已暂停'} ${state.route!.title}，${state.current!.title ?? '第 ${state.current!.position} 条线索'}',
+              hint: '双击回到当前旅程；也可以上下拖动并吸附到左右侧边',
               customSemanticsActions: {
                 const CustomSemanticsAction(label: '向左移动'): () =>
                     _move(const Offset(-.08, 0), userId),
@@ -104,19 +110,23 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => context.go('/journey/${state.session!.id}'),
+                onPanStart: (_) {
+                  _isDragging = true;
+                  _dragOffset = offset;
+                },
                 onPanUpdate: (details) {
-                  final current =
-                      origin + normalized.resolve(available, _hitSize);
+                  final next = (_dragOffset ?? offset) + details.delta;
+                  _dragOffset = next;
                   setState(() {
                     _position = NormalizedOrbPosition.fromOffset(
-                      current + details.delta - origin,
+                      next - origin,
                       available,
                       _hitSize,
                     );
                   });
                 },
-                onPanEnd: (_) => _persist(userId),
-                onPanCancel: () => _persist(userId),
+                onPanEnd: (_) => _finishDrag(userId),
+                onPanCancel: () => _finishDrag(userId),
                 child: Center(
                   child: TickerMode(
                     enabled: rotating,
@@ -158,12 +168,25 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
     final current = _position ?? const NormalizedOrbPosition(1, .72);
     setState(() {
       _position = NormalizedOrbPosition(
-        current.x + delta.dx,
+        delta.dx == 0 ? current.x : (delta.dx < 0 ? 0 : 1),
         current.y + delta.dy,
       ).clamped();
     });
     _persist(userId);
   }
+
+  void _finishDrag(String userId) {
+    final current = _position ?? const NormalizedOrbPosition(1, .72);
+    setState(() {
+      _isDragging = false;
+      _dragOffset = null;
+      _position = NormalizedOrbPosition(current.x < .5 ? 0 : 1, current.y);
+    });
+    _persist(userId);
+  }
+
+  NormalizedOrbPosition _edgePosition(NormalizedOrbPosition value) =>
+      NormalizedOrbPosition(value.x < .5 ? 0 : 1, value.y).clamped();
 
   Future<void> _persist(String userId) async {
     final value = _position;

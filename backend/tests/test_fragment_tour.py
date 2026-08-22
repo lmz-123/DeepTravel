@@ -203,6 +203,36 @@ def test_trigger_accuracy_distance_and_idempotency(client, guest_headers, caplog
     assert "fragment_trigger_accepted" in caplog.text
 
 
+def test_real_location_can_trigger_out_of_order_but_demo_stays_dependency_ordered(
+    client, guest_headers
+):
+    route, journey = _start(client, guest_headers)
+    later = route["audio_tour"]["fragments"][3]
+    endpoint = f"/api/v1/journeys/{journey['id']}/fragments/{later['id']}/triggers"
+
+    located = client.post(
+        endpoint,
+        json={
+            "method": "location",
+            "latitude": later["trigger_region"]["latitude"],
+            "longitude": later["trigger_region"]["longitude"],
+            "accuracy_m": 10,
+            "idempotency_key": str(uuid4()),
+        },
+        headers=guest_headers,
+    )
+    assert located.status_code == 200
+    assert located.get_json()["data"]["fragment"]["id"] == later["id"]
+
+    demo = client.post(
+        endpoint,
+        json={"method": "demo", "idempotency_key": str(uuid4())},
+        headers=guest_headers,
+    )
+    assert demo.status_code == 409
+    assert demo.get_json()["error"]["code"] == "fragment_locked"
+
+
 def test_legacy_photo_guidance_uses_safe_runtime_fallbacks(app, client, guest_headers):
     database = app.extensions["database"]
     with database.session_factory() as session:

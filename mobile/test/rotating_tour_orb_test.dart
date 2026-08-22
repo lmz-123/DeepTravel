@@ -43,7 +43,7 @@ void main() {
       child: MaterialApp.router(routerConfig: router),
     ));
     await tester.pumpAndSettle();
-    final orb = find.bySemanticsLabel(RegExp('正在播放 测试路线'));
+    final orb = find.bySemanticsLabel(RegExp('测试路线'));
     expect(orb, findsOneWidget);
     expect(tester.getSize(orb), const Size(72, 72));
 
@@ -54,8 +54,14 @@ void main() {
     expect(topLeft.dx, greaterThanOrEqualTo(0));
     expect(topLeft.dy, greaterThanOrEqualTo(0));
     final saved = await preferences.readOrbPosition('user-a');
-    expect(saved.x, lessThan(1));
+    expect(saved.x, 0);
     expect(saved.y, 0);
+
+    await tester.drag(orb, const Offset(500, 120));
+    await tester.pumpAndSettle();
+    final snappedRight = await preferences.readOrbPosition('user-a');
+    expect(snappedRight.x, 1);
+    expect(snappedRight.y, greaterThan(0));
 
     await tester.tap(orb);
     await tester.pumpAndSettle();
@@ -102,6 +108,53 @@ void main() {
     expect(bounds.bottom, lessThanOrEqualTo(600));
     final semantics = tester.getSemantics(orb);
     expect(semantics.getSemanticsData().customSemanticsActionIds, isNotEmpty);
+  });
+
+  testWidgets('playing orb rotates while paused orb remains still',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentUserIdProvider.overrideWithValue('user-a'),
+        activeTourControllerProvider.overrideWith(
+          () => _StaticTourController(
+            _pausedState.copyWith(status: 'simulated', isPlaying: true),
+          ),
+        ),
+      ],
+      child: const MaterialApp(
+        home: Scaffold(body: Stack(children: [RotatingTourOrbOverlay()])),
+      ),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    final playingOrb = find.bySemanticsLabel(RegExp('正在播放 测试路线'));
+    final playingTransform = tester.widget<Transform>(find.descendant(
+      of: playingOrb,
+      matching: find.byType(Transform),
+    ));
+    expect(playingTransform.transform.isIdentity(), isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentUserIdProvider.overrideWithValue('user-a'),
+        activeTourControllerProvider.overrideWith(
+          () => _StaticTourController(_pausedState),
+        ),
+      ],
+      child: const MaterialApp(
+        home: Scaffold(body: Stack(children: [RotatingTourOrbOverlay()])),
+      ),
+    ));
+    await tester.pump();
+    final pausedOrb = find.bySemanticsLabel(RegExp('已暂停 测试路线'));
+    final pausedTransform = tester.widget<Transform>(find.descendant(
+      of: pausedOrb,
+      matching: find.byType(Transform),
+    ));
+    expect(pausedTransform.transform.isIdentity(), isTrue);
   });
 
   testWidgets('stopped owner does not render the home orb', (tester) async {

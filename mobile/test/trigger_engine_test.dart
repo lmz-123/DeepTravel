@@ -3,17 +3,23 @@ import 'package:jiandi/features/experience/application/trigger_engine.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 
-StoryFragment _fragment({List<String> dependencies = const []}) =>
+StoryFragment _fragment({
+  String id = 'f1',
+  int position = 1,
+  double latitude = 22.5381,
+  double longitude = 113.9227,
+  List<String> dependencies = const [],
+}) =>
     StoryFragment(
-      id: 'f1',
-      position: 1,
+      id: id,
+      position: position,
       safePreview: '安全预览',
       interactionType: 'passive',
       reviewState: 'in_review',
       dependencyIds: dependencies,
-      triggerRegion: const TriggerRegion(
-        latitude: 22.5381,
-        longitude: 113.9227,
+      triggerRegion: TriggerRegion(
+        latitude: latitude,
+        longitude: longitude,
         entryRadiusM: 60,
         exitRadiusM: 90,
         maxAccuracyM: 50,
@@ -61,9 +67,9 @@ void main() {
     expect(engine.process(second, [fragment], {}), isNull);
   });
 
-  test('does not reveal a fragment before dependencies are collected', () {
+  test('real location can reveal a later fragment before dependencies', () {
     final engine = StableTriggerEngine();
-    final fragment = _fragment(dependencies: ['previous']);
+    final fragment = _fragment(position: 4, dependencies: ['previous']);
     final time = DateTime.utc(2026, 8, 22, 10);
     for (var index = 0; index < 2; index++) {
       final sample = LocationSample(
@@ -72,7 +78,45 @@ void main() {
         accuracyM: 10,
         recordedAt: time.add(Duration(seconds: index * 5)),
       );
-      expect(engine.process(sample, [fragment], {}), isNull);
+      final candidate = engine.process(sample, [fragment], {});
+      if (index == 0) {
+        expect(candidate, isNull);
+      } else {
+        expect(candidate?.fragment.id, 'f1');
+      }
+    }
+  });
+
+  test('chooses the nearest qualified region, then the authored position', () {
+    final engine = StableTriggerEngine();
+    final farther = _fragment(
+      id: 'farther',
+      position: 1,
+      latitude: 22.5380,
+    );
+    final nearer = _fragment(
+      id: 'nearer',
+      position: 4,
+      latitude: 22.53818,
+      dependencies: ['farther'],
+    );
+    final time = DateTime.utc(2026, 8, 22, 10);
+    for (var index = 0; index < 2; index++) {
+      final result = engine.process(
+        LocationSample(
+          latitude: 22.53818,
+          longitude: 113.9227,
+          accuracyM: 10,
+          recordedAt: time.add(Duration(seconds: index * 5)),
+        ),
+        [farther, nearer],
+        {},
+      );
+      if (index == 0) {
+        expect(result, isNull);
+      } else {
+        expect(result?.fragment.id, 'nearer');
+      }
     }
   });
 }
