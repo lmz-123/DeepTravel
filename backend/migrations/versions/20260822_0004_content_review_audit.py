@@ -14,18 +14,50 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("historical_claims", sa.Column("reviewed_by", sa.String(120)))
-    op.add_column("historical_claims", sa.Column("reviewed_at", sa.DateTime(timezone=True)))
-    op.add_column("story_arcs", sa.Column("reviewed_by", sa.String(120)))
-    op.add_column("story_arcs", sa.Column("reviewed_at", sa.DateTime(timezone=True)))
-    op.add_column("story_arcs", sa.Column("source_version", sa.String(80)))
-    op.add_column("story_arcs", sa.Column("publication_decision", sa.String(40)))
+    bind = op.get_bind()
+    _add_column_if_missing(
+        bind, "historical_claims", sa.Column("reviewed_by", sa.String(120))
+    )
+    _add_column_if_missing(
+        bind,
+        "historical_claims",
+        sa.Column("reviewed_at", sa.DateTime(timezone=True)),
+    )
+    _add_column_if_missing(
+        bind, "story_arcs", sa.Column("reviewed_by", sa.String(120))
+    )
+    _add_column_if_missing(
+        bind, "story_arcs", sa.Column("reviewed_at", sa.DateTime(timezone=True))
+    )
+    _add_column_if_missing(
+        bind, "story_arcs", sa.Column("source_version", sa.String(80))
+    )
+    _add_column_if_missing(
+        bind,
+        "story_arcs",
+        sa.Column("publication_decision", sa.String(40)),
+    )
 
 
 def downgrade() -> None:
-    op.drop_column("story_arcs", "publication_decision")
-    op.drop_column("story_arcs", "source_version")
-    op.drop_column("story_arcs", "reviewed_at")
-    op.drop_column("story_arcs", "reviewed_by")
-    op.drop_column("historical_claims", "reviewed_at")
-    op.drop_column("historical_claims", "reviewed_by")
+    bind = op.get_bind()
+    _drop_column_if_present(bind, "story_arcs", "publication_decision")
+    _drop_column_if_present(bind, "story_arcs", "source_version")
+    _drop_column_if_present(bind, "story_arcs", "reviewed_at")
+    _drop_column_if_present(bind, "story_arcs", "reviewed_by")
+    _drop_column_if_present(bind, "historical_claims", "reviewed_at")
+    _drop_column_if_present(bind, "historical_claims", "reviewed_by")
+
+
+def _column_names(bind, table_name: str) -> set[str]:
+    return {column["name"] for column in sa.inspect(bind).get_columns(table_name)}
+
+
+def _add_column_if_missing(bind, table_name: str, column: sa.Column) -> None:
+    if column.name not in _column_names(bind, table_name):
+        op.add_column(table_name, column)
+
+
+def _drop_column_if_present(bind, table_name: str, column_name: str) -> None:
+    if column_name in _column_names(bind, table_name):
+        op.drop_column(table_name, column_name)
