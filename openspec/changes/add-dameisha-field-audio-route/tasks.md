@@ -38,4 +38,4 @@
 - [x] 6.1 Add a Dameisha Android field checklist recording at least eight samples per stop, accuracy/drift, trigger timing, safe surface, false-entry checks and background/re-entry behavior.
 - [ ] 6.2 Smoke-test both deployed services and all media over their production addresses, then install a release APK configured for `http://115.29.221.190:5001` with both location modes available and execute the field pass with real mode selected.
 - [x] 6.3 Commit scoped changes, push `main` to both `DeepTravel` and `DeepTravel-admin`, and provide idempotent server pull/migration/redeploy commands plus the APK artifact.
-- [ ] 6.4 Commit the location-switch and backend-driven discovery corrections, push `main` to `DeepTravel`, and rebuild the production-address APK without compiling out simulated location.
+- [x] 6.4 Commit the location-switch and backend-driven discovery corrections, push `main` to `DeepTravel`, and rebuild the production-address APK without compiling out simulated location.
