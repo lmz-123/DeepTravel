@@ -48,4 +48,4 @@ curl -fsS -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 已发布路线一旦产生用户行程，结构修改会返回 `409 published_route_locked`，防止用户走到一半时故事、线索 ID 或位置被替换。当前 MVP 的修订方式是复制内容包，使用新的 route/arc/fragment ID 和新 `package_version` 发布新路线版本；后台不会覆盖旧行程使用的内容。
 
-后台和 Flask 必须挂载同一媒体宿主目录。服务器部署独立后台时，把 `MEDIA_HOST_PATH` 指向 `DeepTravel/backend/media` 的绝对路径；否则后台能登记资源，但 Flask 容器可能读不到文件。
+后台和 Flask 必须挂载同一媒体宿主目录。主项目默认把 `./backend/media` 挂载到 Flask 的 `/app/media`；服务器部署独立后台时，把后台 `.env` 的 `MEDIA_HOST_PATH` 指向 `/root/DeepTravel/backend/media`。上传完成后公共媒体 API 会立即读取新文件，不需要重建 Flask 镜像。

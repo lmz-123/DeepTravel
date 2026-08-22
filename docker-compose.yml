@@ -35,6 +35,7 @@ services:
       EVIDENCE_RETENTION_DAYS: ${EVIDENCE_RETENTION_DAYS:-30}
     volumes:
       - jiandi_evidence:/app/private-evidence
+      - ${MEDIA_HOST_PATH:-./backend/media}:/app/media
     ports:
       - "5001:5000"
     depends_on:
