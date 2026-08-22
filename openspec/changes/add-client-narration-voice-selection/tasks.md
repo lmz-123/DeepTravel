@@ -29,4 +29,4 @@
 
 - [x] 6.1 Run backend, migration, admin API/UI, Flutter analysis/unit/widget suites and additive contract checks without paid TTS credentials; validate the OpenSpec change strictly.
 - [ ] 6.2 Generate or approve at least two complete non-default voice profiles for a disposable route and smoke-test client selection, account isolation, background playback, fallback, and the username edit sequence through an Android text connection.
-- [ ] 6.3 Commit and push DeepTravel and DeepTravel-admin to their `main` branches, build only the production-profile APK with test authentication disabled, verify version/signature/API endpoint, and deliver the APK plus idempotent deployment commands.
+- [x] 6.3 Commit and push DeepTravel and DeepTravel-admin to their `main` branches, build only the production-profile APK with test authentication disabled, verify version/signature/API endpoint, and deliver the APK plus idempotent deployment commands.
