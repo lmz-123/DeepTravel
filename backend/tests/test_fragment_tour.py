@@ -34,7 +34,7 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     assert tour["fragments"][0]["audio"]["url"].endswith(".m4a")
 
 
-def test_trigger_accuracy_distance_and_idempotency(client, guest_headers):
+def test_trigger_accuracy_distance_and_idempotency(client, guest_headers, caplog):
     route, journey = _start(client, guest_headers)
     fragment = route["audio_tour"]["fragments"][0]
     endpoint = f"/api/v1/journeys/{journey['id']}/fragments/{fragment['id']}/triggers"
@@ -77,6 +77,8 @@ def test_trigger_accuracy_distance_and_idempotency(client, guest_headers):
     assert accepted.status_code == 200
     assert accepted.get_json() == repeated.get_json()
     assert accepted.get_json()["data"]["fragment"]["transcript"]
+    assert "fragment_trigger_requested" in caplog.text
+    assert "fragment_trigger_accepted" in caplog.text
 
 
 def test_complete_fragment_arc_with_private_evidence_and_reconstruction(client, guest_headers):

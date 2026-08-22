@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 
 import click
@@ -25,6 +26,7 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
     app.config.from_object(Config)
     if test_config:
         app.config.update(test_config)
+    app.logger.setLevel(logging.INFO)
 
     database = Database(str(app.config["DATABASE_URL"]))
     app.extensions["database"] = database

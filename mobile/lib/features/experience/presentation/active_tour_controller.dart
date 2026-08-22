@@ -270,29 +270,66 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> triggerNextDemo() async {
+    final reporter = ref.read(runtimeLogReporterProvider);
     if (!AppConfig.enableDemoTriggers ||
         state.locationMode != TourLocationMode.simulated ||
         state.status != 'simulated' ||
         _triggering) {
+      unawaited(reporter?.warning(
+        'tour',
+        'demo_arrival_ignored',
+        context: {
+          'demo_enabled': AppConfig.enableDemoTriggers,
+          'location_mode': state.locationMode.name,
+          'tour_status': state.status,
+          'trigger_in_progress': _triggering,
+        },
+      ));
       return;
     }
-    var next = _nextDemoFragment();
-    if (next == null) {
-      state = state.copyWith(isBusy: true, clearError: true);
-      try {
+
+    state = state.copyWith(
+      isBusy: true,
+      locationMessage: '正在确认下一条线索…',
+      clearError: true,
+    );
+    unawaited(reporter?.info(
+      'tour',
+      'demo_arrival_tapped',
+      context: {'tour_status': state.status},
+    ));
+
+    try {
+      var next = _nextDemoFragment();
+      if (next == null) {
         await _refreshLedger();
         next = _nextDemoFragment();
-      } catch (error) {
-        state = state.copyWith(errorMessage: _message(error));
-      } finally {
-        state = state.copyWith(isBusy: false);
       }
       if (next == null) {
-        state = state.copyWith(locationMessage: '照片仍在确认中，确认完成后才能进入下一条线索。');
+        state = state.copyWith(
+          locationMessage: '上一条线索仍在播放或等待照片确认，完成后才能进入下一条。',
+        );
+        unawaited(reporter?.warning(
+          'tour',
+          'demo_arrival_no_eligible_fragment',
+        ));
         return;
       }
+      final triggered = await _trigger(next, method: 'demo');
+      if (triggered) {
+        state = state.copyWith(locationMessage: '已到达新线索，正在准备播放故事。');
+      }
+    } catch (error, stackTrace) {
+      state = state.copyWith(errorMessage: _message(error));
+      unawaited(reporter?.error(
+        'tour',
+        'demo_arrival_failed',
+        error: error,
+        stackTrace: stackTrace,
+      ));
+    } finally {
+      state = state.copyWith(isBusy: false);
     }
-    await _trigger(next, method: 'demo');
   }
 
   StoryFragment? _nextDemoFragment() {
@@ -314,12 +351,22 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     return null;
   }
 
-  Future<void> _trigger(StoryFragment fragment,
+  Future<bool> _trigger(StoryFragment fragment,
       {required String method, LocationSample? sample}) async {
     final session = state.session;
-    if (session == null) return;
+    if (session == null) return false;
+    final reporter = ref.read(runtimeLogReporterProvider);
     _triggering = true;
     final key = _uuid.v4();
+    unawaited(reporter?.info(
+      'tour',
+      'fragment_trigger_requested',
+      context: {
+        'fragment_id': fragment.id,
+        'fragment_position': fragment.position,
+        'method': method,
+      },
+    ));
     try {
       final revealed = await _repository.triggerFragment(
           session.id, fragment.id,
@@ -331,7 +378,17 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       _triggerEngine.acknowledge(fragment.id);
       await _enqueueNarration(revealed);
       await _refreshLedger();
-    } catch (error) {
+      unawaited(reporter?.info(
+        'tour',
+        'fragment_trigger_succeeded',
+        context: {
+          'fragment_id': fragment.id,
+          'fragment_position': fragment.position,
+          'method': method,
+        },
+      ));
+      return true;
+    } catch (error, stackTrace) {
       if (method == 'location') {
         await _store.enqueue(OutboxEvent(id: key, type: 'trigger', payload: {
           'journey_id': session.id,
@@ -346,6 +403,18 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         }
       }
       state = state.copyWith(errorMessage: _message(error));
+      unawaited(reporter?.error(
+        'tour',
+        'fragment_trigger_failed',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'fragment_id': fragment.id,
+          'fragment_position': fragment.position,
+          'method': method,
+        },
+      ));
+      return false;
     } finally {
       _triggering = false;
     }
@@ -360,31 +429,69 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     state = state.copyWith(
         current: fragment, position: Duration.zero, clearError: true);
     await _persistNarrationQueue();
-    unawaited(
-        _player.play(fragment, preparedPath: state.preparedPaths[fragment.id]));
+    unawaited(_playNarration(fragment));
   }
 
   Future<void> _onNarrationCompleted() async {
-    final current = state.current;
+    final completed = state.current;
     final session = state.session;
-    if (current == null || session == null) return;
+    if (completed == null || session == null) return;
+
+    // just_audio keeps `playing == true` when playback naturally reaches the
+    // completed processing state. Reset it immediately so the next trigger is
+    // started instead of becoming stranded behind an already-finished item.
+    StoryFragment? next;
+    if (state.queue.isNotEmpty) {
+      next = state.queue.first;
+      state = state.copyWith(
+        current: next,
+        queue: state.queue.skip(1).toList(),
+        isPlaying: false,
+        position: Duration.zero,
+      );
+    } else {
+      state = state.copyWith(
+        isPlaying: false,
+        position: state.duration ?? state.position,
+      );
+    }
+    await _persistNarrationQueue();
+    if (next != null) unawaited(_playNarration(next));
+
     final key = _uuid.v4();
     try {
-      await _repository.acknowledgePlayback(session.id, current.id, 1, key);
+      await _repository.acknowledgePlayback(session.id, completed.id, 1, key);
       await _refreshLedger();
     } catch (_) {
       await _store.enqueue(OutboxEvent(id: key, type: 'playback', payload: {
         'journey_id': session.id,
-        'fragment_id': current.id,
+        'fragment_id': completed.id,
         'progress': 1.0
       }));
     }
-    if (state.queue.isNotEmpty) {
-      final next = state.queue.first;
-      state =
-          state.copyWith(queue: state.queue.skip(1).toList(), current: next);
-      await _persistNarrationQueue();
-      unawaited(_player.play(next, preparedPath: state.preparedPaths[next.id]));
+  }
+
+  Future<void> _playNarration(StoryFragment fragment) async {
+    try {
+      await _player.play(
+        fragment,
+        preparedPath: state.preparedPaths[fragment.id],
+      );
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        isPlaying: false,
+        errorMessage: '故事音频暂时无法播放，可以先查看文字稿后重试。',
+      );
+      unawaited(ref.read(runtimeLogReporterProvider)?.error(
+            'audio',
+            'narration_playback_failed',
+            error: error,
+            stackTrace: stackTrace,
+            context: {
+              'fragment_id': fragment.id,
+              'fragment_position': fragment.position,
+            },
+          ));
     }
   }
 

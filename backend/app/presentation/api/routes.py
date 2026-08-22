@@ -235,13 +235,24 @@ def stop_active_tour(journey_id: str):
 @api.post("/journeys/<journey_id>/fragments/<fragment_id>/triggers")
 @require_guest
 def trigger_fragment(journey_id: str, fragment_id: str):
-    return jsonify(
-        {
-            "data": _services()["fragment_tours"].trigger(
-                g.guest_session.id, journey_id, fragment_id, _json_body()
-            )
-        }
+    payload = _json_body()
+    method = str(payload.get("method") or "location")
+    current_app.logger.info(
+        "fragment_trigger_requested journey=%s fragment=%s method=%s",
+        journey_id,
+        fragment_id,
+        method,
     )
+    result = _services()["fragment_tours"].trigger(
+        g.guest_session.id, journey_id, fragment_id, payload
+    )
+    current_app.logger.info(
+        "fragment_trigger_accepted journey=%s fragment=%s method=%s",
+        journey_id,
+        fragment_id,
+        method,
+    )
+    return jsonify({"data": result})
 
 
 @api.post("/journeys/<journey_id>/fragments/<fragment_id>/playback")

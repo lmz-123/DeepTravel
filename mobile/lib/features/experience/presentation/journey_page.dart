@@ -147,8 +147,14 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                         : () => ref
                             .read(activeTourControllerProvider.notifier)
                             .triggerNextDemo(),
-                    icon: const Icon(Icons.my_location_rounded),
-                    label: const Text('模拟到达下一条线索')),
+                    icon: state.isBusy
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.my_location_rounded),
+                    label: Text(state.isBusy
+                        ? '正在确认下一条线索…'
+                        : '模拟到达下一条线索')),
               ],
               if (state.errorMessage != null)
                 Padding(

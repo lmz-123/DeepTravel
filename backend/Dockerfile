@@ -15,4 +15,4 @@ RUN mkdir -p /app/media /app/private-evidence
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "alembic upgrade head && flask --app 'app:create_app' seed && gunicorn --bind 0.0.0.0:5000 --workers 2 --threads 4 'app:create_app()'"]
+CMD ["sh", "-c", "alembic upgrade head && flask --app 'app:create_app' seed && gunicorn --bind 0.0.0.0:5000 --workers 2 --threads 4 --access-logfile - --error-logfile - --capture-output --log-level info 'app:create_app()'"]
