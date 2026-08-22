@@ -1,0 +1,4 @@
+interface:
+  display_name: "DeepTravel 项目上下文"
+  short_description: "DeepTravel 开发、推送、部署与递增版本打包流程"
+  default_prompt: "Use $deeptravel-project to implement and validate DeepTravel work, push the correct repository, package a versioned APK when needed, and provide deployment commands."
