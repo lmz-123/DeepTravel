@@ -113,4 +113,26 @@ class SqliteTourStore implements TourStore {
         limit: 1);
     return rows.isEmpty ? null : rows.first['path'] as String;
   }
+
+  @override
+  Future<List<PreparedAssetRecord>> preparedAssets() async {
+    final rows = await (await _db).query('prepared_assets', orderBy: 'url ASC');
+    return rows
+        .map((row) => PreparedAssetRecord(
+              url: row['url'] as String,
+              path: row['path'] as String,
+              version: row['version'] as String,
+              sizeBytes: row['size_bytes'] as int,
+            ))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> removePreparedAsset(String url) async {
+    await (await _db).delete(
+      'prepared_assets',
+      where: 'url = ?',
+      whereArgs: [url],
+    );
+  }
 }

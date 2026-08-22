@@ -22,6 +22,10 @@ flutter run --dart-define=APP_MODE=api \
 
 发现页从后端获取城市和该城市的全部已发布路线，路线卡片可左右滑动选择。开始碎片导览后，客户端仅在用户选择真实定位时请求定位权限，且需在 15 秒内出现两次合格采样才触发音频；真实/模拟定位开关在所有构建中永久保留。服务器需要设置 `ALLOW_DEMO_ARRIVAL=true` 才能接受模拟到达请求。
 
+点击首页左上角“见地”可打开旅行者菜单，进入足迹、设置或退出账号。完成过的路线会保留全部已解锁线索与私密照片，再次点击路线直接进入回听；进行中的路线也会绕过首次耳机邀请。音频离开旅程页后继续播放时，发现页右侧显示可自由拖动的旋转唱片圆球，点击即可回到当前进度；开始另一景点的音频会原子停止上一景点。已解锁的绿色节点可随时回听且不改写行走进度。
+
+现场拍照是可选留念。相机打开前会显示后台配置的站位、朝向、构图与安全建议；跳过、取消或离线排队都不阻止“下一条线索”。本机照片和足迹照片可点击进入带缩放的怀旧画框查看器，服务端照片始终通过当前账号的 Bearer 鉴权加载。
+
 ## 使用 Flask + MySQL
 
 ```bash
@@ -93,7 +97,7 @@ flutter test
 flutter build web
 
 cd ..
-openspec validate add-location-aware-fragment-audio-tour --strict
+openspec validate add-traveler-menu-footprints-and-tour-continuity --strict
 ```
 
 ## 架构
@@ -137,7 +141,9 @@ Travel/
 - `GET /routes/{slug}`
 - `GET /assets/{path}`
 - `POST /journeys`
+- `GET /journeys?status=active|completed`
 - `GET /journeys/{id}`
+- `GET /journeys/{id}/context`
 - `POST /journeys/{id}/arrivals`
 - `POST /journeys/{id}/answers`
 - `POST /journeys/{id}/advance`
@@ -145,7 +151,9 @@ Travel/
 - `POST /journeys/{id}/fragments/{fragment_id}/triggers`
 - `POST /journeys/{id}/fragments/{fragment_id}/playback`
 - `POST /journeys/{id}/fragments/{fragment_id}/evidence`
+- `GET /journeys/{id}/evidence`
 - `GET|DELETE /journeys/{id}/evidence/{evidence_id}`
+- `GET /policies/evidence`
 - `GET /journeys/{id}/ledger`
 - `POST /journeys/{id}/reconstruction`
 - `GET /journeys/{id}/recap`
@@ -168,7 +176,7 @@ Journey 端点需要 `Authorization: Bearer <user-token>`。错误统一为：
 - 客户端与 API 始终显示研究预览标签，不会把种子数据标成已核验史实；
 - 两张路线视觉图由 ImageGen 为本项目原创生成，存放在 `backend/media/images/`，并通过 `media_assets` 数据表登记；
 - MVP 不采集姓名、手机号或连续位置轨迹；触发请求只保存碎片、时间、方式和验证结果，不保留原始经纬度；用户 JWT 仅包含随机用户 ID、认证版本与过期时间；
-- 旅行者照片默认私密、按旅程鉴权、随机对象键存储，可在最终重构前删除。删除会使对应任务回到待完成状态。
+- 旅行者照片默认私密、按旅程鉴权、随机对象键存储，并会重新编码去除 EXIF。照片是可稍后补拍的留念，不阻塞线索收集、下一节点或最终重构；完成前后删除照片都不会回退旅程进度。
 
 ## 已知 MVP 边界
 

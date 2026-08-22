@@ -19,7 +19,7 @@
 - `fragments`：位置从 1 连续递增，依赖只能指向前序碎片；旁白与 transcript 必须完全一致。
 - `trigger_region`：运行坐标只存 WGS-84，`exit_radius_m` 大于进入半径，并保留原坐标系、来源和现场备注。
 - `claims` 与 `sources`：每条碎片至少关联一个有来源支持的史实主张。
-- `photo_mission`：写明可观察对象、安全提醒和无障碍/延期替代方案。
+- `photo_mission`：照片只作为可稍后补拍的私密留念，不得作为线索收集或下一节点的 gate。必须填写 `field_subject`、`vantage_point`（安全站位/经典机位）、`shooting_direction`（拍摄朝向）、`composition_tip`（构图建议）、安全提醒和无障碍/延期替代方案，并设置 `required: false`。
 - `media`：资源 key、服务器相对路径和 MIME；包导入会验证文件确实存在并登记数据库。
 
 ## API 自动化
@@ -49,3 +49,14 @@ curl -fsS -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 已发布路线一旦产生用户行程，结构修改会返回 `409 published_route_locked`，防止用户走到一半时故事、线索 ID 或位置被替换。当前 MVP 的修订方式是复制内容包，使用新的 route/arc/fragment ID 和新 `package_version` 发布新路线版本；后台不会覆盖旧行程使用的内容。
 
 后台和 Flask 必须挂载同一媒体宿主目录。主项目默认把 `./backend/media` 挂载到 Flask 的 `/app/media`；服务器部署独立后台时，把后台 `.env` 的 `MEDIA_HOST_PATH` 指向 `/root/DeepTravel/backend/media`。上传完成后公共媒体 API 会立即读取新文件，不需要重建 Flask 镜像。
+
+## 照片指导重新发布清单
+
+以下清单只供运营人员确认；代码部署和测试不会自动修改生产内容或执行发布：
+
+1. 先部署包含 nullable 指导字段的 API migration，再部署支持这些字段的独立后台。
+2. 在后台打开每个已有照片任务，核对安全站位、朝向、构图和安全说明均为该节点专属文案，并确认 `required=false`。
+3. 导出内容包并运行 graph validation；错误必须为零，旧字段 fallback 只用于部署过渡，不能作为重新发布后的长期数据。
+4. 由内容编辑完成 review/approve，使用 `tools/publish_content_package.py` 显式发布目标包；不要在迁移脚本、应用启动或测试中自动 publish。
+5. 发布后读取公共 route manifest，确认 `mission_preview.required=false`；再用 owner 旅程触发节点，确认 revealed mission 返回三项指导且不拍照也能进入下一条。
+6. 对生产 A/B 测试账号验证照片仍为 Bearer 鉴权私有资源，删除照片不会减少 collected count 或重新锁定重构。

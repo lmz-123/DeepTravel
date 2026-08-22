@@ -107,7 +107,7 @@
     "source_version": "dameisha-sources-2026.08.22",
     "publication_decision": "field_test"
   },
-  "required_photo_mission_count": 3,
+  "required_photo_mission_count": 0,
   "sources": [
     {
       "id": "source-dameisha-archives",
@@ -340,10 +340,13 @@
         "id": "dameisha-mission-1",
         "prompt": "在不拍清他人面部的前提下，让旧村公共街巷或老树与通往海滨的人流同时进入画面。",
         "field_subject": "旧村空间与当代游客动线的并置",
+        "vantage_point": "站在旧村公共步行空间较宽处，避开私人院门、车道和人流中心。",
+        "shooting_direction": "朝向能同时看见老树或旧街巷与通往海滨游客动线的方向。",
+        "composition_tip": "把旧村元素放在近景一侧，人流作为远景层次，避免拍清陌生人面部。",
         "safety_copy": "不要进入私人院落，不站在车道拍摄；拥挤时先放下手机。",
         "accessibility_alternative": "可拍公共路牌、街巷入口或稍后补拍，不影响继续听故事。",
         "authenticity_label": "present_day_observation_only",
-        "required": true,
+        "required": false,
         "audit_state": "in_review"
       }
     },
@@ -518,10 +521,13 @@
         "id": "dameisha-mission-4",
         "prompt": "拍下入口、分流、救生提示或其他管理设施与可用公共空间的关系，不拍清陌生人的脸。",
         "field_subject": "承载力管理如何进入公共海岸",
+        "vantage_point": "站在入口外侧或分流设施旁的非通行区域，不停留在闸口中央。",
+        "shooting_direction": "面向入口、提示牌或分流设施，并带入其服务的公共海岸空间。",
+        "composition_tip": "让管理设施位于画面一侧，另一侧保留开放空间，呈现管理与使用的关系。",
         "safety_copy": "拥挤时不要逆行或停在通道中央；可以不拍人群。",
         "accessibility_alternative": "可拍空置分流栏、提示牌或远景，并可稍后完成。",
         "authenticity_label": "present_day_management_observation",
-        "required": true,
+        "required": false,
         "audit_state": "in_review"
       }
     },
@@ -584,10 +590,13 @@
         "id": "dameisha-mission-5",
         "prompt": "寻找一个旧的景观符号与新的植物、步道、排水或高差设计同框的角度。",
         "field_subject": "保留记忆与灾后新系统的并置",
+        "vantage_point": "站在西部公园干燥铺装和护栏内侧，远离浪溅区与绿化边缘。",
+        "shooting_direction": "朝向旧景观符号与新步道、植物或排水系统相交的界面。",
+        "composition_tip": "用斜向构图连接旧符号和新系统，保留足够环境说明二者不是孤立物件。",
         "safety_copy": "不攀爬护栏，不进入绿化和浪溅区域；雨天只观察不拍摄。",
         "accessibility_alternative": "可拍任一明确的新旧并置细节，也可以用文字回看代替现场拍照。",
         "authenticity_label": "interpretive_location_pending_field_audit",
-        "required": true,
+        "required": false,
         "audit_state": "in_review"
       }
     }

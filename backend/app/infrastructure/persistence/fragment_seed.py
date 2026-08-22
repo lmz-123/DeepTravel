@@ -157,6 +157,9 @@ FRAGMENTS = (
                 "将“宁南”石匾与门洞的位置关系拍进同一画面。它帮助你区分建置年代与可见城垣年代。"
             ),
             "subject": "南门“宁南”石匾及其所在门洞",
+            "vantage_point": "站在南门外公共步行区正前方略偏左，避开门洞通行线。",
+            "shooting_direction": "面向南门，将“宁南”石匾和完整门洞同时收入画面。",
+            "composition_tip": "把石匾放在上方三分之一处，保留门洞两侧墙体作为历史层次。",
             "authenticity": "field_audit_required",
         },
     },
@@ -208,6 +211,9 @@ FRAGMENTS = (
                 "拍下一处明确写有说明文字的县治展示。当前展示属于解释性陈列，不把它当作明代原构。"
             ),
             "subject": "公开区域内标明性质的县治解释性展示",
+            "vantage_point": "站在展示区公共参观线外侧，不跨越围挡或影响讲解队伍。",
+            "shooting_direction": "正对带有说明文字的展示，让文字与空间关系同时可辨。",
+            "composition_tip": "说明牌占画面下三分之一，展示主体居中，并保留环境判断其陈列性质。",
             "authenticity": "exhibition_interpretation",
         },
     },
@@ -259,6 +265,9 @@ FRAGMENTS = (
                 "拍下一处旧材料或街巷尺度与当代用途同框的画面。它只说明共存，不证明某个古代事件。"
             ),
             "subject": "旧空间层次与明确当代用途的并置",
+            "vantage_point": "选择北街口公共步行区较宽处停留，避开店铺出入口和居民通道。",
+            "shooting_direction": "朝向一处旧墙、街巷尺度与当代店铺或公共使用并存的界面。",
+            "composition_tip": "用前后景同时容纳旧材料和新用途，避免只拍招牌而失去街巷尺度。",
             "authenticity": "coexistence_not_event_proof",
         },
     },
@@ -381,21 +390,6 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
             )
             for claim_id in item["claims"]:
                 session.add(FragmentClaimModel(fragment_id=item["id"], claim_id=claim_id))
-            if item.get("mission"):
-                mission = item["mission"]
-                session.add(
-                    PhotoMissionModel(
-                        id=mission["id"],
-                        fragment_id=item["id"],
-                        prompt=mission["prompt"],
-                        field_subject=mission["subject"],
-                        safety_copy="请停在安全、允许拍照且不妨碍他人的位置；可稍后完成。",
-                        accessibility_alternative="若无法拍照，可阅读文字线索；研究版仍保留任务待完成状态。",
-                        authenticity_label=mission["authenticity"],
-                        required=True,
-                        audit_state="in_review",
-                    )
-                )
             changed = True
         elif (
             fragment.narration_script != item["script"] or fragment.script_version != SCRIPT_VERSION
@@ -409,6 +403,33 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
         elif fragment.audio_size_bytes != audio_size:
             fragment.audio_size_bytes = audio_size
             changed = True
+        mission_data = item.get("mission")
+        if mission_data:
+            mission = session.get(PhotoMissionModel, mission_data["id"])
+            values = {
+                "prompt": mission_data["prompt"],
+                "field_subject": mission_data["subject"],
+                "vantage_point": mission_data["vantage_point"],
+                "shooting_direction": mission_data["shooting_direction"],
+                "composition_tip": mission_data["composition_tip"],
+                "safety_copy": "请停在安全、允许拍照且不妨碍他人的位置；可稍后完成。",
+                "accessibility_alternative": "若无法拍照，可跳过并继续路线，之后仍可回来留念。",
+                "authenticity_label": mission_data["authenticity"],
+                "required": False,
+                "audit_state": "in_review",
+            }
+            if mission is None:
+                session.add(
+                    PhotoMissionModel(
+                        id=mission_data["id"], fragment_id=item["id"], **values
+                    )
+                )
+                changed = True
+            else:
+                for field_name, value in values.items():
+                    if getattr(mission, field_name) != value:
+                        setattr(mission, field_name, value)
+                        changed = True
     for position in range(2, 6):
         fragment_id = f"nantou-fragment-{position}"
         required_id = f"nantou-fragment-{position - 1}"

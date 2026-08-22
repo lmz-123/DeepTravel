@@ -10,6 +10,7 @@ import '../domain/fragment_models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
+import 'widgets/evidence_photo_widgets.dart';
 import 'widgets/narration_voice_selector.dart';
 
 class JourneyPage extends ConsumerStatefulWidget {
@@ -34,16 +35,30 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _scheduleActiveTourStart();
+  }
+
+  void _scheduleActiveTourStart() {
     if (_started) return;
     _started = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final journey = ref.read(journeyControllerProvider);
-      if (journey.route?.audioTour != null && journey.session != null) {
+      if (journey.route?.audioTour != null &&
+          journey.session?.id == widget.journeyId) {
         ref
             .read(activeTourControllerProvider.notifier)
             .start(journey.route!, journey.session!);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant JourneyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.journeyId == widget.journeyId) return;
+    _started = false;
+    _scheduleActiveTourStart();
   }
 
   @override
@@ -140,8 +155,12 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                       : _NarrationCard(
                           key: ValueKey(state.current!.id), state: state)),
               if (ledger != null) ...[
-                ...ledger.entries.where((entry) => entry.isMissionPending).map(
-                    (entry) => Padding(
+                ...ledger.entries
+                    .where((entry) =>
+                        entry.isRevealed &&
+                        entry.mission != null &&
+                        entry.evidenceId == null)
+                    .map((entry) => Padding(
                         padding: const EdgeInsets.only(top: 18),
                         child: _MissionCard(fragment: entry, state: state))),
                 ...ledger.entries
@@ -171,7 +190,18 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                             dimension: 18,
                             child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.my_location_rounded),
-                    label: Text(state.isBusy ? '正在确认下一条线索…' : '模拟到达下一条线索')),
+                    label: Text(state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）')),
+              ],
+              if (state.playbackMode == TourPlaybackMode.revisit &&
+                  state.liveFragmentId != null) ...[
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed: () => ref
+                      .read(activeTourControllerProvider.notifier)
+                      .returnToLive(),
+                  icon: const Icon(Icons.directions_walk_rounded),
+                  label: const Text('回到当前行走进度'),
+                ),
               ],
               if (state.errorMessage != null)
                 Padding(
@@ -474,6 +504,7 @@ class _StatusPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final monitoring = state.status == 'monitoring';
     final simulated = state.status == 'simulated';
+    final revisiting = state.playbackMode == TourPlaybackMode.revisit;
     final running = monitoring || simulated;
     final label = switch (state.status) {
       'preparing' => '正在准备离线故事',
@@ -481,6 +512,7 @@ class _StatusPanel extends ConsumerWidget {
       'simulated' => '模拟定位中 · 不读取 GPS',
       'paused' => '导览已暂停',
       'stopped' => '导览已停止',
+      'revisit' => '足迹回听中 · 不改写进度',
       _ => monitoring ? '正在寻找附近的历史线索' : '正在恢复导览'
     };
     return Container(
@@ -501,14 +533,24 @@ class _StatusPanel extends ConsumerWidget {
                   style: const TextStyle(
                       color: AppColors.white, fontWeight: FontWeight.w600))),
           IconButton.filledTonal(
-              tooltip: running ? '暂停自动导览' : '继续自动导览',
-              onPressed: running
+              tooltip: revisiting
+                  ? state.isPlaying
+                      ? '暂停回听'
+                      : '继续回听'
+                  : running
+                      ? '暂停自动导览'
+                      : '继续自动导览',
+              onPressed: revisiting
                   ? () => ref
                       .read(activeTourControllerProvider.notifier)
-                      .pauseTour()
-                  : () => ref
-                      .read(activeTourControllerProvider.notifier)
-                      .resumeTour(),
+                      .togglePlayback()
+                  : running
+                      ? () => ref
+                          .read(activeTourControllerProvider.notifier)
+                          .pauseTour()
+                      : () => ref
+                          .read(activeTourControllerProvider.notifier)
+                          .resumeTour(),
               icon: Icon(
                   monitoring ? Icons.pause_rounded : Icons.play_arrow_rounded)),
           IconButton(
@@ -527,87 +569,131 @@ class _StatusPanel extends ConsumerWidget {
                       style: TextStyle(
                           color: AppColors.white.withValues(alpha: .72),
                           height: 1.45)))),
-        const SizedBox(height: 12),
-        Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
-        const SizedBox(height: 8),
-        Semantics(
-          label: '模拟定位测试开关',
-          hint: state.locationMode == TourLocationMode.simulated
-              ? '当前忽略真实位置'
-              : '当前使用真实位置',
-          child: Row(children: [
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  const Text('模拟定位（测试）',
-                      style: TextStyle(
-                          color: AppColors.white, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
-                  Text(
-                      state.locationMode == TourLocationMode.simulated
-                          ? '手动模拟到达，不申请定位权限'
-                          : '读取真实位置，稳定靠近后触发',
-                      style: TextStyle(
-                          color: AppColors.white.withValues(alpha: .66),
-                          fontSize: 12)),
-                ])),
-            Switch.adaptive(
-                value: state.locationMode == TourLocationMode.simulated,
-                onChanged: state.isBusy || state.status == 'preparing'
-                    ? null
-                    : (value) => ref
-                        .read(activeTourControllerProvider.notifier)
-                        .setLocationMode(value
-                            ? TourLocationMode.simulated
-                            : TourLocationMode.real)),
-          ]),
-        ),
+        if (!revisiting) ...[
+          const SizedBox(height: 12),
+          Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
+          const SizedBox(height: 8),
+          Semantics(
+            label: '模拟定位测试开关',
+            hint: state.locationMode == TourLocationMode.simulated
+                ? '当前忽略真实位置'
+                : '当前使用真实位置',
+            child: Row(children: [
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('模拟定位（测试）',
+                        style: TextStyle(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                        state.locationMode == TourLocationMode.simulated
+                            ? '手动模拟到达，不申请定位权限'
+                            : '读取真实位置，稳定靠近后触发',
+                        style: TextStyle(
+                            color: AppColors.white.withValues(alpha: .66),
+                            fontSize: 12)),
+                  ])),
+              Switch.adaptive(
+                  value: state.locationMode == TourLocationMode.simulated,
+                  onChanged: state.isBusy || state.status == 'preparing'
+                      ? null
+                      : (value) => ref
+                          .read(activeTourControllerProvider.notifier)
+                          .setLocationMode(value
+                              ? TourLocationMode.simulated
+                              : TourLocationMode.real)),
+            ]),
+          ),
+        ],
       ]),
     );
   }
 }
 
-class _FragmentRail extends StatelessWidget {
+class _FragmentRail extends ConsumerWidget {
   const _FragmentRail({required this.manifest, required this.ledger});
   final AudioTourManifest manifest;
   final StoryLedger? ledger;
   @override
-  Widget build(BuildContext context) => Row(
-          children: manifest.fragments.map((fragment) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(activeTourControllerProvider);
+    return Row(
+      children: manifest.fragments.map((fragment) {
         StoryFragment? entry;
         for (final value in ledger?.entries ?? const <StoryFragment>[]) {
           if (value.id == fragment.id) entry = value;
         }
         final collected = entry?.isCollected ?? false;
         final pending = entry?.isMissionPending ?? false;
+        final selected = state.selectedFragmentId == fragment.id;
+        final live = state.liveFragmentId == fragment.id;
         return Expanded(
-            child: Column(children: [
-          AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                  color: collected
-                      ? AppColors.moss
-                      : pending
-                          ? AppColors.terracotta
-                          : AppColors.paperDeep,
-                  shape: BoxShape.circle),
-              alignment: Alignment.center,
-              child: Icon(
-                  collected
-                      ? Icons.check_rounded
-                      : pending
-                          ? Icons.photo_camera_outlined
-                          : Icons.lock_outline_rounded,
-                  color: collected || pending ? AppColors.white : AppColors.ink,
-                  size: 17)),
-          const SizedBox(height: 6),
-          Text('${fragment.position}',
-              style: Theme.of(context).textTheme.labelMedium)
-        ]));
-      }).toList());
+          child: Column(
+            children: [
+              Semantics(
+                button: true,
+                selected: selected,
+                label: collected
+                    ? '第 ${fragment.position} 条线索，已解锁${live ? '，当前行走进度' : ''}'
+                    : '第 ${fragment.position} 条线索，尚未解锁',
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: IconButton(
+                    tooltip:
+                        collected ? '回听第 ${fragment.position} 条线索' : '线索尚未解锁',
+                    onPressed: () {
+                      if (collected) {
+                        ref
+                            .read(activeTourControllerProvider.notifier)
+                            .selectCollectedFragment(fragment.id);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('这条线索尚未解锁')),
+                        );
+                      }
+                    },
+                    style: IconButton.styleFrom(
+                      backgroundColor: collected
+                          ? AppColors.moss
+                          : pending
+                              ? AppColors.terracotta
+                              : AppColors.paperDeep,
+                      foregroundColor: collected || pending
+                          ? AppColors.white
+                          : AppColors.ink,
+                      side: BorderSide(
+                        color: selected
+                            ? AppColors.gold
+                            : live
+                                ? AppColors.terracotta
+                                : Colors.transparent,
+                        width: selected || live ? 3 : 1,
+                      ),
+                    ),
+                    icon: Icon(
+                      collected
+                          ? selected
+                              ? Icons.graphic_eq_rounded
+                              : Icons.check_rounded
+                          : pending
+                              ? Icons.photo_camera_outlined
+                              : Icons.lock_outline_rounded,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text('${fragment.position}',
+                  style: Theme.of(context).textTheme.labelMedium),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
 }
 
 class _ListeningCard extends StatelessWidget {
@@ -737,7 +823,7 @@ class _MissionCard extends ConsumerWidget {
               const Row(children: [
                 Icon(Icons.camera_alt_outlined, color: AppColors.terracotta),
                 SizedBox(width: 8),
-                Text('可以稍后完成的现场任务')
+                Text('可选的现场留念')
               ]),
               const SizedBox(height: 14),
               Text(mission.prompt,
@@ -747,24 +833,34 @@ class _MissionCard extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyMedium),
               if (pendingPath != null && File(pendingPath).existsSync())
                 Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.file(File(pendingPath),
-                            height: 160,
-                            width: double.infinity,
-                            fit: BoxFit.cover))),
+                  padding: const EdgeInsets.only(top: 14),
+                  child: LocalPhotoThumbnail(
+                    path: pendingPath,
+                    title: fragment.title ?? fragment.safePreview,
+                    width: 190,
+                  ),
+                ),
+              if (upload != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _uploadLabel(upload.phase),
+                  style: const TextStyle(color: AppColors.moss, fontSize: 12),
+                ),
+              ],
               const SizedBox(height: 16),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                       onPressed: state.isBusy
                           ? null
-                          : () => ref
-                              .read(activeTourControllerProvider.notifier)
-                              .captureEvidence(fragment),
+                          : () => _showCameraGuide(context, ref, mission),
                       icon: const Icon(Icons.camera_alt_rounded),
                       label: Text(pendingPath == null ? '拍摄并检查线索' : '重拍线索'))),
+              const SizedBox(height: 4),
+              const Text(
+                '不拍也可以继续；测试时“下一条线索”不会等待照片。',
+                style: TextStyle(fontSize: 12, color: AppColors.moss),
+              ),
               if (pendingPath != null)
                 SizedBox(
                     width: double.infinity,
@@ -780,18 +876,154 @@ class _MissionCard extends ConsumerWidget {
                                 : '重试私密上传'))),
             ])));
   }
+
+  Future<void> _showCameraGuide(
+    BuildContext context,
+    WidgetRef ref,
+    PhotoMission mission,
+  ) async {
+    final shouldCapture = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.paper,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 4, 22, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('先找到经典机位',
+                  style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              const Text('确认安全且不影响他人后，再打开相机。下面只是建议，不是通关条件。'),
+              const SizedBox(height: 18),
+              _GuideRow(
+                icon: Icons.place_outlined,
+                label: '站位',
+                value: mission.vantagePoint,
+              ),
+              _GuideRow(
+                icon: Icons.explore_outlined,
+                label: '朝向',
+                value: mission.shootingDirection,
+              ),
+              _GuideRow(
+                icon: Icons.crop_free_rounded,
+                label: '构图',
+                value: mission.compositionTip,
+              ),
+              _GuideRow(
+                icon: Icons.health_and_safety_outlined,
+                label: '安全',
+                value: mission.safetyCopy,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('稍后再拍'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.camera_alt_rounded),
+                      label: const Text('打开相机'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (shouldCapture == true) {
+      await ref
+          .read(activeTourControllerProvider.notifier)
+          .captureEvidence(fragment);
+    }
+  }
+
+  String _uploadLabel(EvidenceUploadPhase phase) => switch (phase) {
+        EvidenceUploadPhase.captured => '照片已保存在本机，轻触画框可查看',
+        EvidenceUploadPhase.uploading => '正在私密上传，照片仍可查看',
+        EvidenceUploadPhase.queued => '等待网络重试，照片仍保留在本机',
+        EvidenceUploadPhase.accepted => '已保存到这次足迹',
+      };
 }
 
-class _EvidenceReceiptCard extends StatelessWidget {
+class _GuideRow extends StatelessWidget {
+  const _GuideRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.paperDeep,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppColors.terracotta, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 3),
+                  Text(value),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _EvidenceReceiptCard extends ConsumerWidget {
   const _EvidenceReceiptCard({required this.fragment, required this.state});
   final StoryFragment fragment;
   final ActiveTourState state;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final upload = state.evidenceUploadFor(fragment.id);
     final path = upload?.filePath;
     final hasLocalPreview = path != null && File(path).existsSync();
+    final userId = ref.watch(currentUserIdProvider);
+    final session = state.session;
+    EvidenceRecord? remoteEvidence;
+    if (!hasLocalPreview && userId != null && session != null) {
+      final items = ref
+          .watch(journeyEvidenceProvider(UserJourneyKey(userId, session.id)))
+          .asData
+          ?.value;
+      remoteEvidence = items
+          ?.where((item) =>
+              item.id == fragment.evidenceId || item.fragmentId == fragment.id)
+          .firstOrNull;
+    }
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -800,10 +1032,19 @@ class _EvidenceReceiptCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(22)),
       child: Row(children: [
         if (hasLocalPreview)
-          ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.file(File(path),
-                  width: 72, height: 72, fit: BoxFit.cover))
+          LocalPhotoThumbnail(
+            path: path,
+            title: fragment.title ?? fragment.safePreview,
+            width: 88,
+          )
+        else if (remoteEvidence != null && userId != null && session != null)
+          EvidenceThumbnail(
+            userId: userId,
+            journeyId: session.id,
+            evidence: remoteEvidence,
+            title: fragment.title ?? fragment.safePreview,
+            width: 88,
+          )
         else
           Container(
               width: 72,

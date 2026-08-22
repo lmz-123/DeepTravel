@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.domain.models import City, GuestSession, Journey, JourneyAnswer, Route, User
+from app.domain.models import (
+    City,
+    GuestSession,
+    Journey,
+    JourneyAnswer,
+    JourneyLibraryItem,
+    JourneyStatus,
+    Route,
+    User,
+)
 
 
 class CatalogRepository(Protocol):
@@ -44,7 +53,17 @@ class JourneyRepository(Protocol):
 
     def find_active(self, route_id: str, user_id: str) -> Journey | None: ...
 
+    def find_latest_completed(self, route_id: str, user_id: str) -> Journey | None: ...
+
     def list_active_for_user(self, user_id: str) -> list[Journey]: ...
+
+    def list_for_user(
+        self, user_id: str, statuses: tuple[JourneyStatus, ...] | None = None
+    ) -> list[Journey]: ...
+
+    def list_library_items(
+        self, user_id: str, statuses: tuple[JourneyStatus, ...] | None = None
+    ) -> list[JourneyLibraryItem]: ...
 
     def add_answer(self, journey_id: str, answer: JourneyAnswer) -> None: ...
 

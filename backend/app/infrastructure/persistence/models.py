@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -153,6 +154,16 @@ class GuestSessionModel(Base):
 
 class JourneyModel(Base):
     __tablename__ = "journeys"
+    __table_args__ = (
+        Index("ix_journeys_user_status_updated", "user_id", "status", "updated_at"),
+        Index(
+            "ix_journeys_user_route_status_completed",
+            "user_id",
+            "route_id",
+            "status",
+            "completed_at",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
@@ -386,6 +397,9 @@ class PhotoMissionModel(Base):
     fragment_id: Mapped[str] = mapped_column(ForeignKey("story_fragments.id"), unique=True)
     prompt: Mapped[str] = mapped_column(Text)
     field_subject: Mapped[str] = mapped_column(Text)
+    vantage_point: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shooting_direction: Mapped[str | None] = mapped_column(Text, nullable=True)
+    composition_tip: Mapped[str | None] = mapped_column(Text, nullable=True)
     safety_copy: Mapped[str] = mapped_column(Text)
     accessibility_alternative: Mapped[str] = mapped_column(Text)
     authenticity_label: Mapped[str] = mapped_column(String(80), default="interpretive")

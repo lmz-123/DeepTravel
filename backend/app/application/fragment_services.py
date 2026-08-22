@@ -19,9 +19,9 @@ from app.infrastructure.persistence.models import (
     ActiveTourModel,
     ClaimSourceModel,
     EvidenceModel,
-    FragmentNarrationTrackModel,
     FragmentClaimModel,
     FragmentDependencyModel,
+    FragmentNarrationTrackModel,
     HistoricalClaimModel,
     HistoricalSourceModel,
     IdempotencyRecordModel,
@@ -39,6 +39,11 @@ from app.infrastructure.persistence.models import (
 
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def _is_expired(value: datetime) -> bool:
+    expires_at = value if value.tzinfo else value.replace(tzinfo=UTC)
+    return expires_at <= datetime.now(UTC)
 
 
 class FragmentTourService:
@@ -216,6 +221,7 @@ class FragmentTourService:
         scope = f"trigger:{journey_id}:{fragment_id}"
         with self._session() as session:
             journey = self._owned_journey(session, user_id, journey_id)
+            self._reconcile_optional_photo_states(session, journey_id)
             duplicate = self._idempotent(session, scope, key)
             if duplicate is not None:
                 return duplicate
@@ -316,8 +322,7 @@ class FragmentTourService:
             )
             if progress >= fragment.completion_threshold:
                 state.playback_completed_at = state.playback_completed_at or now
-                if state.state == "collected":
-                    state.collected_at = state.collected_at or now
+                state.collected_at = state.collected_at or now
             response = {"fragment": self._revealed_fragment(session, fragment, state)}
             self._record_idempotency(session, scope, key, response)
             session.commit()
@@ -408,7 +413,28 @@ class FragmentTourService:
                 raise FragmentOperationError(
                     "evidence_not_found", "照片证据不存在", status_code=404
                 )
+            if _is_expired(evidence.expires_at):
+                raise FragmentOperationError(
+                    "evidence_expired", "照片证据已按保留期清理", status_code=410
+                )
             return self.evidence_storage.open(evidence.object_key), evidence.mime_type
+
+    def list_evidence(self, user_id: str, journey_id: str) -> list[dict]:
+        with self._session() as session:
+            self._owned_journey(session, user_id, journey_id)
+            rows = session.execute(
+                select(EvidenceModel, PhotoMissionModel.fragment_id)
+                .join(PhotoMissionModel, PhotoMissionModel.id == EvidenceModel.mission_id)
+                .where(
+                    EvidenceModel.journey_id == journey_id,
+                    EvidenceModel.deleted_at.is_(None),
+                )
+                .order_by(EvidenceModel.uploaded_at.desc())
+            ).all()
+            return [
+                self._evidence_dict(evidence, fragment_id=fragment_id)
+                for evidence, fragment_id in rows
+            ]
 
     def delete_evidence(self, user_id: str, journey_id: str, evidence_id: str) -> dict:
         with self._session() as session:
@@ -422,16 +448,6 @@ class FragmentTourService:
             )
             if evidence is None:
                 return {"id": evidence_id, "deleted": True}
-            reconstruction = session.scalar(
-                select(ReconstructionModel).where(
-                    ReconstructionModel.journey_id == journey_id,
-                    ReconstructionModel.is_correct.is_(True),
-                )
-            )
-            if reconstruction:
-                raise FragmentOperationError(
-                    "journey_state_conflict", "故事已完成重构，照片只会按保留期清理"
-                )
             mission = session.get(PhotoMissionModel, evidence.mission_id)
             state = session.scalar(
                 select(JourneyFragmentModel).where(
@@ -440,10 +456,8 @@ class FragmentTourService:
                 )
             )
             evidence.deleted_at = datetime.now(UTC)
-            if state:
+            if state and state.evidence_id == evidence.id:
                 state.evidence_id = None
-                state.collected_at = None
-                state.state = "mission_pending"
             session.commit()
             self.evidence_storage.delete(evidence.object_key)
             return {"id": evidence_id, "deleted": True}
@@ -451,6 +465,8 @@ class FragmentTourService:
     def ledger(self, user_id: str, journey_id: str) -> dict:
         with self._session() as session:
             journey = self._owned_journey(session, user_id, journey_id)
+            if self._reconcile_optional_photo_states(session, journey_id):
+                session.commit()
             arc = session.scalar(
                 select(StoryArcModel)
                 .where(StoryArcModel.route_id == journey.route_id)
@@ -502,6 +518,7 @@ class FragmentTourService:
     def reconstruct(self, user_id: str, journey_id: str, submitted: list[str]) -> dict:
         with self._session() as session:
             journey = self._owned_journey(session, user_id, journey_id)
+            self._reconcile_optional_photo_states(session, journey_id)
             arc = session.scalar(
                 select(StoryArcModel).where(StoryArcModel.route_id == journey.route_id)
             )
@@ -639,6 +656,24 @@ class FragmentTourService:
             return float(value)
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _reconcile_optional_photo_states(session: Session, journey_id: str) -> bool:
+        legacy_states = list(
+            session.scalars(
+                select(JourneyFragmentModel).where(
+                    JourneyFragmentModel.journey_id == journey_id,
+                    JourneyFragmentModel.state == "mission_pending",
+                    JourneyFragmentModel.playback_completed_at.is_not(None),
+                )
+            )
+        )
+        for state in legacy_states:
+            state.state = "collected"
+            state.collected_at = state.collected_at or state.playback_completed_at
+        if legacy_states:
+            session.flush()
+        return bool(legacy_states)
 
     @staticmethod
     def _idempotent(session: Session, scope: str, key: str) -> dict | None:
@@ -793,6 +828,9 @@ class FragmentTourService:
                     "id": mission.id,
                     "prompt": mission.prompt,
                     "field_subject": mission.field_subject,
+                    "vantage_point": mission.vantage_point or mission.field_subject,
+                    "shooting_direction": mission.shooting_direction or mission.prompt,
+                    "composition_tip": mission.composition_tip or mission.prompt,
                     "safety_copy": mission.safety_copy,
                     "accessibility_alternative": mission.accessibility_alternative,
                     "authenticity_label": mission.authenticity_label,
@@ -909,8 +947,8 @@ class FragmentTourService:
         }
 
     @staticmethod
-    def _evidence_dict(evidence: EvidenceModel) -> dict:
-        return {
+    def _evidence_dict(evidence: EvidenceModel, *, fragment_id: str | None = None) -> dict:
+        data = {
             "id": evidence.id,
             "journey_id": evidence.journey_id,
             "mission_id": evidence.mission_id,
@@ -918,7 +956,12 @@ class FragmentTourService:
             "size_bytes": evidence.size_bytes,
             "width": evidence.width,
             "height": evidence.height,
+            "captured_at": _iso(evidence.captured_at),
             "uploaded_at": _iso(evidence.uploaded_at),
             "expires_at": _iso(evidence.expires_at),
-            "url": f"evidence/{evidence.id}",
+            "is_expired": _is_expired(evidence.expires_at),
+            "url": f"/journeys/{evidence.journey_id}/evidence/{evidence.id}",
         }
+        if fragment_id is not None:
+            data["fragment_id"] = fragment_id
+        return data

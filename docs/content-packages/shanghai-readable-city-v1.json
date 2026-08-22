@@ -100,7 +100,7 @@
     "source_version": "shanghai-municipal-sources-2026.08.22",
     "publication_decision": "field_test"
   },
-  "required_photo_mission_count": 3,
+  "required_photo_mission_count": 0,
   "sources": [
     {
       "id": "source-sh-citywalk",
@@ -329,10 +329,13 @@
         "id": "sh-readable-mission-1",
         "prompt": "在人行道安全位置拍下建筑转角与住宅窗户的关系，不拍清住户和路人面部。",
         "field_subject": "地标外观与住宅属性并存",
+        "vantage_point": "站在武康大楼对面宽阔人行道内侧，远离路缘和交叉口通行线。",
+        "shooting_direction": "面向建筑尖角，让转角轮廓与仍在使用的住宅窗户同时可见。",
+        "composition_tip": "将尖角置于画面中轴，左右立面形成延伸线，并保留窗户尺度而不拍清住户。",
         "safety_copy": "绝不进入车道或占用路口；人多时跳过拍照。",
         "accessibility_alternative": "可跳过或稍后在安全位置补拍，不影响继续听完整故事。",
         "authenticity_label": "present_day_observation_only",
-        "required": true,
+        "required": false,
         "audit_state": "in_review"
       }
     },
@@ -451,10 +454,13 @@
         "id": "sh-readable-mission-3",
         "prompt": "拍下一块公共建筑铭牌或导览信息，并让它所解释的建筑局部同时入镜。",
         "field_subject": "解释系统与被解释建筑",
+        "vantage_point": "站在铭牌旁不堵门的宽阔人行道区域，与入口保持通行距离。",
+        "shooting_direction": "斜向对准铭牌，使说明文字与对应建筑局部位于同一画面。",
+        "composition_tip": "铭牌放在近景下方，建筑局部作为背景，确保二者关联清楚且不拍个人信息。",
         "safety_copy": "只在宽阔人行道停留，不堵门、不拍二维码中的个人信息。",
         "accessibility_alternative": "可跳过或稍后在安全位置补拍，不影响继续听完整故事。",
         "authenticity_label": "present_day_observation_only",
-        "required": true,
+        "required": false,
         "audit_state": "in_review"
       }
     },
@@ -574,10 +580,13 @@
         "id": "sh-readable-mission-5",
         "prompt": "拍下人行空间中的安全或分流设施，画面避免可识别人脸和机动车号牌。",
         "field_subject": "热门街区背后的公共安全治理",
+        "vantage_point": "选择交叉口外的宽阔人行道停留，不靠近车道、护栏缺口或排队通道。",
+        "shooting_direction": "面向隔离栏、提示牌或分流设施，并带入其对应的人行空间。",
+        "composition_tip": "设施作为前景引导线，街区空间作为背景，避开可识别人脸和机动车号牌。",
         "safety_copy": "不在交叉口停留，不跨护栏；拥挤时只听不拍。",
         "accessibility_alternative": "可跳过或稍后在安全位置补拍，不影响继续听完整故事。",
         "authenticity_label": "present_day_observation_only",
-        "required": true,
+        "required": false,
         "audit_state": "in_review"
       }
     }

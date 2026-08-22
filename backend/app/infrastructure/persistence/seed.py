@@ -15,8 +15,8 @@ from app.infrastructure.persistence.models import (
     MediaAssetModel,
     NarrationVoiceProfileModel,
     RouteModel,
-    StoryFragmentModel,
     StopModel,
+    StoryFragmentModel,
 )
 
 SHANGHAI_CITY_ID = "2b2301c8-d36e-4aa5-a3a8-b1881cb3f001"

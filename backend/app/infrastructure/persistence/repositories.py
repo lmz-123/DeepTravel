@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.domain.models import (
@@ -12,6 +12,7 @@ from app.domain.models import (
     GuestSession,
     Journey,
     JourneyAnswer,
+    JourneyLibraryItem,
     JourneyStatus,
     Route,
     Stop,
@@ -19,12 +20,16 @@ from app.domain.models import (
 )
 from app.infrastructure.persistence.models import (
     CityModel,
+    EvidenceModel,
     GuestSessionModel,
     JourneyAnswerModel,
+    JourneyFragmentModel,
     JourneyModel,
     MediaAssetModel,
     RouteModel,
     StopModel,
+    StoryArcModel,
+    StoryFragmentModel,
     UserModel,
 )
 
@@ -351,6 +356,23 @@ class SqlAlchemyJourneyRepository:
         model = self.session.scalar(statement)
         return _journey_to_domain(model) if model else None
 
+    def find_latest_completed(self, route_id: str, user_id: str) -> Journey | None:
+        statement = (
+            select(JourneyModel)
+            .where(
+                JourneyModel.route_id == route_id,
+                JourneyModel.user_id == user_id,
+                JourneyModel.status == JourneyStatus.COMPLETED.value,
+            )
+            .options(selectinload(JourneyModel.answers))
+            .order_by(
+                JourneyModel.completed_at.desc(),
+                JourneyModel.started_at.desc(),
+            )
+        )
+        model = self.session.scalar(statement)
+        return _journey_to_domain(model) if model else None
+
     def list_active_for_user(self, user_id: str) -> list[Journey]:
         statement = (
             select(JourneyModel)
@@ -362,6 +384,138 @@ class SqlAlchemyJourneyRepository:
             .order_by(JourneyModel.updated_at.desc())
         )
         return [_journey_to_domain(model) for model in self.session.scalars(statement)]
+
+    def list_for_user(
+        self, user_id: str, statuses: tuple[JourneyStatus, ...] | None = None
+    ) -> list[Journey]:
+        selected_statuses = statuses or (
+            JourneyStatus.ACTIVE,
+            JourneyStatus.COMPLETED,
+        )
+        statement = (
+            select(JourneyModel)
+            .where(
+                JourneyModel.user_id == user_id,
+                JourneyModel.status.in_(item.value for item in selected_statuses),
+            )
+            .options(selectinload(JourneyModel.answers))
+            .order_by(
+                func.coalesce(JourneyModel.completed_at, JourneyModel.updated_at).desc(),
+                JourneyModel.started_at.desc(),
+            )
+        )
+        return [_journey_to_domain(model) for model in self.session.scalars(statement)]
+
+    def list_library_items(
+        self, user_id: str, statuses: tuple[JourneyStatus, ...] | None = None
+    ) -> list[JourneyLibraryItem]:
+        selected_statuses = statuses or (
+            JourneyStatus.ACTIVE,
+            JourneyStatus.COMPLETED,
+        )
+        fragment_progress = (
+            select(
+                JourneyFragmentModel.journey_id.label("journey_id"),
+                func.sum(
+                    case(
+                        (
+                            JourneyFragmentModel.state.in_(("collected", "reconstructed")),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("collected_count"),
+            )
+            .group_by(JourneyFragmentModel.journey_id)
+            .subquery()
+        )
+        fragment_totals = (
+            select(
+                StoryArcModel.route_id.label("route_id"),
+                func.count(StoryFragmentModel.id).label("fragment_total"),
+            )
+            .join(StoryFragmentModel, StoryFragmentModel.arc_id == StoryArcModel.id)
+            .group_by(StoryArcModel.route_id)
+            .subquery()
+        )
+        answer_counts = (
+            select(
+                JourneyAnswerModel.journey_id.label("journey_id"),
+                func.count(JourneyAnswerModel.id).label("answer_count"),
+            )
+            .group_by(JourneyAnswerModel.journey_id)
+            .subquery()
+        )
+        stop_totals = (
+            select(
+                StopModel.route_id.label("route_id"),
+                func.count(StopModel.id).label("stop_total"),
+            )
+            .group_by(StopModel.route_id)
+            .subquery()
+        )
+        evidence_counts = (
+            select(
+                EvidenceModel.journey_id.label("journey_id"),
+                func.count(EvidenceModel.id).label("evidence_count"),
+            )
+            .where(EvidenceModel.deleted_at.is_(None))
+            .group_by(EvidenceModel.journey_id)
+            .subquery()
+        )
+        statement = (
+            select(
+                JourneyModel,
+                RouteModel,
+                func.coalesce(fragment_totals.c.fragment_total, 0).label(
+                    "fragment_total"
+                ),
+                func.coalesce(fragment_progress.c.collected_count, 0).label(
+                    "fragment_collected"
+                ),
+                func.coalesce(answer_counts.c.answer_count, 0).label("answer_count"),
+                func.coalesce(stop_totals.c.stop_total, 0).label("stop_total"),
+                func.coalesce(evidence_counts.c.evidence_count, 0).label(
+                    "evidence_count"
+                ),
+            )
+            .join(RouteModel, RouteModel.id == JourneyModel.route_id)
+            .outerjoin(
+                fragment_progress,
+                fragment_progress.c.journey_id == JourneyModel.id,
+            )
+            .outerjoin(
+                fragment_totals, fragment_totals.c.route_id == JourneyModel.route_id
+            )
+            .outerjoin(answer_counts, answer_counts.c.journey_id == JourneyModel.id)
+            .outerjoin(stop_totals, stop_totals.c.route_id == JourneyModel.route_id)
+            .outerjoin(evidence_counts, evidence_counts.c.journey_id == JourneyModel.id)
+            .where(
+                JourneyModel.user_id == user_id,
+                JourneyModel.status.in_(item.value for item in selected_statuses),
+            )
+            .options(selectinload(JourneyModel.answers))
+            .order_by(
+                func.coalesce(JourneyModel.completed_at, JourneyModel.updated_at).desc(),
+                JourneyModel.started_at.desc(),
+            )
+        )
+        items = []
+        for row in self.session.execute(statement):
+            is_fragmented = int(row.fragment_total) > 0
+            items.append(
+                JourneyLibraryItem(
+                    journey=_journey_to_domain(row.JourneyModel),
+                    route=_route_to_domain(row.RouteModel, include_stops=False),
+                    journey_kind="fragmented" if is_fragmented else "legacy",
+                    collected_count=int(
+                        row.fragment_collected if is_fragmented else row.answer_count
+                    ),
+                    total_count=int(row.fragment_total if is_fragmented else row.stop_total),
+                    evidence_count=int(row.evidence_count),
+                )
+            )
+        return items
 
     def add_answer(self, journey_id: str, answer: JourneyAnswer) -> None:
         self.session.add(

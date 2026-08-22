@@ -107,7 +107,10 @@ class PhotoMission {
       required this.accessibilityAlternative,
       required this.authenticityLabel,
       required this.required,
-      required this.auditState});
+      required this.auditState,
+      this.vantagePoint = '请选择不影响通行、远离车流的安全位置。',
+      this.shootingDirection = '面向任务提示中的主体，先观察周围再举起手机。',
+      this.compositionTip = '保留主体与周围环境的关系，避开清晰人脸和个人信息。'});
   final String id;
   final String prompt;
   final String fieldSubject;
@@ -116,6 +119,9 @@ class PhotoMission {
   final String authenticityLabel;
   final bool required;
   final String auditState;
+  final String vantagePoint;
+  final String shootingDirection;
+  final String compositionTip;
 
   factory PhotoMission.fromJson(Map<String, dynamic> json) => PhotoMission(
         id: json['id'] as String,
@@ -126,7 +132,19 @@ class PhotoMission {
         authenticityLabel: json['authenticity_label'] as String,
         required: json['required'] as bool? ?? true,
         auditState: json['audit_state'] as String,
+        vantagePoint:
+            _nonEmptyString(json['vantage_point']) ?? '请选择不影响通行、远离车流的安全位置。',
+        shootingDirection: _nonEmptyString(json['shooting_direction']) ??
+            '面向任务提示中的主体，先观察周围再举起手机。',
+        compositionTip: _nonEmptyString(json['composition_tip']) ??
+            '保留主体与周围环境的关系，避开清晰人脸和个人信息。',
       );
+}
+
+String? _nonEmptyString(Object? value) {
+  if (value is! String) return null;
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
 }
 
 class HistoricalSource {
@@ -385,11 +403,88 @@ class ReconstructionItem {
 }
 
 class EvidenceRecord {
-  const EvidenceRecord({required this.id, required this.url});
+  const EvidenceRecord({
+    required this.id,
+    required this.url,
+    this.journeyId,
+    this.fragmentId,
+    this.missionId,
+    this.mimeType,
+    this.sizeBytes,
+    this.width,
+    this.height,
+    this.capturedAt,
+    this.uploadedAt,
+    this.expiresAt,
+    this.isExpired = false,
+  });
+
   final String id;
   final String url;
-  factory EvidenceRecord.fromJson(Map<String, dynamic> json) =>
-      EvidenceRecord(id: json['id'] as String, url: json['url'] as String);
+  final String? journeyId;
+  final String? fragmentId;
+  final String? missionId;
+  final String? mimeType;
+  final int? sizeBytes;
+  final int? width;
+  final int? height;
+  final DateTime? capturedAt;
+  final DateTime? uploadedAt;
+  final DateTime? expiresAt;
+  final bool isExpired;
+
+  factory EvidenceRecord.fromJson(Map<String, dynamic> json) => EvidenceRecord(
+        id: json['id'] as String,
+        url: json['url'] as String,
+        journeyId: json['journey_id'] as String?,
+        fragmentId: json['fragment_id'] as String?,
+        missionId: json['mission_id'] as String?,
+        mimeType: json['mime_type'] as String?,
+        sizeBytes: json['size_bytes'] as int?,
+        width: json['width'] as int?,
+        height: json['height'] as int?,
+        capturedAt: _dateTime(json['captured_at']),
+        uploadedAt: _dateTime(json['uploaded_at']),
+        expiresAt: _dateTime(json['expires_at']),
+        isExpired: json['is_expired'] as bool? ?? false,
+      );
+}
+
+DateTime? _dateTime(Object? value) => value is String && value.isNotEmpty
+    ? DateTime.tryParse(value)?.toLocal()
+    : null;
+
+class EvidencePolicy {
+  const EvidencePolicy({
+    required this.uploadEnabled,
+    required this.retentionDays,
+    required this.maxBytes,
+    required this.maxEdgePixels,
+    required this.allowedMimeTypes,
+    required this.privateAccess,
+    required this.exifRemoved,
+    required this.normalizedOnUpload,
+  });
+
+  final bool uploadEnabled;
+  final int retentionDays;
+  final int maxBytes;
+  final int maxEdgePixels;
+  final List<String> allowedMimeTypes;
+  final bool privateAccess;
+  final bool exifRemoved;
+  final bool normalizedOnUpload;
+
+  factory EvidencePolicy.fromJson(Map<String, dynamic> json) => EvidencePolicy(
+        uploadEnabled: json['upload_enabled'] as bool,
+        retentionDays: json['retention_days'] as int,
+        maxBytes: json['max_bytes'] as int,
+        maxEdgePixels: json['max_edge_pixels'] as int,
+        allowedMimeTypes: List<String>.from(json['allowed_mime_types'] as List),
+        privateAccess: json['private_access'] as bool,
+        exifRemoved: json['exif_removed'] as bool,
+        normalizedOnUpload: json['normalized_on_upload'] as bool,
+      );
 }
 
 class ReconstructionResult {

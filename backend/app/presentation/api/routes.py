@@ -6,10 +6,12 @@ from flask import Blueprint, abort, current_app, g, jsonify, request, send_file
 from sqlalchemy import text
 
 from app.domain.errors import ValidationError
+from app.domain.models import JourneyStatus
 from app.presentation.api.auth import require_user
 from app.presentation.api.media import send_media_asset
 from app.presentation.api.serializers import (
     city_to_dict,
+    journey_library_item_to_dict,
     journey_to_dict,
     route_to_dict,
 )
@@ -136,6 +138,25 @@ def current_user():
     )
 
 
+@api.get("/policies/evidence")
+@require_user
+def evidence_policy():
+    return jsonify(
+        {
+            "data": {
+                "upload_enabled": bool(current_app.config["EVIDENCE_UPLOAD_ENABLED"]),
+                "retention_days": int(current_app.config["EVIDENCE_RETENTION_DAYS"]),
+                "max_bytes": int(current_app.config["EVIDENCE_MAX_BYTES"]),
+                "max_edge_pixels": int(current_app.config["EVIDENCE_MAX_EDGE"]),
+                "allowed_mime_types": ["image/jpeg", "image/png", "image/webp"],
+                "private_access": True,
+                "exif_removed": True,
+                "normalized_on_upload": True,
+            }
+        }
+    )
+
+
 @api.post("/auth/upgrade-legacy")
 @require_user
 def upgrade_legacy_user():
@@ -195,6 +216,38 @@ def get_journey(journey_id: str):
     return jsonify({"data": journey_to_dict(journey, len(route.stops))})
 
 
+@api.get("/journeys/<journey_id>/context")
+@require_user
+def get_journey_context(journey_id: str):
+    journey = _services()["journeys"].get(g.current_user.id, journey_id)
+    route = _services()["catalog"].get_route_for_journey(journey.route_id)
+    route_payload = _route_payload(route)
+    if "audio_tour" in route_payload:
+        ledger = _services()["fragment_tours"].ledger(g.current_user.id, journey_id)
+        collected_count = ledger["collected_count"]
+        total_count = ledger["total_count"]
+        journey_kind = "fragmented"
+    else:
+        collected_count = len(journey.answers)
+        total_count = len(route.stops)
+        ledger = None
+        journey_kind = "legacy"
+    return jsonify(
+        {
+            "data": {
+                "journey": journey_to_dict(journey, total_count),
+                "route": route_payload,
+                "journey_kind": journey_kind,
+                "progress": {
+                    "collected_count": collected_count,
+                    "total_count": total_count,
+                },
+                "ledger": ledger,
+            }
+        }
+    )
+
+
 @api.get("/journeys/active")
 @require_user
 def list_active_journeys():
@@ -208,6 +261,20 @@ def list_active_journeys():
             }
         )
     return jsonify({"data": rows})
+
+
+@api.get("/journeys")
+@require_user
+def list_journeys():
+    raw_status = request.args.get("status")
+    statuses = None
+    if raw_status is not None:
+        try:
+            statuses = (JourneyStatus(raw_status),)
+        except ValueError as exc:
+            raise ValidationError("status 仅支持 active 或 completed") from exc
+    items = _services()["journeys"].list_library(g.current_user.id, statuses)
+    return jsonify({"data": [journey_library_item_to_dict(item) for item in items]})
 
 
 @api.post("/journeys/<journey_id>/arrivals")
@@ -389,6 +456,18 @@ def get_evidence(journey_id: str, evidence_id: str):
         g.current_user.id, journey_id, evidence_id
     )
     return send_file(stream, mimetype=mime_type, download_name=f"evidence-{evidence_id}")
+
+
+@api.get("/journeys/<journey_id>/evidence")
+@require_user
+def list_evidence(journey_id: str):
+    return jsonify(
+        {
+            "data": _services()["fragment_tours"].list_evidence(
+                g.current_user.id, journey_id
+            )
+        }
+    )
 
 
 @api.delete("/journeys/<journey_id>/evidence/<evidence_id>")

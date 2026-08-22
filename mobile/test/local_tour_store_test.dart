@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
 import 'package:jiandi/features/experience/data/local_tour_store.dart';
+import 'package:jiandi/features/experience/data/prepared_route_service.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:path/path.dart' as paths;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -71,4 +73,119 @@ void main() {
       '/tmp/public-audio.m4a',
     );
   });
+
+  test(
+      'prepared audio clearing removes files and rows but preserves private state',
+      () async {
+    final directory =
+        await Directory.systemTemp.createTemp('jiandi-cache-clear-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final store = SqliteTourStore(
+      databasePath: paths.join(directory.path, 'tour.db'),
+    );
+    final firstFile = File(paths.join(directory.path, 'first.m4a'));
+    final secondFile = File(paths.join(directory.path, 'second.m4a'));
+    await firstFile.writeAsBytes([1]);
+    await secondFile.writeAsBytes([2]);
+    await store.saveJson('active_tour', {'journey_id': 'journey-1'});
+    await store.enqueue(const OutboxEvent(
+      id: 'evidence-1',
+      type: 'evidence',
+      payload: {'journey_id': 'journey-1'},
+    ));
+    await store.savePreparedAsset('audio-1', firstFile.path, 'v1', 1);
+    await store.savePreparedAsset('audio-2', secondFile.path, 'v1', 1);
+    final service = PreparedRouteService(Dio(), store);
+
+    final result = await service.clearPreparedAudio();
+
+    expect(result.removedCount, 2);
+    expect(result.isComplete, isTrue);
+    expect(await firstFile.exists(), isFalse);
+    expect(await secondFile.exists(), isFalse);
+    expect(await store.preparedAssets(), isEmpty);
+    expect((await store.readJson('active_tour'))?['journey_id'], 'journey-1');
+    expect((await store.pending()).single.id, 'evidence-1');
+    expect((await service.clearPreparedAudio()).removedCount, 0);
+  });
+
+  test('partial file failure keeps only the failed cache index row', () async {
+    final store = _PreparedStore([
+      const PreparedAssetRecord(
+        url: 'audio-ok',
+        path: '/cache/ok.m4a',
+        version: 'v1',
+        sizeBytes: 1,
+      ),
+      const PreparedAssetRecord(
+        url: 'audio-fail',
+        path: '/cache/fail.m4a',
+        version: 'v1',
+        sizeBytes: 1,
+      ),
+    ]);
+    final service = PreparedRouteService(
+      Dio(),
+      store,
+      fileSystem: const _PartiallyFailingFiles(),
+    );
+
+    final result = await service.clearPreparedAudio();
+
+    expect(result.removedCount, 1);
+    expect(result.failedPaths, ['/cache/fail.m4a']);
+    expect((await store.preparedAssets()).single.url, 'audio-fail');
+  });
+}
+
+class _PartiallyFailingFiles implements PreparedFileSystem {
+  const _PartiallyFailingFiles();
+
+  @override
+  Future<void> delete(String path) async {
+    if (path.contains('fail')) throw FileSystemException('locked', path);
+  }
+
+  @override
+  Future<bool> exists(String path) async => true;
+}
+
+class _PreparedStore implements TourStore {
+  _PreparedStore(List<PreparedAssetRecord> values) : values = [...values];
+
+  final List<PreparedAssetRecord> values;
+
+  @override
+  Future<List<PreparedAssetRecord>> preparedAssets() async => [...values];
+
+  @override
+  Future<void> removePreparedAsset(String url) async =>
+      values.removeWhere((item) => item.url == url);
+
+  @override
+  Future<void> acknowledge(String id) async {}
+
+  @override
+  Future<void> clearPrivateData() async {}
+
+  @override
+  Future<void> enqueue(OutboxEvent event) async {}
+
+  @override
+  Future<List<OutboxEvent>> pending() async => const [];
+
+  @override
+  Future<String?> preparedAsset(
+          String url, String version, int sizeBytes) async =>
+      null;
+
+  @override
+  Future<Map<String, dynamic>?> readJson(String key) async => null;
+
+  @override
+  Future<void> saveJson(String key, Map<String, dynamic> value) async {}
+
+  @override
+  Future<void> savePreparedAsset(
+      String url, String path, String version, int sizeBytes) async {}
 }

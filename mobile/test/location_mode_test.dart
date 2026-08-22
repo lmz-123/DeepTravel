@@ -261,9 +261,11 @@ void main() {
 
     player.completeNaturally();
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('模拟到达下一条线索'));
-    await tester.tap(find.text('模拟到达下一条线索'));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一条线索（测试）'));
+    await container
+        .read(activeTourControllerProvider.notifier)
+        .triggerNextDemo();
+    await tester.pump();
 
     expect(repository.isCollected('fragment-2'), isTrue);
     expect(player.playedFragmentIds, ['fragment-2', 'fragment-3']);
@@ -326,6 +328,279 @@ void main() {
     expect(find.byKey(const ValueKey('reconstruction-feedback-overlay')),
         findsNothing);
     expect(find.text('测试完整故事正文'), findsOneWidget);
+  });
+
+  test(
+      'completed revisit switches collected nodes without location or progress writes',
+      () async {
+    final store = _MemoryTourStore();
+    final player = _GenerationNarrationPlayer();
+    final location = _RecordingLocationTracker();
+    final repository = _CountingProgressRepository();
+    final container = ProviderContainer(overrides: [
+      authRepositoryProvider.overrideWithValue(_AuthenticatedRepository()),
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(location),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider
+          .overrideWithValue(_MemoryLocationModeStore(TourLocationMode.real)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.startRevisit(_completedContext);
+    var state = container.read(activeTourControllerProvider);
+    expect(state.status, 'revisit');
+    expect(state.playbackMode, TourPlaybackMode.revisit);
+    expect(state.current?.id, 'fragment-2');
+    expect(location.permissionRequests, 0);
+    expect(location.sampleSubscriptions, 0);
+    expect(repository.startActiveCalls, 0);
+
+    expect(await controller.selectCollectedFragment('fragment-1'), isTrue);
+    state = container.read(activeTourControllerProvider);
+    expect(state.selectedFragmentId, 'fragment-1');
+    expect(state.liveFragmentId, isNull);
+    expect(state.playbackOwner?.fragmentId, 'fragment-1');
+    expect(state.queue, isEmpty);
+    player.emitCurrentPosition(const Duration(seconds: 17));
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(activeTourControllerProvider).position,
+        const Duration(seconds: 17));
+
+    await controller.setSpeed(1.5);
+    await controller.togglePlayback();
+    await controller.togglePlayback();
+    expect(player.lastSpeed, 1.5);
+    expect(player.pauseCalls, 1);
+    expect(player.resumeCalls, 1);
+    await controller.seek(const Duration(seconds: 9));
+    await controller.replay();
+    expect(player.lastSeek, const Duration(seconds: 9));
+    expect(player.replayCalls, 1);
+
+    player.emitCurrentCompletion();
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    expect(repository.acknowledgeCalls, 0);
+    expect(container.read(activeTourControllerProvider).selectedFragmentId,
+        'fragment-1');
+
+    await controller.clearForAccountExit();
+    expect(container.read(activeTourControllerProvider).status, 'idle');
+    expect(container.read(activeTourControllerProvider).playbackOwner, isNull);
+    expect(location.stopCalls, greaterThanOrEqualTo(1));
+  });
+
+  test(
+      'cross-attraction replacement rejects old callbacks and keeps one audio owner',
+      () async {
+    final store = _MemoryTourStore();
+    final player = _GenerationNarrationPlayer();
+    final repository = _CrossRouteRepository();
+    final location = _RecordingLocationTracker();
+    final routeA = _routeFor('route-a', 'fragment-a', '景点 A', 'a.jpg');
+    final routeB = _routeFor('route-b', 'fragment-b', '景点 B', 'b.jpg');
+    final routeC = _routeFor('route-c', 'fragment-c', '景点 C', 'c.jpg');
+    final container = ProviderContainer(overrides: [
+      authRepositoryProvider.overrideWithValue(_AuthenticatedRepository()),
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(location),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.start(routeA, _sessionFor('journey-a', 'route-a'));
+    await controller.togglePlayback();
+    await _waitUntil(() => player.playedFragmentIds.length == 1);
+    final generationA =
+        container.read(activeTourControllerProvider).playbackOwner!.generation;
+
+    await controller.start(routeB, _sessionFor('journey-b', 'route-b'));
+    await controller.togglePlayback();
+    await _waitUntil(() => player.playedFragmentIds.length == 2);
+    var state = container.read(activeTourControllerProvider);
+    expect(state.playbackOwner?.routeId, 'route-b');
+    expect(state.playbackOwner?.journeyId, 'journey-b');
+    expect(state.playbackOwner?.generation, greaterThan(generationA));
+    expect(state.route?.heroImage, 'b.jpg');
+    expect(player.overlapDetected, isFalse);
+
+    player.emitPosition(0, const Duration(minutes: 4));
+    player.emitCompletion(0);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    state = container.read(activeTourControllerProvider);
+    expect(state.route?.id, 'route-b');
+    expect(state.position, Duration.zero);
+    expect(repository.acknowledgedJourneyIds, isEmpty);
+
+    await controller.pauseTour();
+    expect(container.read(activeTourControllerProvider).status, 'paused');
+    player.failFragmentId = 'fragment-c';
+    await controller.start(routeC, _sessionFor('journey-c', 'route-c'));
+    await controller.togglePlayback();
+    await _waitUntil(() =>
+        container.read(activeTourControllerProvider).errorMessage != null);
+    state = container.read(activeTourControllerProvider);
+    expect(state.playbackOwner?.routeId, 'route-c');
+    expect(state.route?.heroImage, 'c.jpg');
+    expect(state.isPlaying, isFalse);
+    expect(player.overlapDetected, isFalse);
+    expect(
+        repository.stoppedJourneyIds, containsAll(['journey-a', 'journey-b']));
+  });
+
+  test('simulated next clue stops early audio and advances without a photo',
+      () async {
+    final store = _MemoryTourStore();
+    final player = _GenerationNarrationPlayer();
+    final repository = _EarlyAdvanceRepository();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.start(_twoFragmentRoute, _session);
+    await controller.togglePlayback();
+    await _waitUntil(() => player.playedFragmentIds.length == 1);
+    await controller.triggerNextDemo();
+
+    expect(repository.acknowledgeCalls, 1);
+    expect(repository.isCollected('fragment-1'), isTrue);
+    expect(player.stopCalls, greaterThanOrEqualTo(3));
+    expect(player.playedFragmentIds, ['fragment-1', 'fragment-2']);
+    expect(
+        container.read(activeTourControllerProvider).current?.id, 'fragment-2');
+  });
+
+  test('simulated trigger failure is retryable and final clue is idempotent',
+      () async {
+    final store = _MemoryTourStore();
+    final player = _GenerationNarrationPlayer();
+    final repository = _FailOnceTriggerRepository();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.start(_twoFragmentRoute, _session);
+    await controller.triggerNextDemo();
+    expect(container.read(activeTourControllerProvider).locationMessage,
+        contains('再次点击重试'));
+    expect(player.playedFragmentIds, isEmpty);
+
+    await controller.triggerNextDemo();
+    expect(player.playedFragmentIds, ['fragment-2']);
+    player.emitCurrentCompletion();
+    await _waitUntil(() => repository.isCollected('fragment-2'));
+
+    await controller.triggerNextDemo();
+    expect(container.read(activeTourControllerProvider).locationMessage,
+        contains('所有线索已经收集完成'));
+    expect(repository.acknowledgeCalls, 1);
+  });
+
+  test('camera cancel postpones and offline capture stays tappable in outbox',
+      () async {
+    final store = _MemoryTourStore();
+    final camera = _SequenceCameraCapture([null, '/tmp/private-clue.jpg']);
+    final repository = _OfflineEvidenceRepository();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(_SilentNarrationPlayer()),
+      cameraCaptureProvider.overrideWithValue(camera),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.start(_route, _session);
+    await controller.captureEvidence(_fragment);
+    expect(container.read(activeTourControllerProvider).locationMessage,
+        contains('安全方便时'));
+    expect(
+        container.read(activeTourControllerProvider).evidenceUploads, isEmpty);
+
+    await controller.captureEvidence(_fragment);
+    final upload = container
+        .read(activeTourControllerProvider)
+        .evidenceUploadFor('fragment-1');
+    expect(upload?.filePath, '/tmp/private-clue.jpg');
+    expect(upload?.phase, EvidenceUploadPhase.queued);
+    expect(store.outbox.single.type, 'evidence');
+    expect(container.read(activeTourControllerProvider).errorMessage,
+        contains('不会阻止继续'));
   });
 }
 
@@ -483,6 +758,113 @@ const _session = JourneySession(
   arrivedStopId: null,
   answeredStopIds: {},
   progress: 0,
+);
+
+JourneySession _sessionFor(String id, String routeId) => JourneySession(
+      id: id,
+      routeId: routeId,
+      status: 'active',
+      currentStopPosition: 1,
+      arrivedStopId: null,
+      answeredStopIds: const {},
+      progress: 0,
+    );
+
+RouteExperience _routeFor(
+  String routeId,
+  String fragmentId,
+  String title,
+  String artwork,
+) {
+  final fragment = StoryFragment(
+    id: fragmentId,
+    position: 1,
+    safePreview: '$title 的线索',
+    interactionType: 'passive',
+    reviewState: 'reviewed',
+    triggerRegion: _region,
+    audio: NarrationAsset(
+      url: 'https://example.test/$fragmentId.m4a',
+      mimeType: 'audio/mp4',
+      sizeBytes: 1,
+      scriptVersion: 'v1',
+    ),
+  );
+  return RouteExperience(
+    id: routeId,
+    slug: routeId,
+    title: title,
+    subtitle: '测试',
+    description: '跨景点切换测试',
+    durationMinutes: 10,
+    distanceKm: 1,
+    difficulty: '轻松',
+    theme: '历史',
+    heroImage: artwork,
+    contentStatus: 'published',
+    stops: const [],
+    audioTour: AudioTourManifest(
+      title: title,
+      centralQuestion: '为什么？',
+      scriptVersion: 'v1',
+      reviewState: 'reviewed',
+      fieldAuditState: 'reviewed',
+      productionReady: true,
+      demoLabel: null,
+      contentMethod: '测试',
+      downloadSizeBytes: 1,
+      fragments: [fragment],
+    ),
+  );
+}
+
+final _completedContext = JourneyContext(
+  journey: const JourneySession(
+    id: 'journey-completed',
+    routeId: 'route-1',
+    status: 'completed',
+    currentStopPosition: 1,
+    arrivedStopId: null,
+    answeredStopIds: {},
+    progress: 1,
+  ),
+  route: _twoFragmentRoute,
+  journeyKind: 'fragmented',
+  collectedCount: 2,
+  totalCount: 2,
+  ledger: StoryLedger(
+    centralQuestion: '中心为什么迁移？',
+    collectedCount: 2,
+    totalCount: 2,
+    reconstructionUnlocked: true,
+    entries: const [
+      StoryFragment(
+        id: 'fragment-1',
+        position: 1,
+        safePreview: '第一条线索',
+        interactionType: 'passive',
+        reviewState: 'reviewed',
+        triggerRegion: _region,
+        audio: _audio,
+        title: '第一条线索',
+        transcript: '第一条正文',
+        state: 'collected',
+      ),
+      StoryFragment(
+        id: 'fragment-2',
+        position: 2,
+        safePreview: '第二条线索',
+        interactionType: 'passive',
+        reviewState: 'reviewed',
+        triggerRegion: _region,
+        audio: _audio,
+        title: '第二条线索',
+        transcript: '第二条正文',
+        state: 'collected',
+        dependencyIds: ['fragment-1'],
+      ),
+    ],
+  ),
 );
 
 const _voiceProfiles = [
@@ -652,6 +1034,180 @@ class _ProgressingFragmentRepository extends _FragmentRepository {
   }
 }
 
+class _CountingProgressRepository extends _ProgressingFragmentRepository {
+  _CountingProgressRepository()
+      : super(initialStates: const {
+          'fragment-1': 'collected',
+          'fragment-2': 'collected',
+        });
+
+  int startActiveCalls = 0;
+  int acknowledgeCalls = 0;
+
+  @override
+  Future<void> startActiveTour(String journeyId) async {
+    startActiveCalls += 1;
+  }
+
+  @override
+  Future<StoryFragment> acknowledgePlayback(
+    String journeyId,
+    String fragmentId,
+    double progress,
+    String idempotencyKey,
+  ) async {
+    acknowledgeCalls += 1;
+    return super.acknowledgePlayback(
+      journeyId,
+      fragmentId,
+      progress,
+      idempotencyKey,
+    );
+  }
+}
+
+class _EarlyAdvanceRepository extends _ProgressingFragmentRepository {
+  _EarlyAdvanceRepository()
+      : super(initialStates: const {
+          'fragment-1': 'triggered',
+          'fragment-2': 'undiscovered',
+        });
+
+  int acknowledgeCalls = 0;
+
+  @override
+  Future<StoryFragment> acknowledgePlayback(
+    String journeyId,
+    String fragmentId,
+    double progress,
+    String idempotencyKey,
+  ) async {
+    acknowledgeCalls += 1;
+    return super.acknowledgePlayback(
+      journeyId,
+      fragmentId,
+      progress,
+      idempotencyKey,
+    );
+  }
+}
+
+class _FailOnceTriggerRepository extends _ProgressingFragmentRepository {
+  _FailOnceTriggerRepository()
+      : super(initialStates: const {
+          'fragment-1': 'collected',
+          'fragment-2': 'undiscovered',
+        });
+
+  bool shouldFail = true;
+  int acknowledgeCalls = 0;
+
+  @override
+  Future<StoryFragment> triggerFragment(
+    String journeyId,
+    String fragmentId, {
+    required String method,
+    required String idempotencyKey,
+    double? latitude,
+    double? longitude,
+    double? accuracyM,
+  }) async {
+    if (shouldFail) {
+      shouldFail = false;
+      throw StateError('temporary trigger failure');
+    }
+    return super.triggerFragment(
+      journeyId,
+      fragmentId,
+      method: method,
+      idempotencyKey: idempotencyKey,
+      latitude: latitude,
+      longitude: longitude,
+      accuracyM: accuracyM,
+    );
+  }
+
+  @override
+  Future<StoryFragment> acknowledgePlayback(
+    String journeyId,
+    String fragmentId,
+    double progress,
+    String idempotencyKey,
+  ) async {
+    acknowledgeCalls += 1;
+    return super.acknowledgePlayback(
+      journeyId,
+      fragmentId,
+      progress,
+      idempotencyKey,
+    );
+  }
+}
+
+class _CrossRouteRepository extends _FragmentRepository {
+  final stoppedJourneyIds = <String>[];
+  final acknowledgedJourneyIds = <String>[];
+
+  @override
+  Future<void> stopActiveTour(String journeyId) async {
+    stoppedJourneyIds.add(journeyId);
+  }
+
+  @override
+  Future<StoryLedger> ledger(String journeyId) async {
+    final suffix = journeyId.split('-').last;
+    final fragmentId = 'fragment-$suffix';
+    final source = _routeFor(
+      'route-$suffix',
+      fragmentId,
+      '景点 ${suffix.toUpperCase()}',
+      '$suffix.jpg',
+    ).audioTour!.fragments.single;
+    final revealed = StoryFragment(
+      id: source.id,
+      position: source.position,
+      safePreview: source.safePreview,
+      interactionType: source.interactionType,
+      reviewState: source.reviewState,
+      triggerRegion: source.triggerRegion,
+      audio: source.audio,
+      title: source.safePreview,
+      transcript: '${source.safePreview}正文',
+      state: 'triggered',
+    );
+    return StoryLedger(
+      centralQuestion: '为什么？',
+      collectedCount: 0,
+      totalCount: 1,
+      reconstructionUnlocked: false,
+      entries: [revealed],
+    );
+  }
+
+  @override
+  Future<StoryFragment> acknowledgePlayback(
+    String journeyId,
+    String fragmentId,
+    double progress,
+    String idempotencyKey,
+  ) async {
+    acknowledgedJourneyIds.add(journeyId);
+    return (await ledger(journeyId)).entries.single;
+  }
+}
+
+class _OfflineEvidenceRepository extends _FragmentRepository {
+  @override
+  Future<EvidenceRecord> uploadEvidence(
+    String journeyId,
+    String fragmentId,
+    String filePath,
+    String idempotencyKey,
+  ) async {
+    throw StateError('offline');
+  }
+}
+
 class _ReconstructionRepository extends _ProgressingFragmentRepository {
   _ReconstructionRepository()
       : super(initialStates: const {
@@ -786,23 +1342,34 @@ class _RecordingPreparedRouteService extends PreparedRouteService {
 
 class _MemoryTourStore implements TourStore {
   final snapshots = <String, Map<String, dynamic>>{};
+  final outbox = <OutboxEvent>[];
 
   @override
-  Future<void> clearPrivateData() async => snapshots.clear();
+  Future<void> clearPrivateData() async {
+    snapshots.clear();
+    outbox.clear();
+  }
 
   @override
-  Future<void> acknowledge(String id) async {}
+  Future<void> acknowledge(String id) async =>
+      outbox.removeWhere((event) => event.id == id);
 
   @override
-  Future<void> enqueue(OutboxEvent event) async {}
+  Future<void> enqueue(OutboxEvent event) async => outbox.add(event);
 
   @override
-  Future<List<OutboxEvent>> pending() async => [];
+  Future<List<OutboxEvent>> pending() async => List.unmodifiable(outbox);
 
   @override
   Future<String?> preparedAsset(
           String url, String version, int sizeBytes) async =>
       null;
+
+  @override
+  Future<List<PreparedAssetRecord>> preparedAssets() async => const [];
+
+  @override
+  Future<void> removePreparedAsset(String url) async {}
 
   @override
   Future<Map<String, dynamic>?> readJson(String key) async => snapshots[key];
@@ -815,6 +1382,16 @@ class _MemoryTourStore implements TourStore {
   @override
   Future<void> savePreparedAsset(
       String url, String path, String version, int sizeBytes) async {}
+}
+
+class _SequenceCameraCapture implements CameraCapture {
+  _SequenceCameraCapture(this.results);
+
+  final List<String?> results;
+  int _index = 0;
+
+  @override
+  Future<String?> capture() async => results[_index++];
 }
 
 class _SilentNarrationPlayer implements NarrationPlayer {
@@ -920,4 +1497,131 @@ class _ControllableNarrationPlayer implements NarrationPlayer {
 
   @override
   Future<void> stop() async => _playing.add(false);
+}
+
+class _GenerationNarrationPlayer implements NarrationPlayer {
+  final _completedControllers = <StreamController<bool>>[];
+  final _positionControllers = <StreamController<Duration>>[];
+  final _playingControllers = <StreamController<bool>>[];
+  final _durationControllers = <StreamController<Duration?>>[];
+  final playedFragmentIds = <String>[];
+  String? failFragmentId;
+  String? activeFragmentId;
+  bool overlapDetected = false;
+  int pauseCalls = 0;
+  int resumeCalls = 0;
+  int replayCalls = 0;
+  int stopCalls = 0;
+  double lastSpeed = 1;
+  Duration? lastSeek;
+
+  @override
+  Stream<bool> get completedStream {
+    final controller = StreamController<bool>.broadcast(sync: true);
+    _completedControllers.add(controller);
+    return controller.stream;
+  }
+
+  @override
+  Stream<Duration?> get durationStream {
+    final controller = StreamController<Duration?>.broadcast(sync: true);
+    _durationControllers.add(controller);
+    return controller.stream;
+  }
+
+  @override
+  Stream<bool> get playingStream {
+    final controller = StreamController<bool>.broadcast(sync: true);
+    _playingControllers.add(controller);
+    return controller.stream;
+  }
+
+  @override
+  Stream<Duration> get positionStream {
+    final controller = StreamController<Duration>.broadcast(sync: true);
+    _positionControllers.add(controller);
+    return controller.stream;
+  }
+
+  void emitCurrentCompletion() => _completedControllers.last.add(true);
+
+  void emitCurrentPosition(Duration value) =>
+      _positionControllers.last.add(value);
+
+  void emitCompletion(int generationIndex) =>
+      _completedControllers[generationIndex].add(true);
+
+  void emitPosition(int generationIndex, Duration value) =>
+      _positionControllers[generationIndex].add(value);
+
+  @override
+  Future<void> play(StoryFragment fragment, {String? preparedPath}) async {
+    if (activeFragmentId != null) overlapDetected = true;
+    activeFragmentId = fragment.id;
+    playedFragmentIds.add(fragment.id);
+    if (fragment.id == failFragmentId) {
+      activeFragmentId = null;
+      throw StateError('load failed');
+    }
+  }
+
+  @override
+  Future<void> pause() async {
+    pauseCalls += 1;
+    if (_playingControllers.isNotEmpty) {
+      _playingControllers.last.add(false);
+    }
+  }
+
+  @override
+  Future<void> resume() async {
+    resumeCalls += 1;
+    if (_playingControllers.isNotEmpty) {
+      _playingControllers.last.add(true);
+    }
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    lastSeek = position;
+    if (_positionControllers.isNotEmpty) {
+      _positionControllers.last.add(position);
+    }
+  }
+
+  @override
+  Future<void> replay() async {
+    replayCalls += 1;
+    await resume();
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    lastSpeed = speed;
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCalls += 1;
+    activeFragmentId = null;
+    if (_playingControllers.isNotEmpty) {
+      _playingControllers.last.add(false);
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    for (final controller in _completedControllers) {
+      await controller.close();
+    }
+    for (final controller in _positionControllers) {
+      await controller.close();
+    }
+    for (final controller in _playingControllers) {
+      await controller.close();
+    }
+    for (final controller in _durationControllers) {
+      await controller.close();
+    }
+  }
 }

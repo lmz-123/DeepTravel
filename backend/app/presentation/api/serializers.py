@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from app.domain.models import City, Journey, JourneyStatus, Route, Stop
+from app.domain.models import (
+    City,
+    Journey,
+    JourneyLibraryItem,
+    JourneyStatus,
+    Route,
+    Stop,
+)
 from app.presentation.api.media import asset_url
 
 
@@ -86,4 +93,22 @@ def journey_to_dict(journey: Journey, stop_count: int | None = None) -> dict:
         "started_at": journey.started_at.isoformat(),
         "updated_at": journey.updated_at.isoformat(),
         "completed_at": journey.completed_at.isoformat() if journey.completed_at else None,
+    }
+
+
+def journey_library_item_to_dict(item: JourneyLibraryItem) -> dict:
+    journey = journey_to_dict(item.journey)
+    journey["completed_stops"] = item.collected_count
+    journey["progress"] = (
+        item.collected_count / item.total_count if item.total_count > 0 else 0.0
+    )
+    if item.journey.status is JourneyStatus.COMPLETED:
+        journey["progress"] = 1.0
+    return {
+        "journey": journey,
+        "route": route_to_dict(item.route, include_stops=False),
+        "journey_kind": item.journey_kind,
+        "collected_count": item.collected_count,
+        "total_count": item.total_count,
+        "evidence_count": item.evidence_count,
     }

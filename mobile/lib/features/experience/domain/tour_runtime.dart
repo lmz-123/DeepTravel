@@ -56,6 +56,20 @@ class OutboxEvent {
   final Map<String, dynamic> payload;
 }
 
+class PreparedAssetRecord {
+  const PreparedAssetRecord({
+    required this.url,
+    required this.path,
+    required this.version,
+    required this.sizeBytes,
+  });
+
+  final String url;
+  final String path;
+  final String version;
+  final int sizeBytes;
+}
+
 abstract interface class TourStore {
   Future<void> clearPrivateData();
   Future<void> saveJson(String key, Map<String, dynamic> value);
@@ -66,4 +80,6 @@ abstract interface class TourStore {
   Future<void> savePreparedAsset(
       String url, String path, String version, int sizeBytes);
   Future<String?> preparedAsset(String url, String version, int sizeBytes);
+  Future<List<PreparedAssetRecord>> preparedAssets();
+  Future<void> removePreparedAsset(String url);
 }

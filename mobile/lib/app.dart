@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/experience/data/api_experience_repository.dart';
 import 'features/experience/presentation/experience_providers.dart';
+import 'features/experience/presentation/active_tour_controller.dart';
 
 class JiandiApp extends ConsumerStatefulWidget {
   const JiandiApp({super.key});
@@ -45,6 +46,8 @@ class _JiandiAppState extends ConsumerState<JiandiApp> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(privateExperienceLifecycleProvider);
+    ref.watch(activeTourAuthLifecycleProvider);
     final usesRemoteApi =
         ref.watch(experienceRepositoryProvider) is ApiExperienceRepository;
     return MaterialApp.router(

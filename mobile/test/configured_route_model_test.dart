@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 
 void main() {
@@ -69,5 +70,39 @@ void main() {
     expect(route.isFeatured, isTrue);
     expect(route.numberOfStops, 5);
     expect(route.stops, isEmpty);
+  });
+
+  test('photo mission parses shooting guidance and supplies legacy fallbacks',
+      () {
+    final guided = PhotoMission.fromJson({
+      'id': 'mission-1',
+      'prompt': '拍下入口',
+      'field_subject': '入口',
+      'safety_copy': '留在人行道内',
+      'accessibility_alternative': '口述观察',
+      'authenticity_label': '现场照片',
+      'required': false,
+      'audit_state': 'reviewed',
+      'vantage_point': '站在树下的宽阔区域',
+      'shooting_direction': '朝向牌楼',
+      'composition_tip': '牌楼居中并保留街巷',
+    });
+    final legacy = PhotoMission.fromJson({
+      'id': 'mission-old',
+      'prompt': '旧任务',
+      'field_subject': '旧主体',
+      'safety_copy': '注意安全',
+      'accessibility_alternative': '跳过',
+      'authenticity_label': '旧内容',
+      'required': false,
+      'audit_state': 'legacy',
+    });
+
+    expect(guided.vantagePoint, '站在树下的宽阔区域');
+    expect(guided.shootingDirection, '朝向牌楼');
+    expect(guided.compositionTip, '牌楼居中并保留街巷');
+    expect(legacy.vantagePoint, isNotEmpty);
+    expect(legacy.shootingDirection, isNotEmpty);
+    expect(legacy.compositionTip, isNotEmpty);
   });
 }

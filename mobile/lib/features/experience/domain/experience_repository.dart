@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'models.dart';
 import 'fragment_models.dart';
 
@@ -23,6 +25,18 @@ abstract interface class ExperienceRepository {
   Future<JourneySession> advance(String journeyId);
 
   Future<JourneyRecap> recap(String journeyId);
+
+  Future<List<JourneyLibraryItem>> journeys({String? status});
+
+  Future<JourneyContext> journeyContext(String journeyId);
+
+  Future<List<EvidenceRecord>> evidence(String journeyId);
+
+  Future<Uint8List> evidenceBytes(String journeyId, EvidenceRecord evidence);
+
+  Future<void> deleteEvidence(String journeyId, String evidenceId);
+
+  Future<EvidencePolicy> evidencePolicy();
 
   Future<void> startActiveTour(String journeyId);
 

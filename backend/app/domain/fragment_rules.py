@@ -39,7 +39,7 @@ def evaluate_trigger(
 def playback_state(interaction_type: str, progress: float, threshold: float) -> str:
     if progress < threshold:
         return "playing"
-    return "mission_pending" if interaction_type == "photo" else "collected"
+    return "collected"
 
 
 def reconstruction_feedback(expected: list[str], submitted: list[str]) -> tuple[bool, list[dict]]:

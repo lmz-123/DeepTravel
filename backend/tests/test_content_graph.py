@@ -51,9 +51,12 @@ def _graph() -> dict:
                 "photo_mission": {
                     "prompt": "拍摄现场",
                     "field_subject": "公共空间",
+                    "vantage_point": "站在公共步道安全区域",
+                    "shooting_direction": "面向公共空间主体",
+                    "composition_tip": "保留前景和环境层次",
                     "safety_copy": "仅在安全时拍摄",
                     "accessibility_alternative": "可以稍后完成",
-                    "required": True,
+                    "required": False,
                 }
                 if index == 0
                 else None,
@@ -87,7 +90,7 @@ def _graph() -> dict:
         ],
         "claims": claims,
         "fragments": fragments,
-        "required_photo_mission_count": 1,
+        "required_photo_mission_count": 0,
     }
 
 
@@ -146,7 +149,15 @@ def test_dameisha_package_graph_and_media_are_complete():
         sum(
             bool((item.get("photo_mission") or {}).get("required")) for item in package["fragments"]
         )
-        == 3
+        == 0
+    )
+    assert all(
+        all(
+            (item.get("photo_mission") or {}).get(key)
+            for key in ("vantage_point", "shooting_direction", "composition_tip")
+        )
+        for item in package["fragments"]
+        if item.get("photo_mission")
     )
     for item in package["media"]:
         path = root / "backend/media" / item["storage_path"]
@@ -169,6 +180,19 @@ def test_shanghai_readable_city_package_is_generic_audio_photo_content():
     assert package["route"]["slug"] == "shanghai-readable-city"
     assert len(package["fragments"]) == 5
     assert sum(item["interaction_type"] == "photo" for item in package["fragments"]) == 3
+    assert package["required_photo_mission_count"] == 0
+    assert all(
+        mission.get("required") is False
+        and all(
+            mission.get(key)
+            for key in ("vantage_point", "shooting_direction", "composition_tip")
+        )
+        for mission in (
+            item["photo_mission"]
+            for item in package["fragments"]
+            if item.get("photo_mission")
+        )
+    )
     assert {item["interaction_type"] for item in package["fragments"]} <= {
         "passive",
         "photo",

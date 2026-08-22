@@ -199,7 +199,15 @@ def validate_content_graph(
         if mission:
             if mission.get("required"):
                 actual_photo_count += 1
-            for key in ("prompt", "field_subject", "safety_copy", "accessibility_alternative"):
+            for key in (
+                "prompt",
+                "field_subject",
+                "vantage_point",
+                "shooting_direction",
+                "composition_tip",
+                "safety_copy",
+                "accessibility_alternative",
+            ):
                 if not str(mission.get(key) or "").strip():
                     error(f"{path}.photo_mission.{key}", "required", "照片任务缺少安全或替代说明")
 

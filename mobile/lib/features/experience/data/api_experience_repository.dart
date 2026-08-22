@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
@@ -8,8 +9,10 @@ import '../domain/models.dart';
 import '../domain/fragment_models.dart';
 
 class ExperienceFailure implements Exception {
-  const ExperienceFailure(this.message);
+  const ExperienceFailure(this.message, {this.code, this.statusCode});
   final String message;
+  final String? code;
+  final int? statusCode;
 
   @override
   String toString() => message;
@@ -171,6 +174,88 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
+  Future<List<JourneyLibraryItem>> journeys({String? status}) async {
+    await _ensureAuth();
+    final response = await _request(
+      () => _dio.get(
+        '/journeys',
+        queryParameters: {if (status != null) 'status': status},
+        options: _authorized,
+      ),
+    );
+    return (response.data['data'] as List<dynamic>)
+        .map(
+            (item) => JourneyLibraryItem.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<JourneyContext> journeyContext(String journeyId) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/journeys/$journeyId/context',
+          options: _authorized,
+        ));
+    return JourneyContext.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<List<EvidenceRecord>> evidence(String journeyId) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/journeys/$journeyId/evidence',
+          options: _authorized,
+        ));
+    return (response.data['data'] as List<dynamic>)
+        .map((item) => EvidenceRecord.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<Uint8List> evidenceBytes(
+      String journeyId, EvidenceRecord evidence) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get<List<int>>(
+          _evidencePath(journeyId, evidence),
+          options: _authorized.copyWith(responseType: ResponseType.bytes),
+        ));
+    return Uint8List.fromList(response.data ?? const <int>[]);
+  }
+
+  String _evidencePath(String journeyId, EvidenceRecord evidence) {
+    final uri = Uri.tryParse(evidence.url);
+    if (uri != null && uri.hasScheme) return evidence.url;
+    const prefix = '/api/v1';
+    if (evidence.url.startsWith('$prefix/')) {
+      return evidence.url.substring(prefix.length);
+    }
+    if (evidence.url.startsWith('/')) return evidence.url;
+    return '/journeys/$journeyId/evidence/${evidence.id}';
+  }
+
+  @override
+  Future<void> deleteEvidence(String journeyId, String evidenceId) async {
+    await _ensureAuth();
+    await _request(() => _dio.delete(
+          '/journeys/$journeyId/evidence/$evidenceId',
+          options: _authorized,
+        ));
+  }
+
+  @override
+  Future<EvidencePolicy> evidencePolicy() async {
+    await _ensureAuth();
+    final response = await _request(
+      () => _dio.get('/policies/evidence', options: _authorized),
+    );
+    return EvidencePolicy.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
   Future<void> startActiveTour(String journeyId) async {
     await _ensureAuth();
     await _request(() =>
@@ -283,16 +368,27 @@ class ApiExperienceRepository implements ExperienceRepository {
     } on DioException catch (error) {
       if (error.response?.statusCode == 401) {
         await onUnauthorized?.call();
-        throw const ExperienceFailure('登录已过期，请重新登录');
+        throw const ExperienceFailure(
+          '登录已过期，请重新登录',
+          code: 'unauthorized',
+          statusCode: 401,
+        );
       }
       final responseData = error.response?.data;
       if (responseData is Map<String, dynamic>) {
         final envelope = responseData['error'];
         if (envelope is Map<String, dynamic>) {
-          throw ExperienceFailure(envelope['message'] as String? ?? '请求失败');
+          throw ExperienceFailure(
+            envelope['message'] as String? ?? '请求失败',
+            code: envelope['code'] as String?,
+            statusCode: error.response?.statusCode,
+          );
         }
       }
-      throw const ExperienceFailure('暂时无法连接见地服务，请检查网络后重试');
+      throw ExperienceFailure(
+        '暂时无法连接见地服务，请检查网络后重试',
+        statusCode: error.response?.statusCode,
+      );
     }
   }
 }

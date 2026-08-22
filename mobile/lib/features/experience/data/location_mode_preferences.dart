@@ -1,21 +1,20 @@
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../domain/tour_runtime.dart';
+import 'user_preferences_repository.dart';
 
 class SharedPreferencesLocationModeStore implements LocationModeStore {
-  static const _key = 'tour_location_mode';
+  SharedPreferencesLocationModeStore({this.userId = 'default'})
+      : _repository = UserPreferencesRepository();
+
+  final String userId;
+  final UserPreferencesRepository _repository;
 
   @override
   Future<TourLocationMode> read() async {
-    final preferences = await SharedPreferences.getInstance();
-    return preferences.getString(_key) == TourLocationMode.simulated.name
-        ? TourLocationMode.simulated
-        : TourLocationMode.real;
+    return _repository.readLocationMode(userId);
   }
 
   @override
   Future<void> write(TourLocationMode mode) async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_key, mode.name);
+    await _repository.writeLocationMode(userId, mode);
   }
 }

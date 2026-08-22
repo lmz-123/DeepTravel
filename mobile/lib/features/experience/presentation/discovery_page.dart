@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/config/app_config.dart';
 import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/fade_slide_in.dart';
 import '../domain/models.dart';
-import '../../auth/presentation/auth_provider.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
+import 'traveler_shell.dart';
+import 'widgets/rotating_tour_orb.dart';
 
 class DiscoveryPage extends ConsumerWidget {
   const DiscoveryPage({super.key});
@@ -21,70 +21,51 @@ class DiscoveryPage extends ConsumerWidget {
     final routes = ref.watch(cityRoutesProvider);
     final archivedJourneys = ref.watch(archivedActiveJourneysProvider);
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(citiesProvider);
-            ref.invalidate(cityRoutesProvider);
-            ref.invalidate(archivedActiveJourneysProvider);
-            await ref.read(citiesProvider.future);
-            await ref.read(cityRoutesProvider.future);
-          },
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                sliver: SliverToBoxAdapter(child: _Header()),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 34, 20, 24),
-                sliver: SliverToBoxAdapter(
-                  child: FadeSlideIn(
-                    child: Text(
-                      '今天，慢一点\n看见城市的里层。',
-                      style: Theme.of(context).textTheme.displaySmall,
-                    ),
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(citiesProvider);
+                ref.invalidate(cityRoutesProvider);
+                ref.invalidate(archivedActiveJourneysProvider);
+                await ref.read(citiesProvider.future);
+                await ref.read(cityRoutesProvider.future);
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    sliver: SliverToBoxAdapter(child: _Header()),
                   ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                sliver: SliverToBoxAdapter(
-                  child: archivedJourneys.maybeWhen(
-                    data: (items) => items.isEmpty
-                        ? const SizedBox.shrink()
-                        : _ArchivedJourneyCard(journey: items.first),
-                    orElse: () => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 0),
-                sliver: SliverToBoxAdapter(
-                  child: cities.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _RouteSkeleton(),
-                    ),
-                    error: (error, _) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: _ErrorCard(
-                        onRetry: () => ref.invalidate(citiesProvider),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 34, 20, 24),
+                    sliver: SliverToBoxAdapter(
+                      child: FadeSlideIn(
+                        child: Text(
+                          '今天，慢一点\n看见城市的里层。',
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
                       ),
                     ),
-                    data: (availableCities) {
-                      if (availableCities.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: _EmptyCatalog(
-                            title: '还没有开放的城市',
-                            message: '新目的地发布后会出现在这里。',
-                          ),
-                        );
-                      }
-                      return routes.when(
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    sliver: SliverToBoxAdapter(
+                      child: archivedJourneys.maybeWhen(
+                        data: (items) => items.isEmpty
+                            ? const SizedBox.shrink()
+                            : _ArchivedJourneyCard(journey: items.first),
+                        orElse: () => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 0),
+                    sliver: SliverToBoxAdapter(
+                      child: cities.when(
                         loading: () => const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 20),
                           child: _RouteSkeleton(),
@@ -92,30 +73,57 @@ class DiscoveryPage extends ConsumerWidget {
                         error: (error, _) => Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _ErrorCard(
-                            onRetry: () => ref.invalidate(cityRoutesProvider),
+                            onRetry: () => ref.invalidate(citiesProvider),
                           ),
                         ),
-                        data: (items) => items.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 20),
-                                child: _EmptyCatalog(
-                                  title: '这座城市还没有开放路线',
-                                  message: '可以先切换城市，或稍后再来看看。',
-                                ),
-                              )
-                            : _RouteCarousel(routes: items),
-                      );
-                    },
+                        data: (availableCities) {
+                          if (availableCities.isEmpty) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 20),
+                              child: _EmptyCatalog(
+                                title: '还没有开放的城市',
+                                message: '新目的地发布后会出现在这里。',
+                              ),
+                            );
+                          }
+                          return routes.when(
+                            loading: () => const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 20),
+                              child: _RouteSkeleton(),
+                            ),
+                            error: (error, _) => Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: _ErrorCard(
+                                onRetry: () =>
+                                    ref.invalidate(cityRoutesProvider),
+                              ),
+                            ),
+                            data: (items) => items.isEmpty
+                                ? const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 20),
+                                    child: _EmptyCatalog(
+                                      title: '这座城市还没有开放路线',
+                                      message: '可以先切换城市，或稍后再来看看。',
+                                    ),
+                                  )
+                                : _RouteCarousel(routes: items),
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                  const SliverPadding(
+                    padding: EdgeInsets.fromLTRB(20, 38, 20, 48),
+                    sliver: SliverToBoxAdapter(child: _ExperiencePromise()),
+                  ),
+                ],
               ),
-              const SliverPadding(
-                padding: EdgeInsets.fromLTRB(20, 38, 20, 48),
-                sliver: SliverToBoxAdapter(child: _ExperiencePromise()),
-              ),
-            ],
+            ),
           ),
-        ),
+          const RotatingTourOrbOverlay(),
+        ],
       ),
     );
   }
@@ -178,35 +186,8 @@ class _Header extends ConsumerWidget {
 
     return Row(
       children: [
-        const BrandMark(),
+        BrandMark(onPressed: () => TravelerShellScope.showDrawer(context)),
         const Spacer(),
-        PopupMenuButton<String>(
-          tooltip: AppConfig.testAuthEnabled ? '账号与测试用户' : '账号',
-          onSelected: (action) async {
-            ref.invalidate(activeTourControllerProvider);
-            await ref.read(tourStoreProvider).clearPrivateData();
-            if (action == 'logout') {
-              await ref.read(authControllerProvider.notifier).logout();
-            } else {
-              await ref
-                  .read(authControllerProvider.notifier)
-                  .switchTestUser(action);
-            }
-            ref.invalidate(journeyControllerProvider);
-            ref.invalidate(activeTourControllerProvider);
-            ref.invalidate(archivedActiveJourneysProvider);
-          },
-          itemBuilder: (context) => [
-            if (AppConfig.testAuthEnabled) ...const [
-              PopupMenuItem(value: 'tester-a', child: Text('切换到测试账号 A')),
-              PopupMenuItem(value: 'tester-b', child: Text('切换到测试账号 B')),
-              PopupMenuDivider(),
-            ],
-            const PopupMenuItem(value: 'logout', child: Text('退出登录')),
-          ],
-          icon: const Icon(Icons.account_circle_outlined),
-        ),
-        const SizedBox(width: 4),
         PopupMenuButton<String>(
           tooltip: '选择城市',
           initialValue: selectedSlug,
@@ -267,16 +248,16 @@ class _Header extends ConsumerWidget {
   }
 }
 
-class _RouteCarousel extends StatefulWidget {
+class _RouteCarousel extends ConsumerStatefulWidget {
   const _RouteCarousel({required this.routes});
 
   final List<RouteExperience> routes;
 
   @override
-  State<_RouteCarousel> createState() => _RouteCarouselState();
+  ConsumerState<_RouteCarousel> createState() => _RouteCarouselState();
 }
 
-class _RouteCarouselState extends State<_RouteCarousel> {
+class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   late final PageController _controller;
   var _selectedIndex = 0;
 
@@ -294,6 +275,7 @@ class _RouteCarouselState extends State<_RouteCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    final journeyIndex = ref.watch(routeJourneyIndexProvider).value ?? const {};
     return FadeSlideIn(
       delay: const Duration(milliseconds: 80),
       child: Column(
@@ -340,7 +322,10 @@ class _RouteCarouselState extends State<_RouteCarousel> {
                         );
                         return;
                       }
-                      context.push('/route/${widget.routes[index].slug}');
+                      _openRoute(
+                        widget.routes[index],
+                        journeyIndex[widget.routes[index].id],
+                      );
                     },
                   ),
                 ),
@@ -374,6 +359,39 @@ class _RouteCarouselState extends State<_RouteCarousel> {
         ],
       ),
     );
+  }
+
+  Future<void> _openRoute(
+      RouteExperience route, JourneyLibraryItem? libraryItem) async {
+    if (libraryItem == null) {
+      context.push('/route/${route.slug}');
+      return;
+    }
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    final key = UserJourneyKey(userId, libraryItem.journey.id);
+    try {
+      final ownerContext = await ref.read(journeyContextProvider(key).future);
+      if (!mounted) return;
+      if (ownerContext.journey.status == 'active') {
+        ref
+            .read(journeyControllerProvider.notifier)
+            .resume(ownerContext.route, ownerContext.journey);
+        context.go('/journey/${ownerContext.journey.id}');
+      } else if (ownerContext.journeyKind == 'fragmented') {
+        await ref
+            .read(activeTourControllerProvider.notifier)
+            .startRevisit(ownerContext);
+        if (mounted) context.go('/journey/${ownerContext.journey.id}');
+      } else {
+        context.go('/footprints/${ownerContext.journey.id}');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('旅程进度暂时无法恢复，请稍后重试')),
+      );
+    }
   }
 }
 

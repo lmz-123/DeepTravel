@@ -169,6 +169,9 @@ class JourneySession {
     required this.arrivedStopId,
     required this.answeredStopIds,
     required this.progress,
+    this.startedAt,
+    this.updatedAt,
+    this.completedAt,
   });
 
   final String id;
@@ -178,6 +181,9 @@ class JourneySession {
   final String? arrivedStopId;
   final Set<String> answeredStopIds;
   final double progress;
+  final DateTime? startedAt;
+  final DateTime? updatedAt;
+  final DateTime? completedAt;
 
   bool get isCompleted => status == 'completed';
 
@@ -198,6 +204,9 @@ class JourneySession {
             clearArrival ? null : arrivedStopId ?? this.arrivedStopId,
         answeredStopIds: answeredStopIds ?? this.answeredStopIds,
         progress: progress ?? this.progress,
+        startedAt: startedAt,
+        updatedAt: updatedAt,
+        completedAt: completedAt,
       );
 
   factory JourneySession.fromJson(Map<String, dynamic> json) => JourneySession(
@@ -208,6 +217,9 @@ class JourneySession {
         arrivedStopId: json['arrived_stop_id'] as String?,
         answeredStopIds: Set<String>.from(json['answered_stop_ids'] as List),
         progress: (json['progress'] as num).toDouble(),
+        startedAt: DateTime.tryParse(json['started_at'] as String? ?? ''),
+        updatedAt: DateTime.tryParse(json['updated_at'] as String? ?? ''),
+        completedAt: DateTime.tryParse(json['completed_at'] as String? ?? ''),
       );
 }
 
@@ -224,6 +236,71 @@ class ResumableJourney {
           json['journey'] as Map<String, dynamic>,
         ),
       );
+}
+
+class JourneyLibraryItem {
+  const JourneyLibraryItem({
+    required this.journey,
+    required this.route,
+    required this.journeyKind,
+    required this.collectedCount,
+    required this.totalCount,
+    required this.evidenceCount,
+  });
+
+  final JourneySession journey;
+  final RouteExperience route;
+  final String journeyKind;
+  final int collectedCount;
+  final int totalCount;
+  final int evidenceCount;
+
+  bool get isFragmented => journeyKind == 'fragmented';
+
+  factory JourneyLibraryItem.fromJson(Map<String, dynamic> json) =>
+      JourneyLibraryItem(
+        journey: JourneySession.fromJson(
+          json['journey'] as Map<String, dynamic>,
+        ),
+        route: RouteExperience.fromJson(json['route'] as Map<String, dynamic>),
+        journeyKind: json['journey_kind'] as String,
+        collectedCount: json['collected_count'] as int,
+        totalCount: json['total_count'] as int,
+        evidenceCount: json['evidence_count'] as int,
+      );
+}
+
+class JourneyContext {
+  const JourneyContext({
+    required this.journey,
+    required this.route,
+    required this.journeyKind,
+    required this.collectedCount,
+    required this.totalCount,
+    this.ledger,
+  });
+
+  final JourneySession journey;
+  final RouteExperience route;
+  final String journeyKind;
+  final int collectedCount;
+  final int totalCount;
+  final StoryLedger? ledger;
+
+  factory JourneyContext.fromJson(Map<String, dynamic> json) {
+    final progress = json['progress'] as Map<String, dynamic>;
+    final ledgerJson = json['ledger'];
+    return JourneyContext(
+      journey: JourneySession.fromJson(json['journey'] as Map<String, dynamic>),
+      route: RouteExperience.fromJson(json['route'] as Map<String, dynamic>),
+      journeyKind: json['journey_kind'] as String,
+      collectedCount: progress['collected_count'] as int,
+      totalCount: progress['total_count'] as int,
+      ledger: ledgerJson is Map<String, dynamic>
+          ? StoryLedger.fromJson(ledgerJson)
+          : null,
+    );
+  }
 }
 
 class AnswerFeedback {

@@ -1,4 +1,6 @@
-from app.infrastructure.persistence.models import RouteModel
+import json
+
+from app.infrastructure.persistence.models import JourneyModel, RouteModel, UserModel
 from app.infrastructure.persistence.seed import seed_database
 
 
@@ -60,6 +62,30 @@ def test_journey_requires_guest(client):
     assert response.get_json()["error"]["code"] == "unauthorized"
 
 
+def test_evidence_policy_is_runtime_driven_authenticated_and_secret_free(
+    app, client, user_headers
+):
+    assert client.get("/api/v1/policies/evidence").status_code == 401
+    response = client.get("/api/v1/policies/evidence", headers=user_headers)
+    assert response.status_code == 200
+    payload = response.get_json()["data"]
+    assert payload == {
+        "upload_enabled": bool(app.config["EVIDENCE_UPLOAD_ENABLED"]),
+        "retention_days": int(app.config["EVIDENCE_RETENTION_DAYS"]),
+        "max_bytes": int(app.config["EVIDENCE_MAX_BYTES"]),
+        "max_edge_pixels": int(app.config["EVIDENCE_MAX_EDGE"]),
+        "allowed_mime_types": ["image/jpeg", "image/png", "image/webp"],
+        "private_access": True,
+        "exif_removed": True,
+        "normalized_on_upload": True,
+    }
+    serialized = json.dumps(payload).lower()
+    assert not any(
+        secret_name in serialized
+        for secret_name in ("secret", "bucket", "object_key", "evidence_root", "access_key")
+    )
+
+
 def test_complete_five_stop_journey(client, guest_headers):
     route = client.get("/api/v1/routes/wukang-urban-slices").get_json()["data"]
     start = client.post(
@@ -115,6 +141,51 @@ def test_complete_five_stop_journey(client, guest_headers):
     recap = client.get(f"/api/v1/journeys/{journey_id}/recap", headers=guest_headers)
     assert recap.status_code == 200
     assert len(recap.get_json()["data"]["insights"]) == 5
+
+
+def test_completed_route_start_revisits_same_owned_journey(app, client, user_headers):
+    route = client.get("/api/v1/routes/wukang-urban-slices").get_json()["data"]
+    journey = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers
+    ).get_json()["data"]
+    correct_options = [0, 1, 1, 1, 0]
+    for index, stop in enumerate(route["stops"]):
+        client.post(
+            f"/api/v1/journeys/{journey['id']}/arrivals",
+            json={"demo": True},
+            headers=user_headers,
+        )
+        client.post(
+            f"/api/v1/journeys/{journey['id']}/answers",
+            json={"stop_id": stop["id"], "selected_option": correct_options[index]},
+            headers=user_headers,
+        )
+        client.post(f"/api/v1/journeys/{journey['id']}/advance", headers=user_headers)
+
+    revisit = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers
+    )
+    assert revisit.status_code == 201
+    assert revisit.get_json()["data"]["id"] == journey["id"]
+    assert revisit.get_json()["data"]["status"] == "completed"
+
+    database = app.extensions["database"]
+    session = database.session_factory()
+    owner = session.query(UserModel).filter_by(username="traveler-one").one()
+    assert (
+        session.query(JourneyModel)
+        .filter_by(user_id=owner.id, route_id=route["id"])
+        .count()
+        == 1
+    )
+    session.close()
+
+    other_headers = _register_test_user(client, "completed-other-user")
+    other = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=other_headers
+    )
+    assert other.status_code == 201
+    assert other.get_json()["data"]["id"] != journey["id"]
 
 
 def test_location_rejects_far_position(client, guest_headers):
@@ -211,6 +282,11 @@ def test_archived_route_rejects_new_start_but_existing_owner_continues(app, clie
     session.close()
 
     assert client.get("/api/v1/routes/wukang-urban-slices").status_code == 404
+    resumed = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers
+    )
+    assert resumed.status_code == 201
+    assert resumed.get_json()["data"]["id"] == journey["id"]
     other = _register_test_user(client, "archived-new-user")
     rejected = client.post("/api/v1/journeys", json={"route_id": route["id"]}, headers=other)
     assert rejected.status_code == 404
@@ -228,6 +304,88 @@ def test_archived_route_rejects_new_start_but_existing_owner_continues(app, clie
         headers=user_headers,
     )
     assert continued.status_code == 200
+
+
+def test_journey_library_filters_orders_and_isolates_accounts(app, client, user_headers):
+    legacy_route = client.get("/api/v1/routes/wukang-urban-slices").get_json()["data"]
+    fragmented_route = client.get("/api/v1/routes/nantou-time-layers").get_json()["data"]
+    completed = client.post(
+        "/api/v1/journeys",
+        json={"route_id": legacy_route["id"]},
+        headers=user_headers,
+    ).get_json()["data"]
+
+    database = app.extensions["database"]
+    session = database.session_factory()
+    completed_model = session.get(JourneyModel, completed["id"])
+    completed_model.status = "completed"
+    completed_model.completed_at = completed_model.updated_at
+    session.commit()
+    session.close()
+
+    active = client.post(
+        "/api/v1/journeys",
+        json={"route_id": fragmented_route["id"]},
+        headers=user_headers,
+    ).get_json()["data"]
+    response = client.get("/api/v1/journeys", headers=user_headers)
+    assert response.status_code == 200
+    rows = response.get_json()["data"]
+    assert {item["journey"]["id"] for item in rows} == {completed["id"], active["id"]}
+    assert {item["journey_kind"] for item in rows} == {"legacy", "fragmented"}
+    assert all("stops" not in item["route"] for item in rows)
+    assert all(
+        {"collected_count", "total_count", "evidence_count"} <= set(item)
+        for item in rows
+    )
+
+    completed_rows = client.get(
+        "/api/v1/journeys?status=completed", headers=user_headers
+    ).get_json()["data"]
+    assert [item["journey"]["id"] for item in completed_rows] == [completed["id"]]
+    assert client.get(
+        "/api/v1/journeys?status=unknown", headers=user_headers
+    ).status_code == 422
+
+    active_rows = client.get("/api/v1/journeys/active", headers=user_headers)
+    assert active_rows.status_code == 200
+    assert [item["journey"]["id"] for item in active_rows.get_json()["data"]] == [
+        active["id"]
+    ]
+    other_headers = _register_test_user(client, "library-other-user")
+    assert client.get("/api/v1/journeys", headers=other_headers).get_json()["data"] == []
+
+
+def test_owner_context_recovers_archived_fragment_route_and_hides_from_others(
+    app, client, user_headers
+):
+    route = client.get("/api/v1/routes/nantou-time-layers").get_json()["data"]
+    journey = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers
+    ).get_json()["data"]
+    database = app.extensions["database"]
+    session = database.session_factory()
+    session.get(RouteModel, route["id"]).content_status = "archived"
+    session.commit()
+    session.close()
+
+    assert client.get("/api/v1/routes/nantou-time-layers").status_code == 404
+    context = client.get(
+        f"/api/v1/journeys/{journey['id']}/context", headers=user_headers
+    )
+    assert context.status_code == 200
+    payload = context.get_json()["data"]
+    assert payload["journey"]["id"] == journey["id"]
+    assert payload["route"]["content_status"] == "archived"
+    assert payload["route"]["audio_tour"]["fragments"]
+    assert payload["journey_kind"] == "fragmented"
+    assert payload["ledger"]["journey_id"] == journey["id"]
+
+    other_headers = _register_test_user(client, "context-other-user")
+    hidden = client.get(
+        f"/api/v1/journeys/{journey['id']}/context", headers=other_headers
+    )
+    assert hidden.status_code == 404
 
 
 def _register_test_user(client, username: str) -> dict[str, str]:

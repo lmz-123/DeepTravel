@@ -307,12 +307,15 @@ class JourneyService:
 
     def start_or_resume(self, user_id: str, route_id: str) -> Journey:
         with self.uow_factory() as uow:
-            route = uow.catalog.get_route_by_id(route_id)
-            if route is None:
-                raise RouteNotFoundError()
             existing = uow.journeys.find_active(route_id, user_id)
             if existing:
                 return existing
+            completed = uow.journeys.find_latest_completed(route_id, user_id)
+            if completed:
+                return completed
+            route = uow.catalog.get_route_by_id(route_id)
+            if route is None:
+                raise RouteNotFoundError()
             now = self.clock()
             journey = Journey(
                 id=str(uuid4()),
@@ -339,6 +342,12 @@ class JourneyService:
     def list_active(self, user_id: str) -> list[Journey]:
         with self.uow_factory() as uow:
             return uow.journeys.list_active_for_user(user_id)
+
+    def list_library(
+        self, user_id: str, statuses: tuple[JourneyStatus, ...] | None = None
+    ):
+        with self.uow_factory() as uow:
+            return uow.journeys.list_library_items(user_id, statuses)
 
     def arrive(
         self,

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
@@ -147,6 +149,59 @@ class DemoExperienceRepository implements ExperienceRepository {
       }).toList(),
     );
   }
+
+  @override
+  Future<List<JourneyLibraryItem>> journeys({String? status}) async {
+    await _pause();
+    final journey = _journey;
+    if (journey == null || status != null && journey.status != status) {
+      return const [];
+    }
+    return [
+      JourneyLibraryItem(
+        journey: journey,
+        route: demoRoute,
+        journeyKind: 'legacy',
+        collectedCount: journey.answeredStopIds.length,
+        totalCount: demoRoute.stops.length,
+        evidenceCount: 0,
+      ),
+    ];
+  }
+
+  @override
+  Future<JourneyContext> journeyContext(String journeyId) async =>
+      JourneyContext(
+        journey: _requireJourney(journeyId),
+        route: demoRoute,
+        journeyKind: 'legacy',
+        collectedCount: _journey!.answeredStopIds.length,
+        totalCount: demoRoute.stops.length,
+      );
+
+  @override
+  Future<List<EvidenceRecord>> evidence(String journeyId) async => const [];
+
+  @override
+  Future<Uint8List> evidenceBytes(
+          String journeyId, EvidenceRecord evidence) async =>
+      _fragmentOnly();
+
+  @override
+  Future<void> deleteEvidence(String journeyId, String evidenceId) async =>
+      _fragmentOnly();
+
+  @override
+  Future<EvidencePolicy> evidencePolicy() async => const EvidencePolicy(
+        uploadEnabled: false,
+        retentionDays: 0,
+        maxBytes: 0,
+        maxEdgePixels: 0,
+        allowedMimeTypes: [],
+        privateAccess: true,
+        exifRemoved: true,
+        normalizedOnUpload: true,
+      );
 
   Never _fragmentOnly() => throw UnsupportedError('内置演示路线不支持碎片音频模式');
 

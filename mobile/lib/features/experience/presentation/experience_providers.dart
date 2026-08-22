@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,9 +8,12 @@ import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/api_experience_repository.dart';
 import '../data/demo_experience_repository.dart';
 import '../data/narration_voice_preference_repository.dart';
+import '../data/user_preferences_repository.dart';
 import '../domain/experience_repository.dart';
+import '../domain/fragment_models.dart';
 import '../domain/models.dart';
 import '../../auth/presentation/auth_provider.dart';
+import 'location_mode_controller.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final reporter = ref.watch(runtimeLogReporterProvider);
@@ -47,6 +52,9 @@ final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {
   }
   return DemoExperienceRepository();
 });
+
+final currentUserIdProvider = Provider<String?>(
+    (ref) => ref.watch(authControllerProvider).asData?.value?.user.id);
 
 final citiesProvider = FutureProvider<List<CityExperience>>((ref) {
   return ref.watch(experienceRepositoryProvider).cities();
@@ -87,6 +95,156 @@ final archivedActiveJourneysProvider =
     return repository.archivedActiveJourneys();
   }
   return const <ResumableJourney>[];
+});
+
+class UserJourneyFilter {
+  const UserJourneyFilter(this.userId, {this.status});
+
+  final String userId;
+  final String? status;
+
+  @override
+  bool operator ==(Object other) =>
+      other is UserJourneyFilter &&
+      other.userId == userId &&
+      other.status == status;
+
+  @override
+  int get hashCode => Object.hash(userId, status);
+}
+
+class UserJourneyKey {
+  const UserJourneyKey(this.userId, this.journeyId);
+
+  final String userId;
+  final String journeyId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is UserJourneyKey &&
+      other.userId == userId &&
+      other.journeyId == journeyId;
+
+  @override
+  int get hashCode => Object.hash(userId, journeyId);
+}
+
+class EvidenceBytesKey {
+  const EvidenceBytesKey({
+    required this.userId,
+    required this.journeyId,
+    required this.evidence,
+  });
+
+  final String userId;
+  final String journeyId;
+  final EvidenceRecord evidence;
+
+  @override
+  bool operator ==(Object other) =>
+      other is EvidenceBytesKey &&
+      other.userId == userId &&
+      other.journeyId == journeyId &&
+      other.evidence.id == evidence.id &&
+      other.evidence.url == evidence.url;
+
+  @override
+  int get hashCode => Object.hash(userId, journeyId, evidence.id, evidence.url);
+}
+
+final journeyLibraryProvider =
+    FutureProvider.family<List<JourneyLibraryItem>, UserJourneyFilter>(
+  (ref, query) =>
+      ref.watch(experienceRepositoryProvider).journeys(status: query.status),
+);
+
+final journeyContextProvider =
+    FutureProvider.family<JourneyContext, UserJourneyKey>(
+  (ref, key) =>
+      ref.watch(experienceRepositoryProvider).journeyContext(key.journeyId),
+);
+
+final journeyEvidenceProvider =
+    FutureProvider.family<List<EvidenceRecord>, UserJourneyKey>(
+  (ref, key) => ref.watch(experienceRepositoryProvider).evidence(key.journeyId),
+);
+
+final evidenceBytesProvider =
+    FutureProvider.family<Uint8List, EvidenceBytesKey>((ref, key) {
+  return ref
+      .watch(experienceRepositoryProvider)
+      .evidenceBytes(key.journeyId, key.evidence);
+});
+
+final evidencePolicyProvider = FutureProvider.family<EvidencePolicy, String>(
+  (ref, userId) => ref.watch(experienceRepositoryProvider).evidencePolicy(),
+);
+
+final orbPositionProvider =
+    FutureProvider.family<NormalizedOrbPosition, String>((ref, userId) =>
+        ref.watch(userPreferencesRepositoryProvider).readOrbPosition(userId));
+
+final currentJourneyLibraryProvider =
+    FutureProvider<List<JourneyLibraryItem>>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return const <JourneyLibraryItem>[];
+  return ref.watch(
+    journeyLibraryProvider(UserJourneyFilter(userId, status: 'completed'))
+        .future,
+  );
+});
+
+final currentAllJourneysProvider =
+    FutureProvider<List<JourneyLibraryItem>>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return const <JourneyLibraryItem>[];
+  return ref.watch(
+    journeyLibraryProvider(UserJourneyFilter(userId)).future,
+  );
+});
+
+final routeJourneyIndexProvider =
+    FutureProvider<Map<String, JourneyLibraryItem>>((ref) async {
+  final items = await ref.watch(currentAllJourneysProvider.future);
+  final result = <String, JourneyLibraryItem>{};
+  for (final item in items) {
+    final current = result[item.route.id];
+    if (current == null ||
+        item.journey.status == 'active' && current.journey.status != 'active') {
+      result[item.route.id] = item;
+    }
+  }
+  return result;
+});
+
+void invalidatePrivateExperience(Ref ref) {
+  ref.invalidate(journeyLibraryProvider);
+  ref.invalidate(journeyContextProvider);
+  ref.invalidate(journeyEvidenceProvider);
+  ref.invalidate(evidenceBytesProvider);
+  ref.invalidate(evidencePolicyProvider);
+  ref.invalidate(currentJourneyLibraryProvider);
+  ref.invalidate(currentAllJourneysProvider);
+  ref.invalidate(routeJourneyIndexProvider);
+}
+
+void invalidatePrivateExperienceFromWidget(WidgetRef ref) {
+  ref.invalidate(journeyLibraryProvider);
+  ref.invalidate(journeyContextProvider);
+  ref.invalidate(journeyEvidenceProvider);
+  ref.invalidate(evidenceBytesProvider);
+  ref.invalidate(evidencePolicyProvider);
+  ref.invalidate(currentJourneyLibraryProvider);
+  ref.invalidate(currentAllJourneysProvider);
+  ref.invalidate(routeJourneyIndexProvider);
+}
+
+final privateExperienceLifecycleProvider = Provider<void>((ref) {
+  ref.listen(authControllerProvider, (previous, next) {
+    final previousId = previous?.asData?.value?.user.id;
+    final nextId = next.asData?.value?.user.id;
+    if (previousId != nextId) invalidatePrivateExperience(ref);
+  });
 });
 
 final routeProvider =
@@ -210,6 +368,8 @@ class JourneyController extends Notifier<JourneyUiState> {
         clearFeedback: true,
         clearError: true,
       );
+      ref.invalidate(journeyLibraryProvider);
+      ref.invalidate(journeyContextProvider);
     });
     return completed;
   }

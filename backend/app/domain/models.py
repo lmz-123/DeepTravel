@@ -124,6 +124,16 @@ class Journey:
         return next((answer for answer in self.answers if answer.stop_id == stop_id), None)
 
 
+@dataclass(frozen=True, slots=True)
+class JourneyLibraryItem:
+    journey: Journey
+    route: Route
+    journey_kind: str
+    collected_count: int
+    total_count: int
+    evidence_count: int
+
+
 def distance_meters(
     latitude_a: float,
     longitude_a: float,

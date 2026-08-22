@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from uuid import uuid4
 
@@ -9,8 +9,11 @@ from PIL import Image
 from sqlalchemy import select
 
 from app.infrastructure.persistence.models import (
+    EvidenceModel,
     FragmentNarrationTrackModel,
+    JourneyFragmentModel,
     NarrationVoiceProfileModel,
+    PhotoMissionModel,
     RouteModel,
     StoryArcModel,
 )
@@ -121,14 +124,19 @@ def test_public_voice_profiles_require_complete_current_coverage_and_preserve_de
     profile_ids = [item["id"] for item in tour["narration_profiles"]]
     assert profile_ids == ["default-narration-voice", "complete-early", "complete-late"]
     assert tour["default_narration_profile_id"] == "default-narration-voice"
-    assert not ({"provider", "model", "voice_id", "emotion", "speed", "pitch"} & set(tour["narration_profiles"][1]))
+    assert not (
+        {"provider", "model", "voice_id", "emotion", "speed", "pitch"}
+        & set(tour["narration_profiles"][1])
+    )
     first_fragment = tour["fragments"][0]
     assert set(first_fragment["narration_tracks"]) == set(profile_ids)
     assert all(
         item["audio_url"].startswith("http://localhost/")
         for item in first_fragment["narration_tracks"].values()
     )
-    assert first_fragment["audio"]["url"] == first_fragment["narration_tracks"]["default-narration-voice"]["audio_url"]
+    assert first_fragment["audio"]["url"] == first_fragment["narration_tracks"][
+        "default-narration-voice"
+    ]["audio_url"]
 
     _, journey = _start(client, user_headers)
     with database.session_factory() as session:
@@ -184,9 +192,36 @@ def test_trigger_accuracy_distance_and_idempotency(client, guest_headers, caplog
     repeated = client.post(endpoint, json=payload, headers=guest_headers)
     assert accepted.status_code == 200
     assert accepted.get_json() == repeated.get_json()
-    assert accepted.get_json()["data"]["fragment"]["transcript"]
+    revealed = accepted.get_json()["data"]["fragment"]
+    assert revealed["transcript"]
+    assert revealed["mission"]["required"] is False
+    assert all(
+        revealed["mission"][key]
+        for key in ("vantage_point", "shooting_direction", "composition_tip")
+    )
     assert "fragment_trigger_requested" in caplog.text
     assert "fragment_trigger_accepted" in caplog.text
+
+
+def test_legacy_photo_guidance_uses_safe_runtime_fallbacks(app, client, guest_headers):
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        mission = session.get(PhotoMissionModel, "nantou-mission-1")
+        mission.vantage_point = None
+        mission.shooting_direction = None
+        mission.composition_tip = None
+        session.commit()
+    route, journey = _start(client, guest_headers)
+    fragment = route["audio_tour"]["fragments"][0]
+    response = client.post(
+        f"/api/v1/journeys/{journey['id']}/fragments/{fragment['id']}/triggers",
+        json={"method": "demo", "idempotency_key": str(uuid4())},
+        headers=guest_headers,
+    )
+    mission = response.get_json()["data"]["fragment"]["mission"]
+    assert mission["vantage_point"] == mission["field_subject"]
+    assert mission["shooting_direction"] == mission["prompt"]
+    assert mission["composition_tip"] == mission["prompt"]
 
 
 def test_ledger_logs_state_summary(client, guest_headers, caplog):
@@ -273,9 +308,19 @@ def test_complete_fragment_arc_with_private_evidence_and_reconstruction(client, 
     )
     assert photo.status_code == 200
     assert photo.content_type == "image/jpeg"
+    deleted_after_completion = client.delete(
+        f"/api/v1/journeys/{journey_id}/evidence/{evidence_ids[0]}",
+        headers=guest_headers,
+    )
+    assert deleted_after_completion.status_code == 200
+    after_delete = client.get(
+        f"/api/v1/journeys/{journey_id}/ledger", headers=guest_headers
+    ).get_json()["data"]
+    assert after_delete["collected_count"] == 5
+    assert after_delete["reconstruction_unlocked"] is True
 
 
-def test_evidence_is_private_between_guests(client, guest_headers):
+def test_evidence_is_private_between_guests(app, client, guest_headers):
     route, journey = _start(client, guest_headers)
     fragment = route["audio_tour"]["fragments"][0]
     base = f"/api/v1/journeys/{journey['id']}/fragments/{fragment['id']}"
@@ -295,15 +340,75 @@ def test_evidence_is_private_between_guests(client, guest_headers):
         headers=guest_headers,
         content_type="multipart/form-data",
     ).get_json()["data"]
+    listed = client.get(
+        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
+    )
+    assert listed.status_code == 200
+    metadata = listed.get_json()["data"]
+    assert len(metadata) == 1
+    assert metadata[0]["fragment_id"] == fragment["id"]
+    assert metadata[0]["url"].endswith(
+        f"/journeys/{journey['id']}/evidence/{evidence['id']}"
+    )
+    assert not (
+        {"object_key", "storage_provider", "canonical_reference", "sha256"}
+        & set(metadata[0])
+    )
+    restarted_style_read = client.get(
+        f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
+        headers=guest_headers,
+    )
+    assert restarted_style_read.status_code == 200
+    assert restarted_style_read.content_type == "image/jpeg"
     other_token = client.post("/api/v1/sessions/guest").get_json()["data"]["token"]
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+    assert (
+        client.get(
+            f"/api/v1/journeys/{journey['id']}/evidence", headers=other_headers
+        ).status_code
+        == 404
+    )
     response = client.get(
         f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
-        headers={"Authorization": f"Bearer {other_token}"},
+        headers=other_headers,
     )
     assert response.status_code == 404
 
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        stored = session.get(EvidenceModel, evidence["id"])
+        stored.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        session.commit()
+    expired = client.get(
+        f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
+        headers=guest_headers,
+    )
+    assert expired.status_code == 410
+    assert expired.get_json()["error"]["code"] == "evidence_expired"
+    assert client.get(
+        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
+    ).get_json()["data"][0]["is_expired"] is True
 
-def test_invalid_evidence_does_not_collect_and_delete_rolls_back_mission(client, guest_headers):
+    deleted = client.delete(
+        f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
+        headers=guest_headers,
+    )
+    assert deleted.status_code == 200
+    assert client.get(
+        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
+    ).get_json()["data"] == []
+    assert (
+        client.get(
+            f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
+            headers=guest_headers,
+        ).status_code
+        == 404
+    )
+
+
+def test_invalid_evidence_does_not_change_progress_and_delete_preserves_collection(
+    client, guest_headers
+):
     route, journey = _start(client, guest_headers)
     fragment = route["audio_tour"]["fragments"][0]
     base = f"/api/v1/journeys/{journey['id']}/fragments/{fragment['id']}"
@@ -329,15 +434,25 @@ def test_invalid_evidence_does_not_collect_and_delete_rolls_back_mission(client,
     assert invalid.status_code == 422
     assert invalid.get_json()["error"]["code"] == "evidence_invalid"
 
-    accepted = client.post(
+    upload_key = str(uuid4())
+    accepted_response = client.post(
         f"{base}/evidence",
         data={
             "photo": (_image(), "clue.jpg"),
-            "idempotency_key": str(uuid4()),
+            "idempotency_key": upload_key,
         },
         headers=guest_headers,
         content_type="multipart/form-data",
-    ).get_json()["data"]
+    )
+    accepted = accepted_response.get_json()["data"]
+    repeated = client.post(
+        f"{base}/evidence",
+        data={"photo": (_image(), "clue.jpg"), "idempotency_key": upload_key},
+        headers=guest_headers,
+        content_type="multipart/form-data",
+    )
+    assert repeated.status_code == 201
+    assert repeated.get_json()["data"]["id"] == accepted["id"]
     deleted = client.delete(
         f"/api/v1/journeys/{journey['id']}/evidence/{accepted['id']}",
         headers=guest_headers,
@@ -346,4 +461,72 @@ def test_invalid_evidence_does_not_collect_and_delete_rolls_back_mission(client,
     ledger = client.get(
         f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
     ).get_json()["data"]
-    assert ledger["entries"][0]["state"] == "mission_pending"
+    assert ledger["entries"][0]["state"] == "collected"
+    assert ledger["entries"][0]["collected_at"] is not None
+
+
+def test_photo_clue_collects_without_upload_and_legacy_pending_reconciles(
+    app, client, guest_headers
+):
+    route, journey = _start(client, guest_headers)
+    first, second = route["audio_tour"]["fragments"][:2]
+    first_base = f"/api/v1/journeys/{journey['id']}/fragments/{first['id']}"
+    client.post(
+        f"{first_base}/triggers",
+        json={"method": "demo", "idempotency_key": str(uuid4())},
+        headers=guest_headers,
+    )
+    completed = client.post(
+        f"{first_base}/playback",
+        json={"progress": 1.0, "idempotency_key": str(uuid4())},
+        headers=guest_headers,
+    )
+    assert completed.get_json()["data"]["fragment"]["state"] == "collected"
+    assert client.get(
+        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
+    ).get_json()["data"] == []
+    next_trigger = client.post(
+        f"/api/v1/journeys/{journey['id']}/fragments/{second['id']}/triggers",
+        json={"method": "demo", "idempotency_key": str(uuid4())},
+        headers=guest_headers,
+    )
+    assert next_trigger.status_code == 200
+    for index, fragment in enumerate(route["audio_tour"]["fragments"][1:], start=1):
+        if index > 1:
+            trigger = client.post(
+                f"/api/v1/journeys/{journey['id']}/fragments/{fragment['id']}/triggers",
+                json={"method": "demo", "idempotency_key": str(uuid4())},
+                headers=guest_headers,
+            )
+            assert trigger.status_code == 200
+        playback = client.post(
+            f"/api/v1/journeys/{journey['id']}/fragments/{fragment['id']}/playback",
+            json={"progress": 1.0, "idempotency_key": str(uuid4())},
+            headers=guest_headers,
+        )
+        assert playback.status_code == 200
+    no_photo_ledger = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
+    ).get_json()["data"]
+    assert no_photo_ledger["collected_count"] == no_photo_ledger["total_count"] == 5
+    assert no_photo_ledger["reconstruction_unlocked"] is True
+    assert client.get(
+        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
+    ).get_json()["data"] == []
+
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        state = session.scalar(
+            select(JourneyFragmentModel).where(
+                JourneyFragmentModel.journey_id == journey["id"],
+                JourneyFragmentModel.fragment_id == first["id"],
+            )
+        )
+        state.state = "mission_pending"
+        state.collected_at = None
+        session.commit()
+    reconciled = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
+    ).get_json()["data"]
+    assert reconciled["entries"][0]["state"] == "collected"
+    assert reconciled["entries"][0]["collected_at"] is not None
