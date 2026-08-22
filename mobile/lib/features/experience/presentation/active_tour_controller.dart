@@ -7,6 +7,7 @@ import '../../../core/logging/runtime_log_reporter.dart';
 import '../application/trigger_engine.dart';
 import '../data/api_experience_repository.dart';
 import '../data/local_tour_store.dart';
+import '../data/narration_voice_preference_repository.dart';
 import '../data/platform_tour_adapters.dart';
 import '../data/prepared_route_service.dart';
 import '../domain/experience_repository.dart';
@@ -15,6 +16,7 @@ import '../domain/models.dart';
 import '../domain/tour_runtime.dart';
 import 'experience_providers.dart';
 import 'location_mode_controller.dart';
+import '../../auth/presentation/auth_provider.dart';
 
 final tourStoreProvider = Provider<TourStore>((ref) => SqliteTourStore());
 final locationTrackerProvider =
@@ -75,6 +77,8 @@ class ActiveTourState {
     this.locationMessage,
     this.errorMessage,
     this.evidenceUploads = const {},
+    this.narrationProfileId,
+    this.narrationProfileMessage,
   });
 
   final String status;
@@ -93,6 +97,8 @@ class ActiveTourState {
   final String? locationMessage;
   final String? errorMessage;
   final Map<String, EvidenceUploadState> evidenceUploads;
+  final String? narrationProfileId;
+  final String? narrationProfileMessage;
 
   ActiveTourState copyWith(
           {String? status,
@@ -113,7 +119,10 @@ class ActiveTourState {
           bool clearLocationMessage = false,
           String? errorMessage,
           bool clearError = false,
-          Map<String, EvidenceUploadState>? evidenceUploads}) =>
+          Map<String, EvidenceUploadState>? evidenceUploads,
+          String? narrationProfileId,
+          String? narrationProfileMessage,
+          bool clearNarrationProfileMessage = false}) =>
       ActiveTourState(
         status: status ?? this.status,
         route: route ?? this.route,
@@ -133,6 +142,10 @@ class ActiveTourState {
             : locationMessage ?? this.locationMessage,
         errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
         evidenceUploads: evidenceUploads ?? this.evidenceUploads,
+        narrationProfileId: narrationProfileId ?? this.narrationProfileId,
+        narrationProfileMessage: clearNarrationProfileMessage
+            ? null
+            : narrationProfileMessage ?? this.narrationProfileMessage,
       );
 
   EvidenceUploadState? evidenceUploadFor(String fragmentId) =>
@@ -149,6 +162,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   StreamSubscription<Duration?>? _duration;
   bool _triggering = false;
   String? _loadedFragmentId;
+  String? _loadedProfileId;
 
   ExperienceRepository get _repository =>
       ref.read(experienceRepositoryProvider);
@@ -173,15 +187,40 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     if (manifest == null) return;
     await _stopLocationMonitoring();
     final locationMode = await ref.read(locationModeControllerProvider.future);
+    final userId = ref.read(authRepositoryProvider).session?.user.id;
+    final preferenceKey = userId == null
+        ? null
+        : NarrationVoicePreferenceKey(userId: userId, routeId: route.id);
+    final savedProfileId = preferenceKey == null
+        ? null
+        : await ref
+            .read(narrationVoicePreferenceRepositoryProvider)
+            .read(preferenceKey);
+    final profileId = manifest.effectiveProfileId(savedProfileId);
+    final profileFallback =
+        savedProfileId != null && savedProfileId != profileId;
+    if (preferenceKey != null &&
+        profileId != null &&
+        savedProfileId != profileId) {
+      await ref
+          .read(narrationVoicePreferenceRepositoryProvider)
+          .write(preferenceKey, profileId);
+      ref.invalidate(narrationVoicePreferenceProvider(preferenceKey));
+    }
     state = ActiveTourState(
         status: 'preparing',
         route: route,
         session: session,
         locationMode: locationMode,
+        narrationProfileId: profileId,
+        narrationProfileMessage:
+            profileFallback ? '之前选择的讲述音色已不可用，已切换为路线默认音色。' : null,
         isBusy: true);
     var prepared = <String, String>{};
     try {
-      prepared = await ref.read(preparedRouteServiceProvider).prepare(manifest);
+      prepared = await ref
+          .read(preparedRouteServiceProvider)
+          .prepare(manifest, profileId);
     } catch (_) {
       state = state.copyWith(locationMessage: '部分音频未下载，将在有网络时播放；文字稿仍可使用。');
     }
@@ -214,13 +253,15 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         'route_slug': route.slug,
         'status': state.status,
         'location_mode': locationMode.name,
-        'script_version': manifest.scriptVersion
+        'script_version': manifest.scriptVersion,
+        'narration_profile_id': profileId,
       });
       await _store.saveJson('prepared_manifest_${route.slug}', {
         'script_version': manifest.scriptVersion,
         'download_size_bytes': manifest.downloadSizeBytes,
         'fragment_ids': manifest.fragments.map((item) => item.id).toList(),
         'prepared_fragment_ids': prepared.keys.toList(),
+        'narration_profile_id': profileId,
       });
       _bindPlayer();
       if (locationMode == TourLocationMode.real &&
@@ -563,12 +604,14 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   Future<void> _playNarration(StoryFragment fragment) async {
     try {
       _loadedFragmentId = fragment.id;
+      _loadedProfileId = state.narrationProfileId;
       await _player.play(
-        fragment,
+        fragment.withNarrationProfile(state.narrationProfileId),
         preparedPath: state.preparedPaths[fragment.id],
       );
     } catch (error, stackTrace) {
       if (_loadedFragmentId == fragment.id) _loadedFragmentId = null;
+      _loadedProfileId = null;
       state = state.copyWith(
         isPlaying: false,
         errorMessage: '故事音频暂时无法播放，可以先查看文字稿后重试。',
@@ -854,6 +897,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     await _stopLocationMonitoring();
     await _player.stop();
     _loadedFragmentId = null;
+    _loadedProfileId = null;
     if (session != null) await _repository.stopActiveTour(session.id);
     state = state.copyWith(
         status: 'stopped',
@@ -865,7 +909,8 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   Future<void> replay() async {
     final current = state.current;
     if (current == null) return;
-    if (_loadedFragmentId != current.id) {
+    if (_loadedFragmentId != current.id ||
+        _loadedProfileId != state.narrationProfileId) {
       unawaited(_playNarration(current));
       return;
     }
@@ -879,7 +924,8 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     }
     final current = state.current;
     if (current == null) return;
-    if (_loadedFragmentId != current.id) {
+    if (_loadedFragmentId != current.id ||
+        _loadedProfileId != state.narrationProfileId) {
       unawaited(_playNarration(current));
       return;
     }
@@ -889,6 +935,42 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   Future<void> setSpeed(double speed) async {
     await _player.setSpeed(speed);
     state = state.copyWith(speed: speed);
+  }
+
+  Future<void> selectNarrationProfile(String profileId) async {
+    final route = state.route;
+    final manifest = route?.audioTour;
+    final userId = ref.read(authRepositoryProvider).session?.user.id;
+    if (route == null ||
+        manifest == null ||
+        userId == null ||
+        manifest.profile(profileId) == null ||
+        profileId == state.narrationProfileId) {
+      return;
+    }
+    final key = NarrationVoicePreferenceKey(userId: userId, routeId: route.id);
+    state = state.copyWith(isBusy: true, clearError: true);
+    try {
+      final prepared = await ref
+          .read(preparedRouteServiceProvider)
+          .prepare(manifest, profileId);
+      await ref
+          .read(narrationVoicePreferenceRepositoryProvider)
+          .write(key, profileId);
+      ref.invalidate(narrationVoicePreferenceProvider(key));
+      final profile = manifest.profile(profileId)!;
+      state = state.copyWith(
+        narrationProfileId: profileId,
+        preparedPaths: prepared,
+        isBusy: false,
+        narrationProfileMessage: state.isPlaying
+            ? '已选择“${profile.name}”；当前片段保持不变，下次播放或重播时生效。'
+            : '已切换为“${profile.name}”，下次播放时生效。',
+      );
+    } catch (error) {
+      state = state.copyWith(
+          isBusy: false, errorMessage: '音色资源准备失败：${_message(error)}');
+    }
   }
 
   Future<ReconstructionResult> reconstruct(List<String> relationships) async {

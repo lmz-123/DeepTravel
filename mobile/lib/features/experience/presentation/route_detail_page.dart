@@ -8,9 +8,12 @@ import '../../../core/widgets/primary_action.dart';
 import '../domain/tour_runtime.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
+import '../data/narration_voice_preference_repository.dart';
+import '../../auth/presentation/auth_provider.dart';
 import 'experience_providers.dart';
 import 'location_mode_controller.dart';
 import 'widgets/route_canvas.dart';
+import 'widgets/narration_voice_selector.dart';
 
 class RouteDetailPage extends ConsumerWidget {
   const RouteDetailPage({required this.slug, super.key});
@@ -119,7 +122,8 @@ class _RouteDetail extends ConsumerWidget {
                 _Metrics(route: route),
                 if (route.audioTour != null) ...[
                   const SizedBox(height: 26),
-                  _AudioTourBrief(manifest: route.audioTour!),
+                  _AudioTourBrief(
+                      routeId: route.id, manifest: route.audioTour!),
                 ],
                 const SizedBox(height: 28),
                 Text(route.audioTour == null ? '这一路，你会看见什么' : '这一路，你会追问什么',
@@ -195,7 +199,8 @@ class _Metrics extends StatelessWidget {
 }
 
 class _AudioTourBrief extends ConsumerWidget {
-  const _AudioTourBrief({required this.manifest});
+  const _AudioTourBrief({required this.routeId, required this.manifest});
+  final String routeId;
   final AudioTourManifest manifest;
 
   @override
@@ -204,6 +209,18 @@ class _AudioTourBrief extends ConsumerWidget {
     final modeState = ref.watch(locationModeControllerProvider);
     final mode = modeState.asData?.value ?? TourLocationMode.real;
     final isSimulated = mode == TourLocationMode.simulated;
+    final userId = ref.watch(authControllerProvider).asData?.value?.user.id;
+    final preferenceKey = userId == null
+        ? null
+        : NarrationVoicePreferenceKey(userId: userId, routeId: routeId);
+    final saved = preferenceKey == null
+        ? null
+        : ref
+            .watch(narrationVoicePreferenceProvider(preferenceKey))
+            .asData
+            ?.value;
+    final selectedProfileId = manifest.effectiveProfileId(saved);
+    final profileFallback = saved != null && saved != selectedProfileId;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -230,6 +247,22 @@ class _AudioTourBrief extends ConsumerWidget {
             style: TextStyle(
                 color: AppColors.white.withValues(alpha: .78), height: 1.55)),
         const SizedBox(height: 16),
+        NarrationVoiceSelector(
+          profiles: manifest.narrationProfiles,
+          selectedProfileId: selectedProfileId,
+          dark: true,
+          message: profileFallback ? '之前选择的音色已下线，当前使用路线默认音色。' : null,
+          onSelected: preferenceKey == null
+              ? (_) {}
+              : (profileId) async {
+                  await ref
+                      .read(narrationVoicePreferenceRepositoryProvider)
+                      .write(preferenceKey, profileId);
+                  ref.invalidate(
+                      narrationVoicePreferenceProvider(preferenceKey));
+                },
+        ),
+        if (manifest.narrationProfiles.isNotEmpty) const SizedBox(height: 16),
         Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
         const SizedBox(height: 12),
         Semantics(

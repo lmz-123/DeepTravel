@@ -10,6 +10,7 @@ import '../domain/fragment_models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
+import 'widgets/narration_voice_selector.dart';
 
 class JourneyPage extends ConsumerStatefulWidget {
   const JourneyPage({required this.journeyId, super.key});
@@ -121,6 +122,16 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
               const SizedBox(height: 18),
               _FragmentRail(manifest: manifest, ledger: ledger),
               const SizedBox(height: 22),
+              NarrationVoiceSelector(
+                profiles: manifest.narrationProfiles,
+                selectedProfileId: state.narrationProfileId,
+                message: state.narrationProfileMessage,
+                onSelected: (profileId) => ref
+                    .read(activeTourControllerProvider.notifier)
+                    .selectNarrationProfile(profileId),
+              ),
+              if (manifest.narrationProfiles.isNotEmpty)
+                const SizedBox(height: 18),
               AnimatedSwitcher(
                   duration: const Duration(milliseconds: 380),
                   child: state.current == null

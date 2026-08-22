@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
+from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,8 +11,11 @@ from app.infrastructure.persistence.fragment_seed import seed_fragment_tour
 from app.infrastructure.persistence.models import (
     ChallengeModel,
     CityModel,
+    FragmentNarrationTrackModel,
     MediaAssetModel,
+    NarrationVoiceProfileModel,
     RouteModel,
+    StoryFragmentModel,
     StopModel,
 )
 
@@ -355,5 +360,71 @@ def seed_database(session: Session) -> bool:
         stops=SHENZHEN_STOPS,
     )
     changed |= seed_fragment_tour(session, SHENZHEN_ROUTE_ID)
+    changed |= _seed_default_narration_profile(session, now)
     session.commit()
+    return changed
+
+
+def _seed_default_narration_profile(session: Session, now: datetime) -> bool:
+    changed = False
+    profile_id = "default-narration-voice"
+    profile = session.get(NarrationVoiceProfileModel, profile_id)
+    if profile is None:
+        session.add(
+            NarrationVoiceProfileModel(
+                id=profile_id,
+                slug="default",
+                display_name="原声导览",
+                description="路线编辑审核通过的默认旁白",
+                provider="legacy",
+                model="approved-audio",
+                voice_id="default",
+                emotion="neutral",
+                speed=1.0,
+                pitch=0,
+                display_order=0,
+                status="published",
+                is_default=True,
+                created_at=now,
+                updated_at=now,
+                published_at=now,
+            )
+        )
+        session.flush()
+        changed = True
+    for fragment in session.scalars(select(StoryFragmentModel)):
+        if not fragment.audio_path:
+            continue
+        transcript_hash = hashlib.sha256(fragment.narration_script.strip().encode()).hexdigest()
+        existing = session.scalar(
+            select(FragmentNarrationTrackModel).where(
+                FragmentNarrationTrackModel.fragment_id == fragment.id,
+                FragmentNarrationTrackModel.profile_id == profile_id,
+                FragmentNarrationTrackModel.transcript_hash == transcript_hash,
+                FragmentNarrationTrackModel.script_version == fragment.script_version,
+            )
+        )
+        if existing is not None:
+            continue
+        session.add(
+            FragmentNarrationTrackModel(
+                id=str(
+                    uuid5(
+                        NAMESPACE_URL,
+                        f"jiandi:narration-track:{fragment.id}:{profile_id}:{transcript_hash}:{fragment.script_version}",
+                    )
+                ),
+                fragment_id=fragment.id,
+                profile_id=profile_id,
+                transcript_hash=transcript_hash,
+                script_version=fragment.script_version,
+                media_path=fragment.audio_path,
+                mime_type=fragment.audio_mime_type,
+                size_bytes=fragment.audio_size_bytes,
+                generation_metadata_json={"backfilled": True},
+                approved_at=now,
+                published_at=now,
+            )
+        )
+        changed = True
     return changed

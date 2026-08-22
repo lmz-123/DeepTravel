@@ -4,8 +4,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jiandi/features/auth/data/auth_repository.dart';
+import 'package:jiandi/features/auth/domain/auth_models.dart';
+import 'package:jiandi/features/auth/presentation/auth_provider.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/data/location_mode_preferences.dart';
+import 'package:jiandi/features/experience/data/narration_voice_preference_repository.dart';
 import 'package:jiandi/features/experience/data/prepared_route_service.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
@@ -148,6 +152,63 @@ void main() {
     expect(player.playedFragmentIds, ['fragment-1', 'fragment-2']);
     expect(state.current?.id, 'fragment-2');
     expect(state.queue, isEmpty);
+  });
+
+  test('saved account voice drives preparation, playback, switch and replay',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'narration_voice:account-a:voice-route': 'voice-warm',
+    });
+    final store = _MemoryTourStore();
+    final prepared = _RecordingPreparedRouteService(store);
+    final player = _RecordingNarrationPlayer();
+    final repository = _VoiceFragmentRepository();
+    final container = ProviderContainer(overrides: [
+      authRepositoryProvider.overrideWithValue(_AuthenticatedRepository()),
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider.overrideWithValue(prepared),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.start(_voiceRoute, _session);
+    expect(container.read(activeTourControllerProvider).narrationProfileId,
+        'voice-warm');
+    expect(prepared.profileIds, ['voice-warm']);
+
+    await controller.togglePlayback();
+    await _waitUntil(() => player.urls.isNotEmpty);
+    expect(player.urls.last, 'https://example.test/warm.mp3');
+
+    await controller.selectNarrationProfile('voice-default');
+    expect(prepared.profileIds, ['voice-warm', 'voice-default']);
+    expect(container.read(activeTourControllerProvider).narrationProfileMessage,
+        contains('重播时生效'));
+    expect(player.urls, ['https://example.test/warm.mp3']);
+
+    await controller.replay();
+    await _waitUntil(() => player.urls.length == 2);
+    expect(player.urls.last, 'https://example.test/default.mp3');
+    expect(
+      await NarrationVoicePreferenceRepository().read(
+          const NarrationVoicePreferenceKey(
+              userId: 'account-a', routeId: 'voice-route')),
+      'voice-default',
+    );
   });
 
   testWidgets(
@@ -424,6 +485,82 @@ const _session = JourneySession(
   progress: 0,
 );
 
+const _voiceProfiles = [
+  NarrationVoiceProfile(
+      id: 'voice-default',
+      slug: 'default',
+      name: '原声',
+      description: '默认声音',
+      isDefault: true),
+  NarrationVoiceProfile(
+      id: 'voice-warm',
+      slug: 'warm',
+      name: '温柔',
+      description: '温柔声音',
+      isDefault: false),
+];
+
+const _voiceFragment = StoryFragment(
+  id: 'voice-fragment',
+  position: 1,
+  safePreview: '声音线索',
+  interactionType: 'passive',
+  reviewState: 'reviewed',
+  triggerRegion: _region,
+  audio: NarrationAsset(
+      url: 'https://example.test/default.mp3',
+      mimeType: 'audio/mpeg',
+      sizeBytes: 0,
+      scriptVersion: 'v1'),
+  title: '声音线索',
+  transcript: '不因音色改变的文字稿',
+  state: 'triggered',
+  narrationTracks: {
+    'voice-default': NarrationTrack(
+        transcriptHash: 'same',
+        audio: NarrationAsset(
+            url: 'https://example.test/default.mp3',
+            mimeType: 'audio/mpeg',
+            sizeBytes: 0,
+            scriptVersion: 'v1')),
+    'voice-warm': NarrationTrack(
+        transcriptHash: 'same',
+        audio: NarrationAsset(
+            url: 'https://example.test/warm.mp3',
+            mimeType: 'audio/mpeg',
+            sizeBytes: 0,
+            scriptVersion: 'v1')),
+  },
+);
+
+const _voiceRoute = RouteExperience(
+  id: 'voice-route',
+  slug: 'voice-route',
+  title: '声音路线',
+  subtitle: '测试',
+  description: '测试',
+  durationMinutes: 10,
+  distanceKm: 1,
+  difficulty: 'easy',
+  theme: 'history',
+  heroImage: '',
+  contentStatus: 'published',
+  stops: [],
+  audioTour: AudioTourManifest(
+      title: '声音导览',
+      centralQuestion: '为什么？',
+      scriptVersion: 'v1',
+      reviewState: 'reviewed',
+      fieldAuditState: 'reviewed',
+      productionReady: true,
+      demoLabel: null,
+      contentMethod: '测试',
+      downloadSizeBytes: 0,
+      defaultNarrationProfileId: 'voice-default',
+      narrationProfiles: _voiceProfiles,
+      fragments: [_voiceFragment]),
+);
+
 class _FragmentRepository extends DemoExperienceRepository {
   _FragmentRepository() : super(latency: Duration.zero);
 
@@ -568,6 +705,30 @@ class _ReconstructionRepository extends _ProgressingFragmentRepository {
           fragments: [_fragment, _secondFragment]);
 }
 
+class _VoiceFragmentRepository extends _FragmentRepository {
+  @override
+  Future<StoryLedger> ledger(String journeyId) async => const StoryLedger(
+        centralQuestion: '为什么？',
+        collectedCount: 0,
+        totalCount: 1,
+        reconstructionUnlocked: false,
+        defaultNarrationProfileId: 'voice-default',
+        narrationProfiles: _voiceProfiles,
+        entries: [_voiceFragment],
+      );
+}
+
+class _AuthenticatedRepository extends AuthRepository {
+  _AuthenticatedRepository() : super(Dio());
+
+  @override
+  AuthSession? get session => const AuthSession(
+        user: AuthUser(
+            id: 'account-a', username: 'traveler', accountKind: 'registered'),
+        token: 'test-token',
+      );
+}
+
 class _RecordingLocationTracker implements LocationTracker {
   int permissionRequests = 0;
   int sampleSubscriptions = 0;
@@ -606,7 +767,21 @@ class _NoopPreparedRouteService extends PreparedRouteService {
   _NoopPreparedRouteService(TourStore store) : super(Dio(), store);
 
   @override
-  Future<Map<String, String>> prepare(AudioTourManifest manifest) async => {};
+  Future<Map<String, String>> prepare(
+          AudioTourManifest manifest, String? profileId) async =>
+      {};
+}
+
+class _RecordingPreparedRouteService extends PreparedRouteService {
+  _RecordingPreparedRouteService(TourStore store) : super(Dio(), store);
+  final profileIds = <String?>[];
+
+  @override
+  Future<Map<String, String>> prepare(
+      AudioTourManifest manifest, String? profileId) async {
+    profileIds.add(profileId);
+    return {};
+  }
 }
 
 class _MemoryTourStore implements TourStore {
@@ -678,6 +853,23 @@ class _SilentNarrationPlayer implements NarrationPlayer {
 
   @override
   Future<void> stop() async {}
+}
+
+class _RecordingNarrationPlayer extends _SilentNarrationPlayer {
+  final urls = <String>[];
+  final _playing = StreamController<bool>.broadcast(sync: true);
+
+  @override
+  Stream<bool> get playingStream => _playing.stream;
+
+  @override
+  Future<void> play(StoryFragment fragment, {String? preparedPath}) async {
+    urls.add(fragment.audio.url);
+    _playing.add(true);
+  }
+
+  @override
+  Future<void> dispose() => _playing.close();
 }
 
 class _ControllableNarrationPlayer implements NarrationPlayer {

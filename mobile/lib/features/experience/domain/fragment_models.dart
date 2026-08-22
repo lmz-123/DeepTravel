@@ -53,6 +53,51 @@ class NarrationAsset {
       );
 }
 
+class NarrationVoiceProfile {
+  const NarrationVoiceProfile({
+    required this.id,
+    required this.slug,
+    required this.name,
+    required this.description,
+    required this.isDefault,
+    this.previewAudioUrl,
+  });
+
+  final String id;
+  final String slug;
+  final String name;
+  final String description;
+  final bool isDefault;
+  final String? previewAudioUrl;
+
+  factory NarrationVoiceProfile.fromJson(Map<String, dynamic> json) =>
+      NarrationVoiceProfile(
+        id: json['id'] as String,
+        slug: json['slug'] as String,
+        name: json['name'] as String,
+        description: json['description'] as String? ?? '',
+        isDefault: json['is_default'] as bool? ?? false,
+        previewAudioUrl: json['preview_audio_url'] as String?,
+      );
+}
+
+class NarrationTrack {
+  const NarrationTrack({required this.audio, required this.transcriptHash});
+
+  final NarrationAsset audio;
+  final String transcriptHash;
+
+  factory NarrationTrack.fromJson(Map<String, dynamic> json) => NarrationTrack(
+        audio: NarrationAsset(
+          url: json['audio_url'] as String,
+          mimeType: json['mime_type'] as String,
+          sizeBytes: json['size_bytes'] as int? ?? 0,
+          scriptVersion: json['script_version'] as String,
+        ),
+        transcriptHash: json['transcript_hash'] as String,
+      );
+}
+
 class PhotoMission {
   const PhotoMission(
       {required this.id,
@@ -128,6 +173,7 @@ class StoryFragment {
     this.evidenceId,
     this.sources = const [],
     this.dependencyIds = const [],
+    this.narrationTracks = const {},
   });
 
   final String id;
@@ -149,10 +195,37 @@ class StoryFragment {
   final String? evidenceId;
   final List<HistoricalSource> sources;
   final List<String> dependencyIds;
+  final Map<String, NarrationTrack> narrationTracks;
 
   bool get isCollected => state == 'collected';
   bool get isMissionPending => state == 'mission_pending';
   bool get isRevealed => title != null;
+
+  NarrationAsset narrationFor(String? profileId) =>
+      narrationTracks[profileId]?.audio ?? audio;
+
+  StoryFragment withNarrationProfile(String? profileId) => StoryFragment(
+        id: id,
+        position: position,
+        safePreview: safePreview,
+        interactionType: interactionType,
+        reviewState: reviewState,
+        triggerRegion: triggerRegion,
+        audio: narrationFor(profileId),
+        title: title,
+        transcript: transcript,
+        keyClaim: keyClaim,
+        answersQuestion: answersQuestion,
+        raisesQuestion: raisesQuestion,
+        authenticityLabel: authenticityLabel,
+        state: state,
+        playbackProgress: playbackProgress,
+        mission: mission,
+        evidenceId: evidenceId,
+        sources: sources,
+        dependencyIds: dependencyIds,
+        narrationTracks: narrationTracks,
+      );
 
   factory StoryFragment.fromJson(Map<String, dynamic> json) {
     final missionJson = json['mission'];
@@ -183,6 +256,10 @@ class StoryFragment {
           .toList(),
       dependencyIds: List<String>.from(
           json['dependency_ids'] as List<dynamic>? ?? const []),
+      narrationTracks: (json['narration_tracks'] as Map<String, dynamic>? ??
+              const <String, dynamic>{})
+          .map((key, value) => MapEntry(
+              key, NarrationTrack.fromJson(value as Map<String, dynamic>))),
     );
   }
 }
@@ -198,7 +275,9 @@ class AudioTourManifest {
       required this.demoLabel,
       required this.contentMethod,
       required this.downloadSizeBytes,
-      required this.fragments});
+      required this.fragments,
+      this.defaultNarrationProfileId,
+      this.narrationProfiles = const []});
   final String title;
   final String centralQuestion;
   final String scriptVersion;
@@ -209,6 +288,20 @@ class AudioTourManifest {
   final String contentMethod;
   final int downloadSizeBytes;
   final List<StoryFragment> fragments;
+  final String? defaultNarrationProfileId;
+  final List<NarrationVoiceProfile> narrationProfiles;
+
+  NarrationVoiceProfile? profile(String? id) {
+    for (final profile in narrationProfiles) {
+      if (profile.id == id) return profile;
+    }
+    return null;
+  }
+
+  String? effectiveProfileId(String? preferredId) =>
+      profile(preferredId)?.id ??
+      profile(defaultNarrationProfileId)?.id ??
+      (narrationProfiles.isEmpty ? null : narrationProfiles.first.id);
 
   int get photoMissionCount =>
       fragments.where((value) => value.interactionType == 'photo').length;
@@ -228,6 +321,13 @@ class AudioTourManifest {
             .map((value) =>
                 StoryFragment.fromJson(value as Map<String, dynamic>))
             .toList(),
+        defaultNarrationProfileId:
+            json['default_narration_profile_id'] as String?,
+        narrationProfiles: (json['narration_profiles'] as List<dynamic>? ??
+                const [])
+            .map((value) =>
+                NarrationVoiceProfile.fromJson(value as Map<String, dynamic>))
+            .toList(),
       );
 }
 
@@ -238,13 +338,17 @@ class StoryLedger {
       required this.totalCount,
       required this.reconstructionUnlocked,
       required this.entries,
-      this.reconstructionItems = const []});
+      this.reconstructionItems = const [],
+      this.defaultNarrationProfileId,
+      this.narrationProfiles = const []});
   final String centralQuestion;
   final int collectedCount;
   final int totalCount;
   final bool reconstructionUnlocked;
   final List<StoryFragment> entries;
   final List<ReconstructionItem> reconstructionItems;
+  final String? defaultNarrationProfileId;
+  final List<NarrationVoiceProfile> narrationProfiles;
 
   factory StoryLedger.fromJson(Map<String, dynamic> json) => StoryLedger(
         centralQuestion: json['central_question'] as String,
@@ -259,6 +363,13 @@ class StoryLedger {
         entries: (json['entries'] as List<dynamic>)
             .map((value) =>
                 StoryFragment.fromJson(value as Map<String, dynamic>))
+            .toList(),
+        defaultNarrationProfileId:
+            json['default_narration_profile_id'] as String?,
+        narrationProfiles: (json['narration_profiles'] as List<dynamic>? ??
+                const [])
+            .map((value) =>
+                NarrationVoiceProfile.fromJson(value as Map<String, dynamic>))
             .toList(),
       );
 }

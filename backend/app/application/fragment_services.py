@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -18,6 +19,7 @@ from app.infrastructure.persistence.models import (
     ActiveTourModel,
     ClaimSourceModel,
     EvidenceModel,
+    FragmentNarrationTrackModel,
     FragmentClaimModel,
     FragmentDependencyModel,
     HistoricalClaimModel,
@@ -26,6 +28,7 @@ from app.infrastructure.persistence.models import (
     JourneyFragmentModel,
     JourneyModel,
     MediaAssetModel,
+    NarrationVoiceProfileModel,
     PhotoMissionModel,
     ReconstructionModel,
     StoryArcModel,
@@ -92,9 +95,10 @@ class FragmentTourService:
             dependency_map: dict[str, list[str]] = {}
             for fragment_id, required_id in dependency_rows:
                 dependency_map.setdefault(fragment_id, []).append(required_id)
+            narration = self._narration_context(session, arc)
             fragments = [
                 {
-                    **self._public_fragment(item, session),
+                    **self._public_fragment(item, session, narration),
                     "dependency_ids": dependency_map.get(item.id, []),
                 }
                 for item in arc.fragments
@@ -132,6 +136,8 @@ class FragmentTourService:
                 },
                 "permissions": ["location_always", "notifications", "camera"],
                 "download_size_bytes": total_bytes,
+                "default_narration_profile_id": narration["default_profile_id"],
+                "narration_profiles": narration["profiles"],
                 "fragment_count": len(fragments),
                 "photo_mission_count": sum(
                     1 for item in arc.fragments if item.photo_mission is not None
@@ -463,13 +469,17 @@ class FragmentTourService:
                 )
             }
             entries = []
+            narration = self._narration_context(session, arc)
             for fragment in arc.fragments:
                 state = states[fragment.id]
                 if state.state in {"triggered", "playing", "mission_pending", "collected"}:
-                    entries.append(self._revealed_fragment(session, fragment, state))
+                    entries.append(self._revealed_fragment(session, fragment, state, narration))
                 else:
                     entries.append(
-                        {**self._public_fragment(fragment, session), "state": state.state}
+                        {
+                            **self._public_fragment(fragment, session, narration),
+                            "state": state.state,
+                        }
                     )
             collected = sum(1 for item in states.values() if item.state == "collected")
             reconstruction_unlocked = collected == len(entries)
@@ -484,6 +494,8 @@ class FragmentTourService:
                 )
                 if reconstruction_unlocked
                 else [],
+                "default_narration_profile_id": narration["default_profile_id"],
+                "narration_profiles": narration["profiles"],
                 "entries": entries,
             }
 
@@ -701,9 +713,15 @@ class FragmentTourService:
             or (self.media_root / value).is_file()
         )
 
-    def _public_fragment(self, fragment: StoryFragmentModel, session: Session) -> dict:
+    def _public_fragment(
+        self,
+        fragment: StoryFragmentModel,
+        session: Session,
+        narration: dict | None = None,
+    ) -> dict:
         region = fragment.trigger_region
         mission = fragment.photo_mission
+        narration = narration or self._narration_context(session, fragment.arc)
         return {
             "id": fragment.id,
             "position": fragment.position,
@@ -727,15 +745,20 @@ class FragmentTourService:
                 "size_bytes": fragment.audio_size_bytes,
                 "script_version": fragment.script_version,
             },
+            "narration_tracks": narration["tracks_by_fragment"].get(fragment.id, {}),
             "mission_preview": {"required": mission.required, "audit_state": mission.audit_state}
             if mission
             else None,
         }
 
     def _revealed_fragment(
-        self, session: Session, fragment: StoryFragmentModel, state: JourneyFragmentModel
+        self,
+        session: Session,
+        fragment: StoryFragmentModel,
+        state: JourneyFragmentModel,
+        narration: dict | None = None,
     ) -> dict:
-        data = self._public_fragment(fragment, session)
+        data = self._public_fragment(fragment, session, narration)
         mission = fragment.photo_mission
         claims = list(
             session.scalars(
@@ -802,6 +825,88 @@ class FragmentTourService:
             }
         )
         return data
+
+    def _narration_context(self, session: Session, arc: StoryArcModel) -> dict:
+        fragments = list(arc.fragments)
+        fragment_ids = [item.id for item in fragments]
+        profiles = list(
+            session.scalars(
+                select(NarrationVoiceProfileModel)
+                .where(
+                    NarrationVoiceProfileModel.status == "published",
+                    NarrationVoiceProfileModel.published_at.is_not(None),
+                )
+                .order_by(
+                    NarrationVoiceProfileModel.display_order,
+                    NarrationVoiceProfileModel.display_name,
+                )
+            )
+        )
+        if not fragment_ids or not profiles:
+            return {"profiles": [], "default_profile_id": None, "tracks_by_fragment": {}}
+        tracks = list(
+            session.scalars(
+                select(FragmentNarrationTrackModel).where(
+                    FragmentNarrationTrackModel.fragment_id.in_(fragment_ids),
+                    FragmentNarrationTrackModel.profile_id.in_([item.id for item in profiles]),
+                    FragmentNarrationTrackModel.published_at.is_not(None),
+                )
+            )
+        )
+        matching: dict[tuple[str, str], FragmentNarrationTrackModel] = {}
+        fragment_by_id = {item.id: item for item in fragments}
+        for track in tracks:
+            fragment = fragment_by_id[track.fragment_id]
+            transcript_hash = hashlib.sha256(fragment.narration_script.strip().encode()).hexdigest()
+            if (
+                track.transcript_hash == transcript_hash
+                and track.script_version == fragment.script_version
+            ):
+                matching[(track.profile_id, track.fragment_id)] = track
+        complete_profiles = [
+            profile
+            for profile in profiles
+            if all((profile.id, fragment_id) in matching for fragment_id in fragment_ids)
+        ]
+        profile_payload = [
+            {
+                "id": item.id,
+                "slug": item.slug,
+                "name": item.display_name,
+                "description": item.description,
+                "preview_audio_url": self.asset_url_builder(
+                    self._asset_reference(session, item.preview_media_path)
+                )
+                if item.preview_media_path
+                else None,
+                "is_default": item.is_default,
+            }
+            for item in complete_profiles
+        ]
+        tracks_by_fragment: dict[str, dict[str, dict]] = {
+            fragment_id: {} for fragment_id in fragment_ids
+        }
+        for profile in complete_profiles:
+            for fragment_id in fragment_ids:
+                track = matching[(profile.id, fragment_id)]
+                tracks_by_fragment[fragment_id][profile.id] = {
+                    "audio_url": self.asset_url_builder(
+                        self._asset_reference(session, track.media_path)
+                    ),
+                    "mime_type": track.mime_type,
+                    "size_bytes": track.size_bytes,
+                    "transcript_hash": track.transcript_hash,
+                    "script_version": track.script_version,
+                }
+        default_profile = next(
+            (item for item in complete_profiles if item.is_default),
+            complete_profiles[0] if complete_profiles else None,
+        )
+        return {
+            "profiles": profile_payload,
+            "default_profile_id": default_profile.id if default_profile else None,
+            "tracks_by_fragment": tracks_by_fragment,
+        }
 
     @staticmethod
     def _evidence_dict(evidence: EvidenceModel) -> dict:

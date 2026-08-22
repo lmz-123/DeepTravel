@@ -5,6 +5,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/api_experience_repository.dart';
 import '../data/demo_experience_repository.dart';
+import '../data/narration_voice_preference_repository.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../../auth/presentation/auth_provider.dart';
@@ -92,6 +93,14 @@ final routeProvider =
     FutureProvider.family<RouteExperience, String>((ref, slug) {
   return ref.watch(experienceRepositoryProvider).routeBySlug(slug);
 });
+
+final narrationVoicePreferenceRepositoryProvider =
+    Provider<NarrationVoicePreferenceRepository>(
+        (ref) => NarrationVoicePreferenceRepository());
+
+final narrationVoicePreferenceProvider =
+    FutureProvider.family<String?, NarrationVoicePreferenceKey>((ref, key) =>
+        ref.watch(narrationVoicePreferenceRepositoryProvider).read(key));
 
 final recapProvider =
     FutureProvider.family<JourneyRecap, String>((ref, journeyId) {

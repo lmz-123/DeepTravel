@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import hashlib
+from datetime import UTC, datetime
 from io import BytesIO
 from uuid import uuid4
 
 from PIL import Image
+from sqlalchemy import select
+
+from app.infrastructure.persistence.models import (
+    FragmentNarrationTrackModel,
+    NarrationVoiceProfileModel,
+    RouteModel,
+    StoryArcModel,
+)
 
 
 def _start(client, headers):
@@ -35,6 +45,101 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     audio = client.get("/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-review.1.m4a")
     assert audio.status_code == 200
     assert audio.content_type == "audio/mp4"
+
+
+def test_public_voice_profiles_require_complete_current_coverage_and_preserve_default(
+    app, client, user_headers
+):
+    database = app.extensions["database"]
+    now = datetime.now(UTC)
+    with database.session_factory() as session:
+        route = session.scalar(select(RouteModel).where(RouteModel.slug == "nantou-time-layers"))
+        arc = session.scalar(select(StoryArcModel).where(StoryArcModel.route_id == route.id))
+        fragments = list(arc.fragments)
+
+        def profile(identity, order, status="published"):
+            item = NarrationVoiceProfileModel(
+                id=identity,
+                slug=identity,
+                display_name=f"讲述 {identity}",
+                description=f"{identity} 的公开说明",
+                provider="private-provider",
+                model="private-model",
+                voice_id="private-voice-id",
+                emotion="neutral",
+                speed=1.0,
+                pitch=0,
+                preview_media_path=fragments[0].audio_path,
+                display_order=order,
+                status=status,
+                is_default=False,
+                created_at=now,
+                updated_at=now,
+                published_at=now if status == "published" else None,
+            )
+            session.add(item)
+            return item
+
+        complete_early = profile("complete-early", 2)
+        complete_late = profile("complete-late", 9)
+        missing = profile("missing-track", 3)
+        stale = profile("stale-track", 4)
+        draft = profile("draft-complete", 1, "draft")
+        archived = profile("archived-complete", 1, "archived")
+        session.flush()
+
+        def add_track(fragment, voice, *, stale_hash=False):
+            transcript_hash = hashlib.sha256(
+                fragment.narration_script.strip().encode()
+            ).hexdigest()
+            session.add(
+                FragmentNarrationTrackModel(
+                    id=str(uuid4()),
+                    fragment_id=fragment.id,
+                    profile_id=voice.id,
+                    transcript_hash="0" * 64 if stale_hash else transcript_hash,
+                    script_version=fragment.script_version,
+                    media_path=fragment.audio_path,
+                    mime_type=fragment.audio_mime_type,
+                    size_bytes=fragment.audio_size_bytes,
+                    generation_metadata_json={"test": True},
+                    approved_at=now,
+                    published_at=now,
+                )
+            )
+
+        for fragment in fragments:
+            for voice in (complete_early, complete_late, draft, archived):
+                add_track(fragment, voice)
+            add_track(fragment, stale, stale_hash=True)
+        for fragment in fragments[:-1]:
+            add_track(fragment, missing)
+        session.commit()
+
+    route_payload = client.get("/api/v1/routes/nantou-time-layers").get_json()["data"]
+    tour = route_payload["audio_tour"]
+    profile_ids = [item["id"] for item in tour["narration_profiles"]]
+    assert profile_ids == ["default-narration-voice", "complete-early", "complete-late"]
+    assert tour["default_narration_profile_id"] == "default-narration-voice"
+    assert not ({"provider", "model", "voice_id", "emotion", "speed", "pitch"} & set(tour["narration_profiles"][1]))
+    first_fragment = tour["fragments"][0]
+    assert set(first_fragment["narration_tracks"]) == set(profile_ids)
+    assert all(
+        item["audio_url"].startswith("http://localhost/")
+        for item in first_fragment["narration_tracks"].values()
+    )
+    assert first_fragment["audio"]["url"] == first_fragment["narration_tracks"]["default-narration-voice"]["audio_url"]
+
+    _, journey = _start(client, user_headers)
+    with database.session_factory() as session:
+        route = session.scalar(select(RouteModel).where(RouteModel.slug == "nantou-time-layers"))
+        route.content_status = "archived"
+        session.commit()
+    ledger = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=user_headers
+    ).get_json()["data"]
+    assert [item["id"] for item in ledger["narration_profiles"]] == profile_ids
+    assert ledger["default_narration_profile_id"] == "default-narration-voice"
 
 
 def test_trigger_accuracy_distance_and_idempotency(client, guest_headers, caplog):

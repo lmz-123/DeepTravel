@@ -31,16 +31,10 @@ class _AuthPage extends ConsumerStatefulWidget {
 }
 
 class _AuthPageState extends ConsumerState<_AuthPage> {
-  final _username = TextEditingController();
-  final _password = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  var _username = '';
+  var _password = '';
   var _register = false;
-
-  @override
-  void dispose() {
-    _username.dispose();
-    _password.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,60 +47,58 @@ class _AuthPageState extends ConsumerState<_AuthPage> {
             padding: const EdgeInsets.all(28),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Align(
-                      alignment: Alignment.centerLeft, child: BrandMark()),
-                  const SizedBox(height: 48),
-                  Text(
-                    _register ? '建立你的旅行档案' : '继续上一次行走',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '进度和现场照片只属于这个账号。',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 32),
-                  TextField(
-                    key: const ValueKey('auth-username'),
-                    controller: _username,
-                    decoration: const InputDecoration(labelText: '用户名'),
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    enableIMEPersonalizedLearning: false,
-                    smartDashesType: SmartDashesType.disabled,
-                    smartQuotesType: SmartQuotesType.disabled,
-                    textCapitalization: TextCapitalization.none,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    key: const ValueKey('auth-password'),
-                    controller: _password,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: '密码（至少 8 位）'),
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  if (error != null) ...[
-                    const SizedBox(height: 14),
-                    Text(error,
-                        style: const TextStyle(color: AppColors.terracotta)),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Align(
+                        alignment: Alignment.centerLeft, child: BrandMark()),
+                    const SizedBox(height: 48),
+                    Text(
+                      _register ? '建立你的旅行档案' : '继续上一次行走',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '进度和现场照片只属于这个账号。',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 32),
+                    TextFormField(
+                      key: const ValueKey('auth-username'),
+                      decoration: const InputDecoration(labelText: '用户名'),
+                      textInputAction: TextInputAction.next,
+                      onSaved: (value) => _username = value ?? '',
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      key: const ValueKey('auth-password'),
+                      obscureText: true,
+                      decoration:
+                          const InputDecoration(labelText: '密码（至少 8 位）'),
+                      onSaved: (value) => _password = value ?? '',
+                      onFieldSubmitted: (_) => _submit(),
+                    ),
+                    if (error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(error,
+                          style: const TextStyle(color: AppColors.terracotta)),
+                    ],
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      key: const ValueKey('auth-submit'),
+                      onPressed: auth.isLoading ? null : _submit,
+                      child: Text(_register ? '注册并开始' : '登录'),
+                    ),
+                    TextButton(
+                      onPressed: auth.isLoading
+                          ? null
+                          : () => setState(() => _register = !_register),
+                      child: Text(_register ? '已有账号，直接登录' : '第一次使用，注册账号'),
+                    ),
                   ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    key: const ValueKey('auth-submit'),
-                    onPressed: auth.isLoading ? null : _submit,
-                    child: Text(_register ? '注册并开始' : '登录'),
-                  ),
-                  TextButton(
-                    onPressed: auth.isLoading
-                        ? null
-                        : () => setState(() => _register = !_register),
-                    child: Text(_register ? '已有账号，直接登录' : '第一次使用，注册账号'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -116,11 +108,15 @@ class _AuthPageState extends ConsumerState<_AuthPage> {
   }
 
   void _submit() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final form = _formKey.currentState;
+    if (form == null) return;
+    form.save();
     final controller = ref.read(authControllerProvider.notifier);
     if (_register) {
-      controller.register(_username.text, _password.text);
+      controller.register(_username, _password);
     } else {
-      controller.login(_username.text, _password.text);
+      controller.login(_username, _password);
     }
   }
 }
