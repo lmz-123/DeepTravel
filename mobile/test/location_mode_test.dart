@@ -12,6 +12,7 @@ import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
+import 'package:jiandi/features/experience/presentation/journey_page.dart';
 import 'package:jiandi/features/experience/presentation/location_mode_controller.dart';
 import 'package:jiandi/features/experience/presentation/route_detail_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -148,6 +149,64 @@ void main() {
     expect(state.current?.id, 'fragment-2');
     expect(state.queue, isEmpty);
   });
+
+  testWidgets(
+      'restored triggered clue shows audio and transcript then advances to the next clue',
+      (tester) async {
+    final store = _MemoryTourStore();
+    final player = _ControllableNarrationPlayer();
+    final repository = _ProgressingFragmentRepository(initialStates: const {
+      'fragment-1': 'collected',
+      'fragment-2': 'triggered',
+      'fragment-3': 'undiscovered',
+    });
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider.overrideWithValue(
+          _MemoryLocationModeStore(TourLocationMode.simulated)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+
+    await container
+        .read(journeyControllerProvider.notifier)
+        .start(_threeFragmentRoute);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-1')),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('第二条线索'), findsOneWidget);
+    expect(find.text('阅读等价文字稿'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -240));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('阅读等价文字稿'));
+    await tester.pumpAndSettle();
+    expect(find.text('第二条线索的正文'), findsOneWidget);
+
+    await tester.ensureVisible(find.byTooltip('继续'));
+    await tester.tap(find.byTooltip('继续'));
+    await tester.pump();
+    expect(player.playedFragmentIds, ['fragment-2']);
+
+    player.completeNaturally();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('模拟到达下一条线索'));
+    await tester.tap(find.text('模拟到达下一条线索'));
+    await tester.pumpAndSettle();
+
+    expect(repository.isCollected('fragment-2'), isTrue);
+    expect(player.playedFragmentIds, ['fragment-2', 'fragment-3']);
+    expect(find.text('第三条线索'), findsOneWidget);
+  });
 }
 
 Future<void> _waitUntil(bool Function() condition) async {
@@ -196,6 +255,17 @@ const _secondFragment = StoryFragment(
   triggerRegion: _region,
   audio: _audio,
   dependencyIds: ['fragment-1'],
+);
+
+const _thirdFragment = StoryFragment(
+  id: 'fragment-3',
+  position: 3,
+  safePreview: '第三条线索',
+  interactionType: 'passive',
+  reviewState: 'in_review',
+  triggerRegion: _region,
+  audio: _audio,
+  dependencyIds: ['fragment-2'],
 );
 
 const _manifest = AudioTourManifest(
@@ -256,6 +326,35 @@ const _twoFragmentRoute = RouteExperience(
   audioTour: _twoFragmentManifest,
 );
 
+const _threeFragmentManifest = AudioTourManifest(
+  title: '测试导览',
+  centralQuestion: '中心为什么迁移？',
+  scriptVersion: 'v1',
+  reviewState: 'in_review',
+  fieldAuditState: 'in_review',
+  productionReady: false,
+  demoLabel: '研究预览',
+  contentMethod: '测试内容',
+  downloadSizeBytes: 0,
+  fragments: [_fragment, _secondFragment, _thirdFragment],
+);
+
+const _threeFragmentRoute = RouteExperience(
+  id: 'route-1',
+  slug: 'test-route',
+  title: '测试路线',
+  subtitle: '测试',
+  description: '测试',
+  durationMinutes: 10,
+  distanceKm: 1,
+  difficulty: 'easy',
+  theme: 'history',
+  heroImage: '',
+  contentStatus: 'in_review',
+  stops: [],
+  audioTour: _threeFragmentManifest,
+);
+
 const _session = JourneySession(
   id: 'journey-1',
   routeId: 'route-1',
@@ -279,6 +378,9 @@ class _FragmentRepository extends DemoExperienceRepository {
   Future<RouteExperience> routeBySlug(String slug) async => _route;
 
   @override
+  Future<JourneySession> startOrResume(String routeId) async => _session;
+
+  @override
   Future<StoryLedger> ledger(String journeyId) async => const StoryLedger(
         centralQuestion: '中心为什么迁移？',
         collectedCount: 0,
@@ -289,10 +391,14 @@ class _FragmentRepository extends DemoExperienceRepository {
 }
 
 class _ProgressingFragmentRepository extends _FragmentRepository {
-  final _states = <String, String>{
-    'fragment-1': 'undiscovered',
-    'fragment-2': 'undiscovered',
-  };
+  _ProgressingFragmentRepository({Map<String, String>? initialStates})
+      : _states = Map<String, String>.from(initialStates ??
+            const {
+              'fragment-1': 'undiscovered',
+              'fragment-2': 'undiscovered',
+            });
+
+  final Map<String, String> _states;
 
   bool isCollected(String fragmentId) => _states[fragmentId] == 'collected';
 
@@ -308,8 +414,8 @@ class _ProgressingFragmentRepository extends _FragmentRepository {
   }
 
   @override
-  Future<StoryFragment> acknowledgePlayback(String journeyId,
-      String fragmentId, double progress, String idempotencyKey) async {
+  Future<StoryFragment> acknowledgePlayback(String journeyId, String fragmentId,
+      double progress, String idempotencyKey) async {
     _states[fragmentId] = 'collected';
     return _fragmentWithState(fragmentId, 'collected', revealed: true);
   }
@@ -332,7 +438,8 @@ class _ProgressingFragmentRepository extends _FragmentRepository {
 
   StoryFragment _fragmentWithState(String id, String state,
       {required bool revealed}) {
-    final source = id == _fragment.id ? _fragment : _secondFragment;
+    final source = [_fragment, _secondFragment, _thirdFragment]
+        .firstWhere((fragment) => fragment.id == id);
     return StoryFragment(
       id: source.id,
       position: source.position,

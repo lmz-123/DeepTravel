@@ -149,6 +149,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   StreamSubscription<Duration>? _position;
   StreamSubscription<Duration?>? _duration;
   bool _triggering = false;
+  String? _loadedFragmentId;
 
   ExperienceRepository get _repository =>
       ref.read(experienceRepositoryProvider);
@@ -197,6 +198,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     try {
       await _repository.startActiveTour(session.id);
       final ledger = await _repository.ledger(session.id);
+      final restoredCurrent = _restorableCurrent(ledger);
       state = state.copyWith(
           status: locationMode == TourLocationMode.simulated
               ? 'simulated'
@@ -204,9 +206,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
                   ? 'monitoring'
                   : 'permission_limited',
           ledger: ledger,
+          current: restoredCurrent,
           preparedPaths: prepared,
           isBusy: false,
-          locationMessage: locationMessage,
+          locationMessage:
+              _restoredLocationMessage(restoredCurrent, locationMessage),
           clearError: true);
       await _store.saveJson('active_tour', {
         'journey_id': session.id,
@@ -300,18 +304,42 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     ));
 
     try {
-      var next = _nextDemoFragment();
-      if (next == null) {
-        await _refreshLedger();
-        next = _nextDemoFragment();
+      await _refreshLedger();
+      final pendingNarration = _pendingNarration();
+      if (pendingNarration != null) {
+        state = state.copyWith(
+          current: pendingNarration,
+          locationMessage:
+              state.isPlaying && _loadedFragmentId == pendingNarration.id
+                  ? '第 ${pendingNarration.position} 条线索仍在播放，听完或阅读文字稿后即可继续。'
+                  : '已恢复第 ${pendingNarration.position} 条线索，正在播放尚未完成的故事。',
+        );
+        if (_loadedFragmentId != pendingNarration.id) {
+          unawaited(_playNarration(pendingNarration));
+        } else if (!state.isPlaying) {
+          unawaited(_player.resume());
+        }
+        unawaited(reporter?.info(
+          'tour',
+          'pending_narration_resumed',
+          context: {
+            'fragment_id': pendingNarration.id,
+            'fragment_position': pendingNarration.position,
+            'fragment_state': pendingNarration.state,
+          },
+        ));
+        return;
       }
+
+      final next = _nextDemoFragment();
       if (next == null) {
         state = state.copyWith(
-          locationMessage: '上一条线索仍在播放或等待照片确认，完成后才能进入下一条。',
+          locationMessage: _demoBlockedMessage(),
         );
         unawaited(reporter?.warning(
           'tour',
           'demo_arrival_no_eligible_fragment',
+          context: _ledgerStateSummary(),
         ));
         return;
       }
@@ -349,6 +377,71 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       }
     }
     return null;
+  }
+
+  StoryFragment? _pendingNarration() {
+    final entries = state.ledger?.entries ?? const <StoryFragment>[];
+    for (final entry in entries) {
+      if (entry.isRevealed &&
+          (entry.state == 'triggered' || entry.state == 'playing')) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  StoryFragment? _restorableCurrent(StoryLedger ledger) {
+    final revealed = ledger.entries.where((entry) => entry.isRevealed).toList()
+      ..sort((left, right) => left.position.compareTo(right.position));
+    for (final entry in revealed.reversed) {
+      if (entry.state == 'triggered' || entry.state == 'playing') return entry;
+    }
+    for (final entry in revealed.reversed) {
+      if (entry.isMissionPending) return entry;
+    }
+    return revealed.lastOrNull;
+  }
+
+  String _restoredLocationMessage(StoryFragment? restored, String fallback) {
+    if (restored == null) return fallback;
+    if (restored.state == 'triggered' || restored.state == 'playing') {
+      return '已恢复第 ${restored.position} 条线索；音频和文字稿可继续查看。';
+    }
+    if (restored.isMissionPending) {
+      return '已恢复第 ${restored.position} 条线索，现场照片仍待确认。';
+    }
+    return '已恢复第 ${restored.position} 条线索，可以继续寻找下一条。';
+  }
+
+  String _demoBlockedMessage() {
+    final ledger = state.ledger;
+    if (ledger == null) return '故事进度尚未加载，请稍后重试。';
+    final missionPending =
+        ledger.entries.where((entry) => entry.isMissionPending).firstOrNull;
+    if (missionPending != null) {
+      return '第 ${missionPending.position} 条线索的照片尚未由服务器确认，请完成上传后继续。';
+    }
+    if (ledger.collectedCount == ledger.totalCount) {
+      return '所有线索已经收集完成，可以开始拼合完整故事。';
+    }
+    return '当前没有可触发的新线索，已重新同步进度；请查看线索簿中的未完成项。';
+  }
+
+  Map<String, Object?> _ledgerStateSummary() {
+    final ledger = state.ledger;
+    if (ledger == null) return const {'ledger_loaded': false};
+    final counts = <String, int>{};
+    for (final entry in ledger.entries) {
+      counts[entry.state] = (counts[entry.state] ?? 0) + 1;
+    }
+    return {
+      'ledger_loaded': true,
+      'collected_count': ledger.collectedCount,
+      'total_count': ledger.totalCount,
+      'state_counts': counts.entries
+          .map((entry) => '${entry.key}:${entry.value}')
+          .join(','),
+    };
   }
 
   Future<bool> _trigger(StoryFragment fragment,
@@ -473,25 +566,27 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> _playNarration(StoryFragment fragment) async {
     try {
+      _loadedFragmentId = fragment.id;
       await _player.play(
         fragment,
         preparedPath: state.preparedPaths[fragment.id],
       );
     } catch (error, stackTrace) {
+      if (_loadedFragmentId == fragment.id) _loadedFragmentId = null;
       state = state.copyWith(
         isPlaying: false,
         errorMessage: '故事音频暂时无法播放，可以先查看文字稿后重试。',
       );
       unawaited(ref.read(runtimeLogReporterProvider)?.error(
-            'audio',
-            'narration_playback_failed',
-            error: error,
-            stackTrace: stackTrace,
-            context: {
-              'fragment_id': fragment.id,
-              'fragment_position': fragment.position,
-            },
-          ));
+        'audio',
+        'narration_playback_failed',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'fragment_id': fragment.id,
+          'fragment_position': fragment.position,
+        },
+      ));
     }
   }
 
@@ -636,7 +731,15 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     final session = state.session;
     if (session == null) return;
     final ledger = await _repository.ledger(session.id);
-    state = state.copyWith(ledger: ledger);
+    StoryFragment? refreshedCurrent;
+    final currentId = state.current?.id;
+    if (currentId != null) {
+      refreshedCurrent = ledger.entries
+          .where((entry) => entry.id == currentId && entry.isRevealed)
+          .firstOrNull;
+    }
+    refreshedCurrent ??= _restorableCurrent(ledger);
+    state = state.copyWith(ledger: ledger, current: refreshedCurrent);
     await _store.saveJson('ledger_${session.id}', {
       'collected_count': ledger.collectedCount,
       'total_count': ledger.totalCount,
@@ -758,6 +861,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     final session = state.session;
     await _stopLocationMonitoring();
     await _player.stop();
+    _loadedFragmentId = null;
     if (session != null) await _repository.stopActiveTour(session.id);
     state = state.copyWith(
         status: 'stopped',
@@ -766,9 +870,30 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> seek(Duration position) => _player.seek(position);
-  Future<void> replay() => _player.replay();
-  Future<void> togglePlayback() =>
-      state.isPlaying ? _player.pause() : _player.resume();
+  Future<void> replay() async {
+    final current = state.current;
+    if (current == null) return;
+    if (_loadedFragmentId != current.id) {
+      unawaited(_playNarration(current));
+      return;
+    }
+    await _player.replay();
+  }
+
+  Future<void> togglePlayback() async {
+    if (state.isPlaying) {
+      await _player.pause();
+      return;
+    }
+    final current = state.current;
+    if (current == null) return;
+    if (_loadedFragmentId != current.id) {
+      unawaited(_playNarration(current));
+      return;
+    }
+    await _player.resume();
+  }
+
   Future<void> setSpeed(double speed) async {
     await _player.setSpeed(speed);
     state = state.copyWith(speed: speed);

@@ -81,6 +81,18 @@ def test_trigger_accuracy_distance_and_idempotency(client, guest_headers, caplog
     assert "fragment_trigger_accepted" in caplog.text
 
 
+def test_ledger_logs_state_summary(client, guest_headers, caplog):
+    _, journey = _start(client, guest_headers)
+
+    response = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
+    )
+
+    assert response.status_code == 200
+    assert "journey_ledger_loaded" in caplog.text
+    assert "undiscovered:5" in caplog.text
+
+
 def test_complete_fragment_arc_with_private_evidence_and_reconstruction(client, guest_headers):
     route, journey = _start(client, guest_headers)
     journey_id = journey["id"]

@@ -311,7 +311,19 @@ def delete_evidence(journey_id: str, evidence_id: str):
 @api.get("/journeys/<journey_id>/ledger")
 @require_guest
 def story_ledger(journey_id: str):
-    return jsonify({"data": _services()["fragment_tours"].ledger(g.guest_session.id, journey_id)})
+    ledger = _services()["fragment_tours"].ledger(g.guest_session.id, journey_id)
+    state_counts: dict[str, int] = {}
+    for entry in ledger["entries"]:
+        entry_state = str(entry["state"])
+        state_counts[entry_state] = state_counts.get(entry_state, 0) + 1
+    current_app.logger.info(
+        "journey_ledger_loaded journey=%s collected=%s total=%s states=%s",
+        journey_id,
+        ledger["collected_count"],
+        ledger["total_count"],
+        ",".join(f"{key}:{value}" for key, value in sorted(state_counts.items())),
+    )
+    return jsonify({"data": ledger})
 
 
 @api.post("/journeys/<journey_id>/reconstruction")

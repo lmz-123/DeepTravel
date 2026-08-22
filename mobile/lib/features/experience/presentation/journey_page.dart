@@ -152,9 +152,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                             dimension: 18,
                             child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.my_location_rounded),
-                    label: Text(state.isBusy
-                        ? '正在确认下一条线索…'
-                        : '模拟到达下一条线索')),
+                    label: Text(state.isBusy ? '正在确认下一条线索…' : '模拟到达下一条线索')),
               ],
               if (state.errorMessage != null)
                 Padding(
@@ -534,78 +532,81 @@ class _NarrationCard extends ConsumerWidget {
     final progress = total == 0
         ? 0.0
         : (state.position.inMilliseconds / total).clamp(0.0, 1.0);
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-          color: AppColors.ink, borderRadius: BorderRadius.circular(26)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('线索 ${fragment.position} · 研究预览',
-            style: const TextStyle(
-                color: AppColors.gold, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 10),
-        Text(fragment.title ?? fragment.safePreview,
-            style: Theme.of(context)
-                .textTheme
-                .headlineMedium
-                ?.copyWith(color: AppColors.white)),
-        const SizedBox(height: 16),
-        Slider(
-            value: progress,
-            onChanged: total == 0
-                ? null
-                : (value) => ref
+    return Material(
+      color: AppColors.ink,
+      borderRadius: BorderRadius.circular(26),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('线索 ${fragment.position} · 研究预览',
+              style: const TextStyle(
+                  color: AppColors.gold, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          Text(fragment.title ?? fragment.safePreview,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineMedium
+                  ?.copyWith(color: AppColors.white)),
+          const SizedBox(height: 16),
+          Slider(
+              value: progress,
+              onChanged: total == 0
+                  ? null
+                  : (value) => ref
+                      .read(activeTourControllerProvider.notifier)
+                      .seek(Duration(milliseconds: (total * value).round()))),
+          Row(children: [
+            IconButton(
+                color: AppColors.white,
+                tooltip: '重播',
+                onPressed: () =>
+                    ref.read(activeTourControllerProvider.notifier).replay(),
+                icon: const Icon(Icons.replay_rounded)),
+            const Spacer(),
+            IconButton.filled(
+                style: IconButton.styleFrom(
+                    backgroundColor: AppColors.gold,
+                    foregroundColor: AppColors.ink),
+                tooltip: state.isPlaying ? '暂停' : '继续',
+                onPressed: () => ref
                     .read(activeTourControllerProvider.notifier)
-                    .seek(Duration(milliseconds: (total * value).round()))),
-        Row(children: [
-          IconButton(
-              color: AppColors.white,
-              tooltip: '重播',
-              onPressed: () =>
-                  ref.read(activeTourControllerProvider.notifier).replay(),
-              icon: const Icon(Icons.replay_rounded)),
-          const Spacer(),
-          IconButton.filled(
-              style: IconButton.styleFrom(
-                  backgroundColor: AppColors.gold,
-                  foregroundColor: AppColors.ink),
-              tooltip: state.isPlaying ? '暂停' : '继续',
-              onPressed: () => ref
-                  .read(activeTourControllerProvider.notifier)
-                  .togglePlayback(),
-              icon: Icon(state.isPlaying
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded)),
-          const Spacer(),
-          PopupMenuButton<double>(
-              initialValue: state.speed,
-              tooltip: '速度',
-              onSelected: (value) => ref
-                  .read(activeTourControllerProvider.notifier)
-                  .setSpeed(value),
-              itemBuilder: (_) => const [.8, 1.0, 1.2, 1.5]
-                  .map((speed) =>
-                      PopupMenuItem(value: speed, child: Text('${speed}x')))
-                  .toList(),
-              child: Text('${state.speed}x',
-                  style: const TextStyle(color: AppColors.white))),
+                    .togglePlayback(),
+                icon: Icon(state.isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded)),
+            const Spacer(),
+            PopupMenuButton<double>(
+                initialValue: state.speed,
+                tooltip: '速度',
+                onSelected: (value) => ref
+                    .read(activeTourControllerProvider.notifier)
+                    .setSpeed(value),
+                itemBuilder: (_) => const [.8, 1.0, 1.2, 1.5]
+                    .map((speed) =>
+                        PopupMenuItem(value: speed, child: Text('${speed}x')))
+                    .toList(),
+                child: Text('${state.speed}x',
+                    style: const TextStyle(color: AppColors.white))),
+          ]),
+          if (fragment.transcript != null)
+            ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                collapsedIconColor: AppColors.white,
+                iconColor: AppColors.gold,
+                title: const Text('阅读等价文字稿',
+                    style: TextStyle(color: AppColors.white)),
+                children: [
+                  Text(fragment.transcript!,
+                      style: TextStyle(
+                          color: AppColors.white.withValues(alpha: .82),
+                          height: 1.7))
+                ]),
+          if (state.queue.isNotEmpty)
+            Text('另有 ${state.queue.length} 段故事在队列中',
+                style: const TextStyle(color: AppColors.gold)),
         ]),
-        if (fragment.transcript != null)
-          ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              collapsedIconColor: AppColors.white,
-              iconColor: AppColors.gold,
-              title: const Text('阅读等价文字稿',
-                  style: TextStyle(color: AppColors.white)),
-              children: [
-                Text(fragment.transcript!,
-                    style: TextStyle(
-                        color: AppColors.white.withValues(alpha: .82),
-                        height: 1.7))
-              ]),
-        if (state.queue.isNotEmpty)
-          Text('另有 ${state.queue.length} 段故事在队列中',
-              style: const TextStyle(color: AppColors.gold)),
-      ]),
+      ),
     );
   }
 }
