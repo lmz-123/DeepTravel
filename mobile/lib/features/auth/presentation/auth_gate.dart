@@ -16,10 +16,24 @@ class AuthGate extends ConsumerWidget {
             color: AppColors.paper,
             child: Center(child: CircularProgressIndicator()),
           ),
-          error: (error, _) => _AuthPage(initialError: error.toString()),
-          data: (session) => session == null ? const _AuthPage() : child,
+          error: (error, _) => _AuthNavigator(initialError: error.toString()),
+          data: (session) => session == null ? const _AuthNavigator() : child,
         );
   }
+}
+
+class _AuthNavigator extends StatelessWidget {
+  const _AuthNavigator({this.initialError});
+
+  final String? initialError;
+
+  @override
+  Widget build(BuildContext context) => Navigator(
+        onGenerateRoute: (_) => MaterialPageRoute<void>(
+          settings: const RouteSettings(name: '/auth'),
+          builder: (_) => _AuthPage(initialError: initialError),
+        ),
+      );
 }
 
 class _AuthPage extends ConsumerStatefulWidget {

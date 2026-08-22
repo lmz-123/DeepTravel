@@ -5,9 +5,58 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/features/auth/data/auth_repository.dart';
 import 'package:jiandi/features/auth/presentation/auth_gate.dart';
 import 'package:jiandi/features/auth/presentation/auth_provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets(
+      'production router shell provides an overlay and typing emits no request or framework error',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    var requestCount = 0;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test'));
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+      requestCount += 1;
+      handler.resolve(
+          Response(requestOptions: options, statusCode: 500, data: const {}));
+    }));
+    final router = GoRouter(routes: [
+      GoRoute(path: '/', builder: (_, __) => const Text('authenticated')),
+    ]);
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(AuthRepository(dio)),
+      ],
+      child: MaterialApp.router(
+        routerConfig: router,
+        builder: (context, child) => AuthGate(child: child ?? const SizedBox()),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final username = find.byKey(const ValueKey('auth-username'));
+    await tester.tap(username);
+    tester.testTextInput.updateEditingValue(const TextEditingValue(
+      text: 'liser',
+      selection: TextSelection.collapsed(offset: 5),
+    ));
+    tester.testTextInput.updateEditingValue(const TextEditingValue(
+      text: 'lis',
+      selection: TextSelection.collapsed(offset: 3),
+    ));
+    tester.testTextInput.updateEditingValue(const TextEditingValue(
+      text: 'listt',
+      selection: TextSelection.collapsed(offset: 5),
+    ));
+    await tester.pump();
+
+    expect(find.text('listt'), findsOneWidget);
+    expect(requestCount, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('registration submits the suffix-deletion result exactly',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -66,6 +115,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('listt'), findsOneWidget);
+    expect(submitted, isNull);
 
     await tester.enterText(
       find.byKey(const ValueKey('auth-password')),
