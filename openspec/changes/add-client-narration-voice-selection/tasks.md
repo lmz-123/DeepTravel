@@ -8,6 +8,7 @@
 - [x] 2.1 Implement admin profile list/create/edit/publish/archive/set-default APIs and route coverage validation; test draft exclusion, incomplete publication rejection, default invariants, and missing/stale fragment reports.
 - [x] 2.2 Make preview generation target a stable profile and promote approvals to profile/settings-specific immutable public objects and track rows; test approving multiple profiles never collides with or overwrites the default or another profile.
 - [x] 2.3 Add profile and route-coverage controls to the narration admin UI, including traveler-facing name/description/order, provider voice ID, profile-targeted generation, preview, approval, publication, and default actions; run frontend interaction and production-build tests.
+- [x] 2.4 Replace per-fragment generation as the primary workflow with route/profile one-click generation that creates formal tracks for every narrated node, selects the default profile initially, reports per-node success/failure and refreshed coverage, retries missing/stale nodes idempotently, and retains per-fragment replacement as a secondary correction tool; add admin API/UI tests.
 
 ## 3. Public backend contracts
 

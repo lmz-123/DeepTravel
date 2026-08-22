@@ -55,9 +55,11 @@ The regression harness drives the actual sequence—insert `liser`, delete range
 
 If the defect reproduces below the Flutter editing-value boundary on the target device, the fallback is a narrowly scoped native Android username input platform view; this is a last resort because it increases focus, semantics, and theming complexity.
 
-### 6. Independent admin owns profile publication, not traveler preference
+### 6. Independent admin owns route-wide voice generation and publication, not traveler preference
 
-The admin adds profile list/edit/publish/default controls and makes voice/profile selection explicit for each generation batch. Coverage shows every route fragment as complete, stale, or missing. Publishing a profile requires complete current-script coverage; archiving removes it from new public selection but does not delete media needed by pinned journeys.
+The admin adds profile list/edit/publish/default controls and makes voice/profile selection explicit for each route-wide generation batch. The default profile is selected initially. The primary action generates one configured delivery for every narrated fragment, promotes each successful result directly to that profile's formal public track, and then refreshes route coverage. Generating another profile repeats the route batch without touching any other profile. Coverage shows every route fragment as complete, stale, or missing. Publishing a non-default profile requires complete current-script coverage; archiving removes it from new public selection but does not delete media needed by pinned journeys.
+
+The route batch returns per-fragment results and may preserve successful tracks when one node fails; prior formal tracks are never removed on provider or storage failure. Retry defaults to missing/stale nodes to avoid unnecessary provider cost. A force-regenerate option and the existing per-fragment audition/replacement path are secondary correction tools, not the normal setup workflow.
 
 The admin chooses which safe profiles exist and verifies their audio; the client chooses among those profiles. Neither side contains city-specific voice constants.
 
@@ -92,13 +94,14 @@ Route and ledger fragment payloads retain `audio_url` and add:
 }
 ```
 
-Admin APIs gain profile CRUD/lifecycle/default operations, route coverage, and profile-targeted preview generation/approval. Validation errors list stable fragment IDs and never expose TTS credentials.
+Admin APIs gain profile CRUD/lifecycle/default operations, route coverage, route/profile batch generation with per-fragment results, and secondary profile-targeted preview generation/approval. Validation errors list stable fragment IDs and never expose TTS credentials.
 
 ## Failure Behavior
 
 - Saved profile missing or incomplete: use the backend default, persist the effective fallback for that account/route, and show one non-blocking notice.
 - Selected track fetch fails: offer retry and default-track fallback without marking playback complete automatically.
 - Preview/approval fails: leave every existing profile track and singular default path unchanged.
+- Route batch partially fails: retain every prior formal track, keep successful new tracks, list failed fragment IDs/titles, and leave incomplete profiles unavailable to travelers until retry succeeds.
 - Profile publication validation fails: remain offline and return missing/stale fragment IDs.
 - Username editing regression detected: registration remains on screen with the exact current visible value; no normalized or stale value is submitted.
 

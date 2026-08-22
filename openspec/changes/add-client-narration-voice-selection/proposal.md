@@ -9,6 +9,7 @@ Travelers currently receive one editor-selected narration track even though list
 - Add a client-facing narration voice selector, preview metadata, per-account local preference, and deterministic fallback when a preferred voice is unavailable.
 - Make playback, download preparation, cache identity, background audio, transcript display, and resume state use the selected published track without invoking runtime TTS.
 - Extend the independent admin approval workflow so approved previews are associated with a stable public voice profile instead of replacing the only fragment audio.
+- Make route-wide generation the primary admin workflow: one action generates and permanently stores the selected voice for every narrated fragment in a scenic route, with the default profile selected initially; per-fragment generation remains only for retrying or replacing an exceptional node.
 - Correct registration username editing so deletion is authoritative; the sequence `liser → lis → listt` must never restore `er`.
 - Deliver only a production-profile APK with normal registration/login and no test-account UI.
 
@@ -35,6 +36,7 @@ Travelers currently receive one editor-selected narration track even though list
 
 - Generating TTS on the phone or calling a paid TTS provider during a journey.
 - Letting a traveler create arbitrary voice IDs, clone a real person, or publish editorial audio.
+- Requiring editors to open every route node and repeat the same generation/save action during normal route setup.
 - Changing transcript wording, historical claims, trigger progression, photo missions, or reconstruction rules by voice.
 - Synchronizing the voice preference across devices in this MVP; it is retained locally per authenticated account.
 

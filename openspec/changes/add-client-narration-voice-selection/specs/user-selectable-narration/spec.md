@@ -70,3 +70,21 @@ Approving a generated track SHALL create or update only the targeted fragment/pr
 - **WHEN** any narrated fragment lacks a matching approved track for the profile
 - **THEN** publication is rejected with the missing fragments listed
 
+### Requirement: Admin generates one voice for a complete route
+The admin SHALL make route-wide generation the primary workflow. One action for a selected voice profile SHALL generate and permanently store a current-script track for every narrated fragment in the selected route. The existing default profile SHALL be selected initially so an editor can create one usable route voice without configuring every node separately. Per-fragment generation SHALL remain available only as a retry or replacement tool.
+
+#### Scenario: Editor generates the default route voice
+- **WHEN** an editor opens a route and starts route-wide generation without creating another profile
+- **THEN** the system generates the default profile for every narrated fragment, stores each successful result as the formal profile track, and reports complete route coverage
+
+#### Scenario: Editor adds another selectable voice
+- **WHEN** an editor selects a second profile and starts route-wide generation
+- **THEN** the system generates the same unchanged scripts for every route fragment under that profile without overwriting the default profile tracks
+
+#### Scenario: One node fails during route generation
+- **WHEN** the provider or storage fails for one fragment while other fragments succeed
+- **THEN** the admin reports the failed fragment by name, keeps every prior formal track intact, keeps the profile unavailable to travelers, and offers retrying only missing or stale nodes
+
+#### Scenario: Editor corrects one generated node
+- **WHEN** one formal track has a pronunciation or delivery problem
+- **THEN** the editor can regenerate and replace that fragment/profile track without regenerating other route nodes
