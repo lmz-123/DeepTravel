@@ -63,8 +63,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('城门转角的下午光线'));
     await tester.pumpAndSettle();
-    expect(find.text('顺着榕树向东拍，砖缝的层次最清楚。'), findsOneWidget);
-    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    final detailScroll = find.byKey(const ValueKey('community-detail-scroll'));
+    expect(detailScroll, findsOneWidget);
+    expect(
+      find.descendant(
+        of: detailScroll,
+        matching: find.text('顺着榕树向东拍，砖缝的层次最清楚。'),
+      ),
+      findsOneWidget,
+    );
+    await tester.drag(detailScroll, const Offset(0, -900));
     await tester.pumpAndSettle();
     expect(find.text('现场回应'), findsOneWidget);
     expect(find.text('确实是好机位。'), findsOneWidget);
@@ -175,14 +183,54 @@ void main() {
     await tester.enterText(find.byType(TextField).last, '准备分享私人留念');
     await tester.tap(find.byType(Checkbox).first);
     await tester.pump();
-    await tester.ensureVisible(find.text('发布到见地现场'));
+    await tester.drag(find.byType(ListView).last, const Offset(0, -520));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('发布到见地现场'));
     await tester.pumpAndSettle();
     expect(find.text('分享到见地现场？'), findsOneWidget);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
     expect(repository.createCalls, 0);
-    expect(find.text('留下现场笔记'), findsOneWidget);
+    expect(find.text('发布现场笔记'), findsOneWidget);
+  });
+
+  testWidgets('composer close responds after selecting a footprint photo',
+      (tester) async {
+    final repository = _CommunityRepository();
+    await tester.pumpWidget(ProviderScope(
+      overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
+      child: const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: NodeCommunitySection(
+              userId: 'user-a',
+              journeyId: 'journey-1',
+              fragment: _fragment,
+              evidence: [
+                EvidenceRecord(
+                  id: 'evidence-1',
+                  url: '/journeys/journey-1/evidence/evidence-1',
+                  fragmentId: 'fragment-1',
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('在这条线索下，留下你的发现…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('关闭发布'));
+    await tester.pumpAndSettle();
+    expect(find.text('放弃这条现场笔记？'), findsOneWidget);
+    await tester.tap(find.text('放弃'));
+    await tester.pumpAndSettle();
+    expect(find.text('发布现场笔记'), findsNothing);
+    expect(repository.createCalls, 0);
   });
 
   testWidgets('locked node has no community surface or feed request',

@@ -137,16 +137,20 @@ class NodeCommunitySection extends ConsumerWidget {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
-      showDragHandle: true,
+      useSafeArea: true,
       backgroundColor: AppColors.paper,
-      builder: (_) => _CommunityComposer(
-        policy: policy,
-        evidence:
-            evidence.where((item) => item.fragmentId == fragment.id).toList(),
-        onPublish: (draft) => ref
-            .read(communityFeedControllerProvider(key).notifier)
-            .publish(draft),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .96,
+        child: _CommunityComposer(
+          policy: policy,
+          evidence:
+              evidence.where((item) => item.fragmentId == fragment.id).toList(),
+          onPublish: (draft) => ref
+              .read(communityFeedControllerProvider(key).notifier)
+              .publish(draft),
+        ),
       ),
     );
   }
@@ -159,12 +163,12 @@ class NodeCommunitySection extends ConsumerWidget {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
       backgroundColor: AppColors.paper,
       builder: (_) => FractionallySizedBox(
-        heightFactor: .94,
+        heightFactor: .96,
         child: _PostDetail(userId: userId, postId: postId),
       ),
     );
@@ -363,12 +367,24 @@ class _CommunityComposerState extends State<_CommunityComposer> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 4, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
-        child: SingleChildScrollView(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: AppColors.paper,
+        appBar: AppBar(
+          backgroundColor: AppColors.paper,
+          leading: IconButton(
+            key: const ValueKey('community-composer-close'),
+            tooltip: '关闭发布',
+            onPressed: _requestClose,
+            icon: const Icon(Icons.close_rounded),
+          ),
+          title: const Text('发布现场笔记'),
+          centerTitle: true,
+        ),
+        body: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+              20, 8, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
+          children: [
             Text('留下现场笔记', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 6),
             const Text('只发布你愿意公开的内容；私人足迹照片会生成一份独立副本。'),
@@ -401,26 +417,35 @@ class _CommunityComposerState extends State<_CommunityComposer> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _photos.indexed
-                    .map((entry) => Stack(children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(File(entry.$2.path),
-                                width: 84, height: 84, fit: BoxFit.cover),
+                children: _photos.indexed.map((entry) {
+                  final index = entry.$1;
+                  return SizedBox.square(
+                    dimension: 92,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.file(File(entry.$2.path),
+                              fit: BoxFit.cover),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: IconButton.filled(
+                            key: ValueKey('remove-community-photo-$index'),
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 17,
+                            tooltip: '移除第 ${index + 1} 张图片',
+                            onPressed: () =>
+                                setState(() => _photos.removeAt(index)),
+                            icon: const Icon(Icons.close_rounded),
                           ),
-                          Positioned(
-                            right: 0,
-                            child: IconButton.filled(
-                              visualDensity: VisualDensity.compact,
-                              iconSize: 16,
-                              tooltip: '移除第 ${entry.$1 + 1} 张图片',
-                              onPressed: () =>
-                                  setState(() => _photos.removeAt(entry.$1)),
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                          ),
-                        ]))
-                    .toList(),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
             ],
             const SizedBox(height: 12),
@@ -482,9 +507,38 @@ class _CommunityComposerState extends State<_CommunityComposer> {
                 label: Text(_publishing ? '正在发布…' : '发布到见地现场'),
               ),
             ),
-          ]),
+          ],
         ),
       );
+
+  Future<void> _requestClose() async {
+    final hasDraft = _title.text.trim().isNotEmpty ||
+        _body.text.trim().isNotEmpty ||
+        _photos.isNotEmpty ||
+        _evidenceIds.isNotEmpty;
+    if (!hasDraft) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('放弃这条现场笔记？'),
+        content: const Text('已经选择的照片和填写的内容不会保存。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('继续编辑'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('放弃'),
+          ),
+        ],
+      ),
+    );
+    if (discard == true && mounted) Navigator.of(context).pop();
+  }
 
   Future<void> _pick(ImageSource source) async {
     final picked = await _picker.pickImage(source: source, imageQuality: 92);
@@ -552,6 +606,7 @@ class _PostDetail extends ConsumerStatefulWidget {
 
 class _PostDetailState extends ConsumerState<_PostDetail> {
   final _comment = TextEditingController();
+
   @override
   void dispose() {
     _comment.dispose();
@@ -562,179 +617,169 @@ class _PostDetailState extends ConsumerState<_PostDetail> {
   Widget build(BuildContext context) {
     final key = CommunityPostKey(widget.userId, widget.postId);
     final value = ref.watch(communityDetailControllerProvider(key));
-    return value.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => _CommunityError(
-        onRetry: () => ref.invalidate(communityDetailControllerProvider(key)),
-      ),
-      data: (state) => ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-        children: [
-          Row(children: [
-            Expanded(
-              child: Text(state.post.category.label,
-                  style: const TextStyle(
-                      color: AppColors.terracotta,
-                      fontWeight: FontWeight.w700)),
-            ),
+    final detail = value.asData?.value;
+    return Scaffold(
+      backgroundColor: AppColors.paper,
+      appBar: AppBar(
+        backgroundColor: AppColors.paper,
+        leading: IconButton(
+          key: const ValueKey('community-detail-close'),
+          tooltip: '关闭动态详情',
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close_rounded),
+        ),
+        title: const Text('现场笔记'),
+        centerTitle: true,
+        actions: [
+          if (detail != null)
             PopupMenuButton<String>(
               tooltip: '更多操作',
-              onSelected: (value) => _action(value, state, key),
+              onSelected: (action) => _action(action, detail, key),
               itemBuilder: (_) => [
-                if (state.post.viewerIsAuthor)
+                if (detail.post.viewerIsAuthor)
                   const PopupMenuItem(value: 'delete', child: Text('删除动态'))
                 else
                   const PopupMenuItem(value: 'report', child: Text('举报动态')),
               ],
             ),
-          ]),
-          if (state.post.title != null) ...[
-            const SizedBox(height: 8),
-            Text(state.post.title!,
-                style: Theme.of(context).textTheme.headlineMedium),
-          ],
-          const SizedBox(height: 8),
-          Text('${state.post.author.displayName} · 旅行者内容'),
-          if (state.post.media.isNotEmpty) ...[
-            const SizedBox(height: 18),
-            ...state.post.media.map((media) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: GestureDetector(
-                    onTap: () => showDialog<void>(
-                      context: context,
-                      builder: (_) => Dialog.fullscreen(
-                        backgroundColor: Colors.black,
-                        child: Stack(children: [
-                          Center(
-                            child: InteractiveViewer(
-                              minScale: .8,
-                              maxScale: 5,
-                              child: _CommunityImage(
-                                  userId: widget.userId, media: media),
-                            ),
-                          ),
-                          SafeArea(
-                            child: IconButton.filled(
-                              tooltip: '关闭图片',
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                          ),
-                        ]),
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: _CommunityImage(
-                            userId: widget.userId, media: media),
-                      ),
-                    ),
-                  ),
-                )),
-          ],
-          if (state.post.body.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Text(state.post.body, style: Theme.of(context).textTheme.bodyLarge),
-          ],
-          const SizedBox(height: 18),
-          Row(children: [
-            FilledButton.tonalIcon(
-              onPressed: state.isMutating
-                  ? null
-                  : () => ref
-                      .read(communityDetailControllerProvider(key).notifier)
-                      .toggleLike(),
-              icon: Icon(state.post.viewerHasLiked
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded),
-              label: Text('${state.post.likeCount} 个赞'),
-            ),
-            const SizedBox(width: 12),
-            Text('${state.post.commentCount} 条评论'),
-          ]),
-          if (state.likers.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text('赞过：${state.likers.map((item) => item.displayName).join('、')}',
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
-          if (state.likerCursor != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: state.isMutating
-                    ? null
-                    : () => ref
-                        .read(communityDetailControllerProvider(key).notifier)
-                        .loadMoreLikers(),
-                child: const Text('查看更多点赞者'),
-              ),
-            ),
-          const Divider(height: 32),
-          Text('现场回应', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 10),
-          ...state.comments.map((comment) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                    child: Icon(Icons.person_outline_rounded)),
-                title: Text(comment.author.displayName),
-                subtitle: Text(comment.body),
-                trailing: PopupMenuButton<String>(
-                  tooltip: '评论操作',
-                  onSelected: (action) async {
-                    if (action == 'delete') {
-                      await ref
-                          .read(communityDetailControllerProvider(key).notifier)
-                          .deleteComment(comment);
-                    } else {
-                      final confirmed = await _confirm(
-                        '举报这条评论？',
-                        '举报后它会从你的视野隐藏，并进入审核。',
-                      );
-                      if (confirmed == true) {
-                        await ref
-                            .read(experienceRepositoryProvider)
-                            .reportCommunityComment(comment.id, 'other');
-                        ref.invalidate(communityDetailControllerProvider(key));
-                      }
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    if (comment.viewerIsAuthor)
-                      const PopupMenuItem(value: 'delete', child: Text('删除评论'))
-                    else
-                      const PopupMenuItem(value: 'report', child: Text('举报评论')),
-                  ],
-                ),
-              )),
-          if (state.commentCursor != null)
-            TextButton(
-              onPressed: state.isMutating
-                  ? null
-                  : () => ref
-                      .read(communityDetailControllerProvider(key).notifier)
-                      .loadMoreComments(),
-              child: const Text('加载更多评论'),
-            ),
-          TextField(
-            controller: _comment,
-            maxLength: 300,
-            decoration: InputDecoration(
-              hintText: '友善地补充一句…',
-              suffixIcon: IconButton(
-                tooltip: '发表评论',
-                onPressed: state.isMutating ? null : () => _submitComment(key),
-                icon: const Icon(Icons.send_rounded),
-              ),
-            ),
-          ),
-          if (state.message != null)
-            Text(state.message!,
-                style: const TextStyle(color: AppColors.terracotta)),
         ],
       ),
+      body: value.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: _CommunityError(
+              onRetry: () =>
+                  ref.invalidate(communityDetailControllerProvider(key)),
+            ),
+          ),
+        ),
+        data: (state) => _detailBody(state, key),
+      ),
     );
+  }
+
+  Widget _detailBody(CommunityDetailState state, CommunityPostKey key) =>
+      Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              key: const ValueKey('community-detail-scroll'),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+                  sliver: SliverList.list(children: [
+                    _PostAuthorHeader(post: state.post),
+                    if (state.post.title != null) ...[
+                      const SizedBox(height: 16),
+                      Text(state.post.title!,
+                          style: Theme.of(context).textTheme.headlineMedium),
+                    ],
+                    if (state.post.body.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(state.post.body,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(height: 1.65)),
+                    ],
+                    if (state.post.media.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      _DetailMediaGallery(
+                        userId: widget.userId,
+                        media: state.post.media,
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    _PostInteractionBar(
+                      post: state.post,
+                      isMutating: state.isMutating,
+                      onLike: () => ref
+                          .read(communityDetailControllerProvider(key).notifier)
+                          .toggleLike(),
+                    ),
+                    if (state.likers.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _LikerSummary(
+                        likers: state.likers,
+                        hasMore: state.likerCursor != null,
+                        onLoadMore: state.isMutating
+                            ? null
+                            : () => ref
+                                .read(communityDetailControllerProvider(key)
+                                    .notifier)
+                                .loadMoreLikers(),
+                      ),
+                    ],
+                    const Divider(height: 38),
+                    Row(children: [
+                      Text('现场回应',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(width: 8),
+                      Text('${state.post.commentCount}',
+                          style: Theme.of(context).textTheme.labelMedium),
+                    ]),
+                    const SizedBox(height: 6),
+                    if (state.comments.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 28),
+                        child: Center(child: Text('还没有回应，留下第一句友善的补充。')),
+                      )
+                    else
+                      ...state.comments.map((comment) => _CommentTile(
+                            comment: comment,
+                            onDelete: () => ref
+                                .read(communityDetailControllerProvider(key)
+                                    .notifier)
+                                .deleteComment(comment),
+                            onReport: () => _reportComment(comment, key),
+                          )),
+                    if (state.commentCursor != null)
+                      Align(
+                        alignment: Alignment.center,
+                        child: TextButton(
+                          onPressed: state.isMutating
+                              ? null
+                              : () => ref
+                                  .read(communityDetailControllerProvider(key)
+                                      .notifier)
+                                  .loadMoreComments(),
+                          child: const Text('加载更多回应'),
+                        ),
+                      ),
+                    if (state.message != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(state.message!,
+                            style:
+                                const TextStyle(color: AppColors.terracotta)),
+                      ),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+          _CommentComposer(
+            controller: _comment,
+            enabled: !state.isMutating,
+            onSend: () => _submitComment(key),
+          ),
+        ],
+      );
+
+  Future<void> _reportComment(
+      CommunityComment comment, CommunityPostKey key) async {
+    final confirmed = await _confirm(
+      '举报这条评论？',
+      '举报后它会从你的视野隐藏，并进入审核。',
+    );
+    if (confirmed != true) return;
+    await ref
+        .read(experienceRepositoryProvider)
+        .reportCommunityComment(comment.id, 'other');
+    ref.invalidate(communityDetailControllerProvider(key));
   }
 
   Future<void> _submitComment(CommunityPostKey key) async {
@@ -781,6 +826,355 @@ class _PostDetailState extends ConsumerState<_PostDetail> {
           ],
         ),
       );
+}
+
+class _PostAuthorHeader extends StatelessWidget {
+  const _PostAuthorHeader({required this.post});
+
+  final CommunityPost post;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          const _CommunityAvatar(radius: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(post.author.displayName,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text('${_formatCommunityTime(post.createdAt)} · 旅行者内容',
+                    style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.terracotta.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(post.category.label,
+                style: const TextStyle(
+                    color: AppColors.terracotta,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12)),
+          ),
+        ],
+      );
+}
+
+class _DetailMediaGallery extends StatefulWidget {
+  const _DetailMediaGallery({required this.userId, required this.media});
+
+  final String userId;
+  final List<CommunityMedia> media;
+
+  @override
+  State<_DetailMediaGallery> createState() => _DetailMediaGalleryState();
+}
+
+class _DetailMediaGalleryState extends State<_DetailMediaGallery> {
+  var _page = 0;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  PageView.builder(
+                    itemCount: widget.media.length,
+                    onPageChanged: (value) => setState(() => _page = value),
+                    itemBuilder: (context, index) => GestureDetector(
+                      onTap: () => _openImage(widget.media[index]),
+                      child: _CommunityImage(
+                          userId: widget.userId, media: widget.media[index]),
+                    ),
+                  ),
+                  if (widget.media.length > 1)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: .58),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text('${_page + 1}/${widget.media.length}',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (widget.media.length > 1) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                widget.media.length,
+                (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: index == _page ? 18 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    color: index == _page
+                        ? AppColors.terracotta
+                        : AppColors.paperDeep,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      );
+
+  Future<void> _openImage(CommunityMedia media) => showDialog<void>(
+        context: context,
+        builder: (dialogContext) => Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: Stack(children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: .8,
+                maxScale: 5,
+                child: _CommunityImage(userId: widget.userId, media: media),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: IconButton.filled(
+                  tooltip: '关闭图片',
+                  onPressed: () => Navigator.pop(dialogContext),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      );
+}
+
+class _PostInteractionBar extends StatelessWidget {
+  const _PostInteractionBar({
+    required this.post,
+    required this.isMutating,
+    required this.onLike,
+  });
+
+  final CommunityPost post;
+  final bool isMutating;
+  final VoidCallback onLike;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.paperDeep.withValues(alpha: .72),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(children: [
+          TextButton.icon(
+            onPressed: isMutating ? null : onLike,
+            icon: Icon(
+              post.viewerHasLiked
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              color: post.viewerHasLiked ? AppColors.terracotta : AppColors.ink,
+            ),
+            label: Text('${post.likeCount} 个赞'),
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.chat_bubble_outline_rounded, size: 19),
+          const SizedBox(width: 6),
+          Text('${post.commentCount} 条回应'),
+        ]),
+      );
+}
+
+class _LikerSummary extends StatelessWidget {
+  const _LikerSummary({
+    required this.likers,
+    required this.hasMore,
+    required this.onLoadMore,
+  });
+
+  final List<CommunityAuthor> likers;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(Icons.people_alt_outlined,
+                size: 18, color: AppColors.moss),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${likers.map((item) => item.displayName).join('、')} 赞过',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          if (hasMore)
+            TextButton(onPressed: onLoadMore, child: const Text('更多')),
+        ],
+      );
+}
+
+class _CommentTile extends StatelessWidget {
+  const _CommentTile({
+    required this.comment,
+    required this.onDelete,
+    required this.onReport,
+  });
+
+  final CommunityComment comment;
+  final VoidCallback onDelete;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _CommunityAvatar(radius: 19),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Expanded(
+                      child: Text(comment.author.displayName,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                    Text(_formatCommunityTime(comment.createdAt),
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(comment.body,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(height: 1.5)),
+                ],
+              ),
+            ),
+            PopupMenuButton<String>(
+              tooltip: '评论操作',
+              iconSize: 20,
+              onSelected: (action) =>
+                  action == 'delete' ? onDelete() : onReport(),
+              itemBuilder: (_) => [
+                if (comment.viewerIsAuthor)
+                  const PopupMenuItem(value: 'delete', child: Text('删除评论'))
+                else
+                  const PopupMenuItem(value: 'report', child: Text('举报评论')),
+              ],
+            ),
+          ],
+        ),
+      );
+}
+
+class _CommentComposer extends StatelessWidget {
+  const _CommentComposer({
+    required this.controller,
+    required this.enabled,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.paper,
+        elevation: 12,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Row(children: [
+              const _CommunityAvatar(radius: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  enabled: enabled,
+                  maxLength: 300,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.newline,
+                  decoration: InputDecoration(
+                    hintText: '友善地回应这条现场笔记…',
+                    counterText: '',
+                    filled: true,
+                    fillColor: AppColors.paperDeep,
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 15, vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                tooltip: '发表评论',
+                onPressed: enabled ? onSend : null,
+                icon: const Icon(Icons.arrow_upward_rounded),
+              ),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _CommunityAvatar extends StatelessWidget {
+  const _CommunityAvatar({required this.radius});
+
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => CircleAvatar(
+        radius: radius,
+        backgroundColor: AppColors.moss.withValues(alpha: .14),
+        foregroundColor: AppColors.moss,
+        child: const Icon(Icons.person_outline_rounded),
+      );
+}
+
+String _formatCommunityTime(DateTime? value) {
+  if (value == null) return '刚刚';
+  final local = value.toLocal();
+  final difference = DateTime.now().difference(local);
+  if (difference.isNegative || difference.inMinutes < 1) return '刚刚';
+  if (difference.inHours < 1) return '${difference.inMinutes} 分钟前';
+  if (difference.inDays < 1) return '${difference.inHours} 小时前';
+  if (difference.inDays < 7) return '${difference.inDays} 天前';
+  return '${local.month}月${local.day}日';
 }
 
 class _CommunityNotice extends StatelessWidget {

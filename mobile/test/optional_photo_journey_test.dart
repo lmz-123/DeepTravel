@@ -8,7 +8,7 @@ import 'package:jiandi/features/experience/presentation/active_tour_controller.d
 import 'package:jiandi/features/experience/presentation/journey_page.dart';
 
 void main() {
-  testWidgets('collected clue keeps optional photo invite and shooting guide',
+  testWidgets('selected node exposes one optional photo entry and guide detail',
       (tester) async {
     await tester.pumpWidget(ProviderScope(
       overrides: [
@@ -26,22 +26,22 @@ void main() {
       const Offset(0, -260),
     );
     expect(find.text('可选的现场留念'), findsOneWidget);
-    expect(find.textContaining('不拍也可以继续'), findsOneWidget);
+    expect(find.byKey(const ValueKey('node-photo-entry-fragment-photo')),
+        findsOneWidget);
+    expect(find.text('老树旁不挡路的位置'), findsNothing);
 
-    await tester.drag(find.byType(ListView), const Offset(0, -120));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('拍摄并检查线索'));
+    await tester.tap(find.text('可选的现场留念'));
     await tester.pumpAndSettle();
 
-    expect(find.text('先找到经典机位'), findsOneWidget);
+    expect(find.text('推荐机位'), findsOneWidget);
     expect(find.text('老树旁不挡路的位置'), findsOneWidget);
     expect(find.text('面向城门'), findsOneWidget);
     expect(find.text('城门居中，留出街巷'), findsOneWidget);
-    expect(find.text('稍后再拍'), findsOneWidget);
+    expect(find.text('打开相机'), findsOneWidget);
 
-    await tester.tap(find.text('稍后再拍'));
+    await tester.tap(find.byTooltip('关闭留念详情'));
     await tester.pumpAndSettle();
-    expect(find.text('先找到经典机位'), findsNothing);
+    expect(find.text('推荐机位'), findsNothing);
     expect(find.text('可选的现场留念'), findsOneWidget);
 
     await tester.dragUntilVisible(

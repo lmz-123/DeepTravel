@@ -134,8 +134,9 @@ class _TravelerDrawer extends ConsumerWidget {
   }
 
   void _go(BuildContext context, String location) {
+    final router = GoRouter.of(context);
     Navigator.of(context).pop();
-    context.go(location);
+    router.push(location);
   }
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../domain/fragment_models.dart';
@@ -24,28 +25,31 @@ class FootprintDetailPage extends ConsumerWidget {
     }
     final key = UserJourneyKey(userId, journeyId);
     final contextValue = ref.watch(journeyContextProvider(key));
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('足迹详情'),
-        leading: IconButton(
-          tooltip: '返回足迹',
-          onPressed: () => context.go('/footprints'),
-          icon: const Icon(Icons.arrow_back_rounded),
+    return RouteBackScope(
+      fallbackLocation: '/footprints',
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('足迹详情'),
+          leading: IconButton(
+            tooltip: '返回足迹',
+            onPressed: () => popOrGo(context, '/footprints'),
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
         ),
-      ),
-      body: contextValue.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _DetailError(
-          onRetry: () => ref.invalidate(journeyContextProvider(key)),
-        ),
-        data: (value) => _DetailContent(
-          value: value,
-          evidence: ref.watch(journeyEvidenceProvider(key)),
-          onRefresh: () async {
-            ref.invalidate(journeyContextProvider(key));
-            ref.invalidate(journeyEvidenceProvider(key));
-            await ref.read(journeyContextProvider(key).future);
-          },
+        body: contextValue.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => _DetailError(
+            onRetry: () => ref.invalidate(journeyContextProvider(key)),
+          ),
+          data: (value) => _DetailContent(
+            value: value,
+            evidence: ref.watch(journeyEvidenceProvider(key)),
+            onRefresh: () async {
+              ref.invalidate(journeyContextProvider(key));
+              ref.invalidate(journeyEvidenceProvider(key));
+              await ref.read(journeyContextProvider(key).future);
+            },
+          ),
         ),
       ),
     );

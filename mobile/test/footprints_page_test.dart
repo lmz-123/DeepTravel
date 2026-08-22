@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:jiandi/core/router/route_back.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 import 'package:jiandi/features/experience/presentation/footprints_page.dart';
@@ -46,6 +48,67 @@ void main() {
     expect(find.text('还没有留下足迹'), findsOneWidget);
     expect(find.textContaining('完整走完一条路线后'), findsOneWidget);
     expect(find.byType(RefreshIndicator), findsOneWidget);
+  });
+
+  testWidgets('system back returns footprint list home and detail to list',
+      (tester) async {
+    final router = GoRouter(
+      initialLocation: '/footprints',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const Scaffold(body: Text('发现首页')),
+        ),
+        GoRoute(
+          path: '/footprints',
+          builder: (_, __) => const FootprintsPage(),
+        ),
+        GoRoute(
+          path: '/footprints/:id',
+          builder: (context, __) => RouteBackScope(
+            fallbackLocation: '/footprints',
+            child: Scaffold(
+              appBar: AppBar(
+                leading: IconButton(
+                  tooltip: '返回足迹',
+                  onPressed: () => popOrGo(context, '/footprints'),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                ),
+              ),
+              body: const Text('足迹详情已打开'),
+            ),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentJourneyLibraryProvider.overrideWith(
+          (ref) async => [_item('recent', '最近完成')],
+        ),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/');
+
+    router.go('/footprints');
+    await tester.pumpAndSettle();
+    await tester.tap(find.ancestor(
+      of: find.text('最近完成'),
+      matching: find.byType(InkWell),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('足迹详情已打开'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('最近完成'), findsOneWidget);
+    expect(find.text('足迹详情已打开'), findsNothing);
   });
 }
 

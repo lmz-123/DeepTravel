@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/user_preferences_repository.dart';
 import '../domain/fragment_models.dart';
@@ -36,54 +36,57 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserIdProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-        leading: IconButton(
-          tooltip: '返回发现页',
-          onPressed: () => context.go('/'),
-          icon: const Icon(Icons.arrow_back_rounded),
+    return RouteBackScope(
+      fallbackLocation: '/',
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('设置'),
+          leading: IconButton(
+            tooltip: '返回首页',
+            onPressed: () => popOrGo(context, '/'),
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
         ),
-      ),
-      body: userId == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-              children: [
-                _SettingsSection(
-                  title: '播放',
-                  children: [
-                    _PlaybackSpeedTile(userId: userId),
-                  ],
-                ),
-                _SettingsSection(
-                  title: '行走与下载',
-                  children: [
-                    const _LocationModeTile(),
-                    _DownloadPolicyTile(userId: userId),
-                    const _ClearAudioCacheTile(),
-                  ],
-                ),
-                _SettingsSection(
-                  title: '照片与隐私',
-                  children: [
-                    _EvidencePolicyTile(userId: userId),
-                  ],
-                ),
-                _SettingsSection(
-                  title: '关于',
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.info_outline_rounded),
-                      title: const Text('见地版本'),
-                      trailing: Text(
-                        ref.watch(appVersionProvider).value ?? '读取中',
+        body: userId == null
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+                children: [
+                  _SettingsSection(
+                    title: '播放',
+                    children: [
+                      _PlaybackSpeedTile(userId: userId),
+                    ],
+                  ),
+                  _SettingsSection(
+                    title: '行走与下载',
+                    children: [
+                      const _LocationModeTile(),
+                      _DownloadPolicyTile(userId: userId),
+                      const _ClearAudioCacheTile(),
+                    ],
+                  ),
+                  _SettingsSection(
+                    title: '照片与隐私',
+                    children: [
+                      _EvidencePolicyTile(userId: userId),
+                    ],
+                  ),
+                  _SettingsSection(
+                    title: '关于',
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.info_outline_rounded),
+                        title: const Text('见地版本'),
+                        trailing: Text(
+                          ref.watch(appVersionProvider).value ?? '读取中',
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                    ],
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

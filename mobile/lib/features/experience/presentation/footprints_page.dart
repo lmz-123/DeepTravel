@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../domain/models.dart';
@@ -13,56 +14,60 @@ class FootprintsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final library = ref.watch(currentJourneyLibraryProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('我的足迹'),
-        leading: IconButton(
-          tooltip: '返回发现页',
-          onPressed: () => context.go('/'),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(journeyLibraryProvider);
-          ref.invalidate(currentJourneyLibraryProvider);
-          await ref.read(currentJourneyLibraryProvider.future);
-        },
-        child: library.when(
-          loading: () => const _ScrollableCenter(
-            child: CircularProgressIndicator(),
+    return RouteBackScope(
+      fallbackLocation: '/',
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('我的足迹'),
+          leading: IconButton(
+            tooltip: '返回首页',
+            onPressed: () => popOrGo(context, '/'),
+            icon: const Icon(Icons.arrow_back_rounded),
           ),
-          error: (error, _) => _ScrollableCenter(
-            child: _LibraryMessage(
-              icon: Icons.cloud_off_outlined,
-              title: '足迹暂时没有加载出来',
-              message: '下拉刷新，或稍后再回来看看。',
-              action: FilledButton.tonal(
-                onPressed: () => ref.invalidate(currentJourneyLibraryProvider),
-                child: const Text('重新加载'),
+        ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(journeyLibraryProvider);
+            ref.invalidate(currentJourneyLibraryProvider);
+            await ref.read(currentJourneyLibraryProvider.future);
+          },
+          child: library.when(
+            loading: () => const _ScrollableCenter(
+              child: CircularProgressIndicator(),
+            ),
+            error: (error, _) => _ScrollableCenter(
+              child: _LibraryMessage(
+                icon: Icons.cloud_off_outlined,
+                title: '足迹暂时没有加载出来',
+                message: '下拉刷新，或稍后再回来看看。',
+                action: FilledButton.tonal(
+                  onPressed: () =>
+                      ref.invalidate(currentJourneyLibraryProvider),
+                  child: const Text('重新加载'),
+                ),
               ),
             ),
-          ),
-          data: (items) => items.isEmpty
-              ? const _ScrollableCenter(
-                  child: _LibraryMessage(
-                    icon: Icons.route_outlined,
-                    title: '还没有留下足迹',
-                    message: '完整走完一条路线后，它会安静地留在这里。',
+            data: (items) => items.isEmpty
+                ? const _ScrollableCenter(
+                    child: _LibraryMessage(
+                      icon: Icons.route_outlined,
+                      title: '还没有留下足迹',
+                      message: '完整走完一条路线后，它会安静地留在这里。',
+                    ),
+                  )
+                : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 40),
+                    itemCount: items.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(height: 14),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return _FootprintSummary(items: items);
+                      }
+                      return _FootprintCard(item: items[index - 1]);
+                    },
                   ),
-                )
-              : ListView.separated(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 40),
-                  itemCount: items.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(height: 14),
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return _FootprintSummary(items: items);
-                    }
-                    return _FootprintCard(item: items[index - 1]);
-                  },
-                ),
+          ),
         ),
       ),
     );
@@ -125,7 +130,7 @@ class _FootprintCard extends StatelessWidget {
   Widget build(BuildContext context) => Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => context.go('/footprints/${item.journey.id}'),
+          onTap: () => context.push('/footprints/${item.journey.id}'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

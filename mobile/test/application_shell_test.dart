@@ -70,14 +70,19 @@ void main() {
     expect(find.text('足迹页已打开'), findsOneWidget);
     expect(container.read(narrationPlayerProvider), same(originalPlayer));
 
-    router.go('/');
+    router.pop();
     await tester.pumpAndSettle();
+    expect(find.text('足迹页已打开'), findsNothing);
     await tester.tap(find.bySemanticsLabel(RegExp('打开旅行者菜单')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('设置'));
     await tester.pumpAndSettle();
     expect(find.text('设置页已打开'), findsOneWidget);
     expect(container.read(narrationPlayerProvider), same(originalPlayer));
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('设置页已打开'), findsNothing);
   });
 
   testWidgets('drawer account switch and logout clear private local state',

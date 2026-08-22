@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -99,9 +98,10 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
     final manifest = state.route!.audioTour!;
     final ledger = state.ledger;
     final userId = ref.watch(currentUserIdProvider);
-    final selectedCommunityFragment = ledger?.entries
-        .where(
-            (entry) => entry.id == state.selectedFragmentId && entry.isRevealed)
+    final selectedFragmentId =
+        state.selectedFragmentId ?? state.current?.id ?? state.liveFragmentId;
+    final selectedFragment = ledger?.entries
+        .where((entry) => entry.id == selectedFragmentId && entry.isRevealed)
         .firstOrNull;
     return PopScope(
       canPop: false,
@@ -151,21 +151,12 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                       : _NarrationCard(
                           key: ValueKey(state.current!.id), state: state)),
               if (ledger != null) ...[
-                ...ledger.entries
-                    .where((entry) =>
-                        entry.isRevealed &&
-                        entry.mission != null &&
-                        entry.evidenceId == null)
-                    .map((entry) => Padding(
-                        padding: const EdgeInsets.only(top: 18),
-                        child: _MissionCard(fragment: entry, state: state))),
-                ...ledger.entries
-                    .where((entry) =>
-                        entry.isCollected && entry.evidenceId != null)
-                    .map((entry) => Padding(
-                        padding: const EdgeInsets.only(top: 18),
-                        child: _EvidenceReceiptCard(
-                            fragment: entry, state: state))),
+                if (selectedFragment?.mission != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 18),
+                    child:
+                        _MissionCard(fragment: selectedFragment!, state: state),
+                  ),
                 if (ledger.reconstructionUnlocked)
                   Padding(
                       padding: const EdgeInsets.only(top: 22),
@@ -205,11 +196,11 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                     child: Text(state.errorMessage!,
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error))),
-              if (userId != null && selectedCommunityFragment != null)
+              if (userId != null && selectedFragment != null)
                 NodeCommunitySection(
                   userId: userId,
                   journeyId: widget.journeyId,
-                  fragment: selectedCommunityFragment,
+                  fragment: selectedFragment,
                 ),
             ],
           ),
@@ -838,72 +829,69 @@ class _MissionCard extends ConsumerWidget {
   const _MissionCard({required this.fragment, required this.state});
   final StoryFragment fragment;
   final ActiveTourState state;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mission = fragment.mission;
     if (mission == null) return const SizedBox.shrink();
     final upload = state.evidenceUploadFor(fragment.id);
     final pendingPath = upload?.filePath;
+    final hasPhoto = fragment.evidenceId != null || pendingPath != null;
+    final status = upload == null
+        ? hasPhoto
+            ? '已保存到足迹'
+            : '1 个推荐机位 · 可选'
+        : _uploadLabel(upload.phase);
     return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey('node-photo-entry-${fragment.id}'),
+        onTap:
+            state.isBusy ? null : () => _showCameraGuide(context, ref, mission),
         child: Padding(
-            padding: const EdgeInsets.all(22),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Row(children: [
-                Icon(Icons.camera_alt_outlined, color: AppColors.terracotta),
-                SizedBox(width: 8),
-                Text('可选的现场留念')
-              ]),
-              const SizedBox(height: 14),
-              Text(mission.prompt,
-                  style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 10),
-              Text(mission.safetyCopy,
-                  style: Theme.of(context).textTheme.bodyMedium),
-              if (pendingPath != null && File(pendingPath).existsSync())
-                Padding(
-                  padding: const EdgeInsets.only(top: 14),
-                  child: LocalPhotoThumbnail(
-                    path: pendingPath,
-                    title: fragment.title ?? fragment.safePreview,
-                    width: 190,
-                  ),
-                ),
-              if (upload != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _uploadLabel(upload.phase),
-                  style: const TextStyle(color: AppColors.moss, fontSize: 12),
-                ),
-              ],
-              const SizedBox(height: 16),
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                      onPressed: state.isBusy
-                          ? null
-                          : () => _showCameraGuide(context, ref, mission),
-                      icon: const Icon(Icons.camera_alt_rounded),
-                      label: Text(pendingPath == null ? '拍摄并检查线索' : '重拍线索'))),
-              const SizedBox(height: 4),
-              const Text(
-                '不拍也可以继续；测试时“下一条线索”不会等待照片。',
-                style: TextStyle(fontSize: 12, color: AppColors.moss),
+          padding: const EdgeInsets.all(17),
+          child: Row(children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: hasPhoto
+                    ? AppColors.moss.withValues(alpha: .14)
+                    : AppColors.terracotta.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(16),
               ),
-              if (pendingPath != null)
-                SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                        onPressed: state.isBusy
-                            ? null
-                            : () => ref
-                                .read(activeTourControllerProvider.notifier)
-                                .submitPendingEvidence(fragment),
-                        child: Text(
-                            upload?.phase == EvidenceUploadPhase.uploading
-                                ? '正在处理照片…'
-                                : '重试私密上传'))),
-            ])));
+              child: Icon(
+                hasPhoto
+                    ? Icons.photo_camera_back_rounded
+                    : Icons.add_a_photo_outlined,
+                color: hasPhoto ? AppColors.moss : AppColors.terracotta,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('可选的现场留念',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(mission.prompt,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(color: AppColors.moss, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded),
+          ]),
+        ),
+      ),
+    );
   }
 
   Future<void> _showCameraGuide(
@@ -911,23 +899,45 @@ class _MissionCard extends ConsumerWidget {
     WidgetRef ref,
     PhotoMission mission,
   ) async {
+    final pendingPath = state.evidenceUploadFor(fragment.id)?.filePath;
     final shouldCapture = await showModalBottomSheet<bool>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
-      showDragHandle: true,
+      useSafeArea: true,
       backgroundColor: AppColors.paper,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 4, 22, 22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: .9,
+        child: Scaffold(
+          backgroundColor: AppColors.paper,
+          appBar: AppBar(
+            backgroundColor: AppColors.paper,
+            leading: IconButton(
+              tooltip: '关闭留念详情',
+              onPressed: () => Navigator.pop(sheetContext, false),
+              icon: const Icon(Icons.close_rounded),
+            ),
+            title: const Text('现场留念'),
+            centerTitle: true,
+          ),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(22, 10, 22, 28),
             children: [
-              Text('先找到经典机位',
-                  style: Theme.of(context).textTheme.headlineMedium),
+              Text(mission.prompt,
+                  style: Theme.of(sheetContext).textTheme.headlineMedium),
               const SizedBox(height: 8),
-              const Text('确认安全且不影响他人后，再打开相机。下面只是建议，不是通关条件。'),
-              const SizedBox(height: 18),
+              const Text('一个节点只保留这一处留念入口。机位建议用于帮助构图，不是通关条件。'),
+              if (pendingPath?.isNotEmpty == true) ...[
+                const SizedBox(height: 18),
+                LocalPhotoThumbnail(
+                  path: pendingPath!,
+                  title: fragment.title ?? fragment.safePreview,
+                  width: 220,
+                ),
+              ],
+              const SizedBox(height: 22),
+              Text('推荐机位', style: Theme.of(sheetContext).textTheme.titleLarge),
+              const SizedBox(height: 14),
               _GuideRow(
                 icon: Icons.place_outlined,
                 label: '站位',
@@ -948,25 +958,25 @@ class _MissionCard extends ConsumerWidget {
                 label: '安全',
                 value: mission.safetyCopy,
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('稍后再拍'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => Navigator.pop(context, true),
-                      icon: const Icon(Icons.camera_alt_rounded),
-                      label: const Text('打开相机'),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(sheetContext, true),
+                  icon: const Icon(Icons.camera_alt_rounded),
+                  label: Text(fragment.evidenceId == null ? '打开相机' : '重新拍摄'),
+                ),
               ),
+              if (state.evidenceUploadFor(fragment.id)?.filePath != null)
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(sheetContext, false);
+                    ref
+                        .read(activeTourControllerProvider.notifier)
+                        .submitPendingEvidence(fragment);
+                  },
+                  child: const Text('重试私密上传'),
+                ),
             ],
           ),
         ),
@@ -1028,77 +1038,6 @@ class _GuideRow extends StatelessWidget {
           ],
         ),
       );
-}
-
-class _EvidenceReceiptCard extends ConsumerWidget {
-  const _EvidenceReceiptCard({required this.fragment, required this.state});
-  final StoryFragment fragment;
-  final ActiveTourState state;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final upload = state.evidenceUploadFor(fragment.id);
-    final path = upload?.filePath;
-    final hasLocalPreview = path != null && File(path).existsSync();
-    final userId = ref.watch(currentUserIdProvider);
-    final session = state.session;
-    EvidenceRecord? remoteEvidence;
-    if (!hasLocalPreview && userId != null && session != null) {
-      final items = ref
-          .watch(journeyEvidenceProvider(UserJourneyKey(userId, session.id)))
-          .asData
-          ?.value;
-      remoteEvidence = items
-          ?.where((item) =>
-              item.id == fragment.evidenceId || item.fragmentId == fragment.id)
-          .firstOrNull;
-    }
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-          color: AppColors.moss.withValues(alpha: .12),
-          border: Border.all(color: AppColors.moss.withValues(alpha: .28)),
-          borderRadius: BorderRadius.circular(22)),
-      child: Row(children: [
-        if (hasLocalPreview)
-          LocalPhotoThumbnail(
-            path: path,
-            title: fragment.title ?? fragment.safePreview,
-            width: 88,
-          )
-        else if (remoteEvidence != null && userId != null && session != null)
-          EvidenceThumbnail(
-            userId: userId,
-            journeyId: session.id,
-            evidence: remoteEvidence,
-            title: fragment.title ?? fragment.safePreview,
-            width: 88,
-          )
-        else
-          Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                  color: AppColors.moss.withValues(alpha: .16),
-                  borderRadius: BorderRadius.circular(14)),
-              child: const Icon(Icons.photo_camera_rounded,
-                  color: AppColors.moss)),
-        const SizedBox(width: 14),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('现场照片已确认', style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 5),
-          Text(fragment.title ?? fragment.safePreview,
-              style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 5),
-          const Text('仅保存在你的旅程中',
-              style: TextStyle(color: AppColors.moss, fontSize: 12)),
-        ])),
-        const Icon(Icons.check_circle_rounded, color: AppColors.moss),
-      ]),
-    );
-  }
 }
 
 class _LedgerEntry extends StatelessWidget {
