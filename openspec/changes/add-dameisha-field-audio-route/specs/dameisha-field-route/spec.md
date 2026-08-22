@@ -1,6 +1,6 @@
 ## Purpose
 
-为关闭模拟定位后的大梅沙实地导览及后续内容运营定义一条可由独立后台完整配置、校验和发布的碎片路线，使客户端无需写死景区数据或重新发版即可安全呈现新的城市、故事、定位任务和因果拼图。
+为可在运行时切换真实与模拟定位的大梅沙实地导览及后续内容运营定义一条可由独立后台完整配置、校验和发布的碎片路线，使客户端无需写死景区数据或重新发版即可安全呈现新的城市、故事、定位任务和因果拼图。
 
 ## ADDED Requirements
 
@@ -52,6 +52,32 @@ The system SHALL expose Dameisha under city `深圳` with five ordered stops, ba
 - **WHEN** the client requests `/api/v1/routes/dameisha-remade-coast`
 - **THEN** the response contains five ordered stops and only backend URLs for cover and stop media
 
+### Requirement: Home discovery is backend-driven and swipe-selectable
+The client SHALL obtain city metadata and every selectable route from the public catalog API. For the selected city it SHALL render all returned published routes as horizontally swipeable cards, animate the centered selection, and bind route details and navigation to that selected backend record. Flutter MUST NOT contain destination-specific route cards, cover assets, descriptions or fallback city names.
+
+#### Scenario: Shenzhen has two published routes
+- **WHEN** the city and route APIs return Shenzhen with Nantou and Dameisha
+- **THEN** the home page shows two horizontally swipeable cards, swiping centers and selects Dameisha, and opening the selection requests the Dameisha detail by its backend slug
+
+#### Scenario: A future destination is published
+- **WHEN** the API returns a new city or route unknown to the installed client
+- **THEN** it appears using its backend name, metadata and media without a Flutter release or destination-specific code branch
+
+#### Scenario: The selected city has no routes
+- **WHEN** the selected city's catalog returns an empty route list
+- **THEN** the client shows a neutral empty state and does not substitute Nantou, Dameisha, Shenzhen or Shanghai content
+
+### Requirement: Location mode remains a runtime user choice
+Every debug and release build SHALL expose the real/simulated location switch on route preparation and active-journey surfaces. The saved user choice SHALL control whether GPS is read; build-time flags MUST NOT hide the switch or force real mode.
+
+#### Scenario: Field tester chooses real location
+- **WHEN** the user turns simulated location off before or during a journey
+- **THEN** the client requests real location permission, monitors qualifying WGS-84 samples and keeps the switch available for a later change
+
+#### Scenario: Tester chooses simulated location in a release build
+- **WHEN** the user turns simulated location on in the production-address release APK
+- **THEN** the client stops reading GPS, exposes manual arrival actions and persists simulated mode without requiring a different APK
+
 ### Requirement: Five fragments form one sourced causal story
 The Dameisha route SHALL answer the central question “大梅沙是被城市发现的天然海滩，还是被交通、公共政策、人群与风暴反复重造的海岸？” through exactly five dependent fragments covering, in order, the old village and place name, transport access, the 1999 public beach, carrying-capacity tension, and post-typhoon reconstruction.
 
@@ -86,7 +112,7 @@ Each fragment SHALL have one WGS-84 circular trigger region centered on a dry, p
 - **THEN** the stored trigger center is the explicitly converted WGS-84 candidate and its original datum and source remain available for field verification
 
 ### Requirement: Real-location entry resists ordinary coastal GPS drift
-With simulated location disabled, a fragment SHALL become eligible only after two fresh qualifying samples inside its entry radius within 15 seconds, each with accuracy no worse than 35 metres. A rejected or stale sample SHALL not advance the journey.
+When the traveler selects real location, a fragment SHALL become eligible only after two fresh qualifying samples inside its entry radius within 15 seconds, each with accuracy no worse than 35 metres. A rejected or stale sample SHALL not advance the journey.
 
 #### Scenario: Two accurate samples arrive inside the next region
 - **WHEN** the device reports two fresh WGS-84 samples inside the next eligible region within 15 seconds and both have accuracy at or below 35 metres

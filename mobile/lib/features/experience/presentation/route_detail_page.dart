@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/primary_action.dart';
@@ -230,43 +229,39 @@ class _AudioTourBrief extends ConsumerWidget {
                 : '开始后将准备约 $size MB 音频，并申请行走期间的位置、通知与拍照权限。锁屏时系统仍可能限制定位，应用会如实显示暂停状态。',
             style: TextStyle(
                 color: AppColors.white.withValues(alpha: .78), height: 1.55)),
-        if (AppConfig.enableDemoTriggers) ...[
-          const SizedBox(height: 16),
-          Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
-          const SizedBox(height: 12),
-          Semantics(
-            label: '模拟定位测试开关',
-            hint: isSimulated ? '当前忽略真实位置' : '当前使用真实位置',
-            child: Row(children: [
-              const Icon(Icons.location_searching_rounded,
-                  color: AppColors.gold),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    const Text('模拟定位（测试）',
-                        style: TextStyle(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 3),
-                    Text(isSimulated ? '忽略 GPS，用按钮模拟到达' : '使用 GPS，靠近地点自动触发',
-                        style: TextStyle(
-                            color: AppColors.white.withValues(alpha: .68),
-                            fontSize: 12)),
-                  ])),
-              Switch.adaptive(
-                  value: isSimulated,
-                  onChanged: modeState.isLoading
-                      ? null
-                      : (value) => ref
-                          .read(locationModeControllerProvider.notifier)
-                          .setMode(value
-                              ? TourLocationMode.simulated
-                              : TourLocationMode.real)),
-            ]),
-          ),
-        ],
+        const SizedBox(height: 16),
+        Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
+        const SizedBox(height: 12),
+        Semantics(
+          label: '模拟定位测试开关',
+          hint: isSimulated ? '当前忽略真实位置' : '当前使用真实位置',
+          child: Row(children: [
+            const Icon(Icons.location_searching_rounded, color: AppColors.gold),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  const Text('模拟定位（测试）',
+                      style: TextStyle(
+                          color: AppColors.white, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 3),
+                  Text(isSimulated ? '忽略 GPS，用按钮模拟到达' : '使用 GPS，靠近地点自动触发',
+                      style: TextStyle(
+                          color: AppColors.white.withValues(alpha: .68),
+                          fontSize: 12)),
+                ])),
+            Switch.adaptive(
+                value: isSimulated,
+                onChanged: modeState.isLoading
+                    ? null
+                    : (value) => ref
+                        .read(locationModeControllerProvider.notifier)
+                        .setMode(value
+                            ? TourLocationMode.simulated
+                            : TourLocationMode.real)),
+          ]),
+        ),
         const SizedBox(height: 12),
         Text(manifest.demoLabel ?? '内容已完成审核',
             style: const TextStyle(color: AppColors.gold)),

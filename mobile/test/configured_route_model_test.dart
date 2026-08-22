@@ -48,4 +48,26 @@ void main() {
     expect(route.audioTour, isNotNull);
     expect(route.stops.single.challenge.options, isEmpty);
   });
+
+  test('catalog summary keeps backend featuring and stop count', () {
+    final route = RouteExperience.fromJson({
+      'id': 'route-summary',
+      'slug': 'configured-summary',
+      'title': '后台路线摘要',
+      'subtitle': '测试',
+      'description': '不依赖前端目的地常量',
+      'duration_minutes': 42,
+      'distance_km': 2.4,
+      'difficulty': '轻松',
+      'theme': '城市故事',
+      'hero_image': 'https://example.test/cover.png',
+      'content_status': 'verified',
+      'is_featured': true,
+      'stop_count': 5,
+    });
+
+    expect(route.isFeatured, isTrue);
+    expect(route.numberOfStops, 5);
+    expect(route.stops, isEmpty);
+  });
 }

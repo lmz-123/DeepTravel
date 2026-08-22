@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/logging/runtime_log_reporter.dart';
 import '../application/trigger_engine.dart';
 import '../data/api_experience_repository.dart';
@@ -173,9 +172,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     final manifest = route.audioTour;
     if (manifest == null) return;
     await _stopLocationMonitoring();
-    final locationMode = AppConfig.enableDemoTriggers
-        ? await ref.read(locationModeControllerProvider.future)
-        : TourLocationMode.real;
+    final locationMode = await ref.read(locationModeControllerProvider.future);
     state = ActiveTourState(
         status: 'preparing',
         route: route,
@@ -275,15 +272,14 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> triggerNextDemo() async {
     final reporter = ref.read(runtimeLogReporterProvider);
-    if (!AppConfig.enableDemoTriggers ||
-        state.locationMode != TourLocationMode.simulated ||
+    if (state.locationMode != TourLocationMode.simulated ||
         state.status != 'simulated' ||
         _triggering) {
       unawaited(reporter?.warning(
         'tour',
         'demo_arrival_ignored',
         context: {
-          'demo_enabled': AppConfig.enableDemoTriggers,
+          'simulation_mode_available': true,
           'location_mode': state.locationMode.name,
           'tour_status': state.status,
           'trigger_in_progress': _triggering,
@@ -824,22 +820,18 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> setLocationMode(TourLocationMode mode) async {
-    final effectiveMode =
-        AppConfig.enableDemoTriggers ? mode : TourLocationMode.real;
-    await ref
-        .read(locationModeControllerProvider.notifier)
-        .setMode(effectiveMode);
+    await ref.read(locationModeControllerProvider.notifier).setMode(mode);
     await _stopLocationMonitoring();
 
     final paused = state.status == 'paused';
     final inactive = state.status == 'idle' || state.status == 'stopped';
     if (inactive) {
-      state = state.copyWith(locationMode: effectiveMode);
+      state = state.copyWith(locationMode: mode);
       return;
     }
-    if (effectiveMode == TourLocationMode.simulated) {
+    if (mode == TourLocationMode.simulated) {
       state = state.copyWith(
-          locationMode: effectiveMode,
+          locationMode: mode,
           status: paused ? 'paused' : 'simulated',
           locationMessage: paused
               ? '已切换为模拟定位；继续导览后可手动模拟到达。'
@@ -850,7 +842,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     }
 
     state = state.copyWith(
-        locationMode: effectiveMode,
+        locationMode: mode,
         locationMessage: paused ? '已切换为真实定位；继续导览时将申请定位权限。' : '正在启用真实定位…',
         clearError: true);
     if (!paused) await _activateRealLocation();

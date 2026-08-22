@@ -34,9 +34,15 @@ class DemoExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<RouteExperience> featuredRoute(String citySlug) async {
+  Future<List<RouteExperience>> routesForCity(String citySlug) async {
     await _pause();
-    return demoRoute;
+    return [demoRoute];
+  }
+
+  @override
+  Future<RouteExperience> featuredRoute(String citySlug) async {
+    final routes = await routesForCity(citySlug);
+    return routes.first;
   }
 
   @override

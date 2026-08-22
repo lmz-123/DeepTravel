@@ -15,12 +15,12 @@ cd mobile
 flutter pub get
 flutter run --dart-define=APP_MODE=api \
   --dart-define=API_BASE_URL=http://127.0.0.1:5001/api/v1 \
-  --dart-define=ENABLE_DEMO_TRIGGERS=true \
+  --dart-define=DEFAULT_CITY_SLUG=shenzhen \
   --dart-define=RUNTIME_LOG_ENDPOINT=http://127.0.0.1:5100/api/runtime/client-logs \
   --dart-define=RUNTIME_LOG_TOKEN=DeepTravelClientLogs2026
 ```
 
-发现页默认展示深圳，用户可切换上海。开始南头路线后，客户端仅在明确的活动旅程中请求定位、后台通知与相机权限；定位需在 15 秒内出现两次合格采样才触发音频。研究构建可显示显式模拟触发按钮，生产构建应同时关闭客户端 `ENABLE_DEMO_TRIGGERS` 和后端 `ALLOW_DEMO_ARRIVAL`。
+发现页从后端获取城市和该城市的全部已发布路线，路线卡片可左右滑动选择。开始碎片导览后，客户端仅在用户选择真实定位时请求定位权限，且需在 15 秒内出现两次合格采样才触发音频；真实/模拟定位开关在所有构建中永久保留。服务器需要设置 `ALLOW_DEMO_ARRIVAL=true` 才能接受模拟到达请求。
 
 ## 使用 Flask + MySQL
 
@@ -57,7 +57,7 @@ cd mobile
 flutter run \
   --dart-define=APP_MODE=api \
   --dart-define=API_BASE_URL=http://127.0.0.1:5001/api/v1 \
-  --dart-define=ENABLE_DEMO_TRIGGERS=true \
+  --dart-define=DEFAULT_CITY_SLUG=shenzhen \
   --dart-define=RUNTIME_LOG_ENDPOINT=http://127.0.0.1:5100/api/runtime/client-logs \
   --dart-define=RUNTIME_LOG_TOKEN=DeepTravelClientLogs2026
 ```

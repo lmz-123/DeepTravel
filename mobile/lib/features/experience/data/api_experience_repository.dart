@@ -42,16 +42,26 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<RouteExperience> featuredRoute(String citySlug) async {
+  Future<List<RouteExperience>> routesForCity(String citySlug) async {
     final response = await _request(() => _dio.get('/cities/$citySlug/routes'));
     final data = response.data['data'] as Map<String, dynamic>;
     final summaries = data['routes'] as List<dynamic>;
-    if (summaries.isEmpty) throw const ExperienceFailure('这座城市还没有可用路线');
-    final featured = summaries.cast<Map<String, dynamic>>().firstWhere(
-          (item) => item['is_featured'] == true,
-          orElse: () => summaries.first as Map<String, dynamic>,
-        );
-    return routeBySlug(featured['slug'] as String);
+    return summaries
+        .map((item) => RouteExperience.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<RouteExperience> featuredRoute(String citySlug) async {
+    final routes = await routesForCity(citySlug);
+    if (routes.isEmpty) {
+      throw const ExperienceFailure('这座城市还没有可用路线');
+    }
+    final summary = routes.firstWhere(
+      (route) => route.isFeatured,
+      orElse: () => routes.first,
+    );
+    return routeBySlug(summary.slug);
   }
 
   @override

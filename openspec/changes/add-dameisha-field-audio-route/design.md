@@ -16,6 +16,8 @@ Dameisha also introduces open-coast location constraints and map-datum risk. Pub
 - Remove route-specific reconstruction content from Flutter and keep mismatch feedback visible above modal UI.
 - Preserve all existing Nantou, Shanghai and in-progress journey behavior.
 - Make a real Android field pass sufficient to correct Dameisha trigger centers through admin configuration rather than a code change.
+- Preserve the real/simulated location selector as an unconditional runtime control in every build.
+- Present all public routes for the selected backend city as an animated horizontal selector without destination-specific Flutter data.
 
 **Non-Goals:**
 
@@ -134,6 +136,18 @@ Backend tests exercise pure validation, transactional rollback, package idempote
 
 The field checklist records at least eight readings per stop over 60–90 seconds, reported accuracy, median coordinate, practical drift, trigger timing, access safety, false-entry checks and app background/re-entry behavior.
 
+### 11. Location mode is a persisted runtime setting, not a build flavor
+
+The route preparation screen and active journey both show the same real/simulated switch in debug and release. `LocationModePreferences` remains the source of the saved choice. Selecting simulated mode prevents GPS startup and enables manual arrival; selecting real mode starts the existing permission, accuracy and two-sample flow. A production-address APK changes only `API_BASE_URL`; it does not compile away either mode.
+
+This deliberately separates two concerns that were previously conflated: the Dameisha field checklist is executed with real mode selected, while the shipped application's testability remains available. Compile-time `ENABLE_DEMO_TRIGGERS` checks are removed from presentation and controller behavior so a stale build flag cannot silently force real mode.
+
+### 12. Home discovery uses one animated PageView over public catalog records
+
+The discovery page selects from `citiesProvider` and loads `routesForCityProvider(selectedSlug)`. It renders the returned list directly in a `PageView.builder` with a viewport fraction that reveals neighboring cards. Page position drives scale, vertical offset, opacity and the selected indicator; `onPageChanged` updates the route whose metadata and detail navigation are active.
+
+Changing city resets the page controller to the first route returned for that city. Empty and error states are neutral and retryable. The client does not infer city display names from slugs and does not inject Nantou, Dameisha, Shenzhen or Shanghai records when the API omits them. Existing demo-repository fixtures may remain isolated test/offline fixtures, but API mode never falls back to them after a successful empty response.
+
 ## Risks / Trade-offs
 
 - [Direct shared-database administration couples schemas] → Keep one backend-owned migration chain, map only explicit tables in the admin service, and contract-test its mappings against backend metadata.
@@ -151,7 +165,7 @@ The field checklist records at least eight readings per stop over 60–90 second
 3. Extend the admin web route workspace and verify draft/import/validate/publish against an isolated MySQL copy.
 4. Generate/upload Dameisha media, import its versioned package, inspect validation warnings and publish through admin.
 5. Deploy the Flask API and verify catalog, route, journey, ledger, real arrival, reconstruction and evidence endpoints.
-6. Build the Android APK for `http://115.29.221.190:5001`, verify real mode and execute the field checklist.
+6. Build the Android APK for `http://115.29.221.190:5001`, verify both location modes remain selectable, then select real mode and execute the field checklist.
 
 Rollback first removes Dameisha from public discovery only if no journey references it; otherwise it stays available to those journeys while catalog featuring is disabled. Backend and admin binaries remain backward-compatible with legacy string causal models, so code rollback does not require deleting content rows.
 

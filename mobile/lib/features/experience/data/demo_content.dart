@@ -12,6 +12,7 @@ const demoRoute = RouteExperience(
   theme: '建筑与城市生活',
   heroImage: '',
   contentStatus: 'demo_unverified',
+  isFeatured: true,
   stops: [
     ExperienceStop(
       id: '8fa6c9b1-5e3a-40df-b5c8-100000000001',

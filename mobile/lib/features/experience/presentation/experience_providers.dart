@@ -46,19 +46,32 @@ final citiesProvider = FutureProvider<List<CityExperience>>((ref) {
   return ref.watch(experienceRepositoryProvider).cities();
 });
 
-class SelectedCityController extends Notifier<String> {
+class SelectedCityController extends Notifier<String?> {
   @override
-  String build() => 'shenzhen';
+  String? build() =>
+      AppConfig.defaultCitySlug.isEmpty ? null : AppConfig.defaultCitySlug;
 
   void select(String citySlug) => state = citySlug;
 }
 
-final selectedCityProvider = NotifierProvider<SelectedCityController, String>(
+final selectedCityProvider = NotifierProvider<SelectedCityController, String?>(
     SelectedCityController.new);
 
-final featuredRouteProvider = FutureProvider<RouteExperience>((ref) {
-  final citySlug = ref.watch(selectedCityProvider);
-  return ref.watch(experienceRepositoryProvider).featuredRoute(citySlug);
+final activeCityProvider = Provider<CityExperience?>((ref) {
+  final available = ref.watch(citiesProvider).asData?.value;
+  if (available == null || available.isEmpty) return null;
+  final selectedSlug = ref.watch(selectedCityProvider);
+  if (selectedSlug == null) return available.first;
+  for (final city in available) {
+    if (city.slug == selectedSlug) return city;
+  }
+  return available.first;
+});
+
+final cityRoutesProvider = FutureProvider<List<RouteExperience>>((ref) {
+  final city = ref.watch(activeCityProvider);
+  if (city == null) return const <RouteExperience>[];
+  return ref.watch(experienceRepositoryProvider).routesForCity(city.slug);
 });
 
 final routeProvider =

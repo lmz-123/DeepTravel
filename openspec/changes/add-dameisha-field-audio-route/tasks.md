@@ -22,6 +22,8 @@
 - [x] 4.1 Remove all route-specific reconstruction strings from Flutter and populate the reorderable puzzle from ledger-supplied stable items for Dameisha, Nantou and a generic configured fixture.
 - [x] 4.2 Present wrong-order feedback in a root overlay above the modal sheet, show the exact mismatch count, mark mismatched rows without revealing correct order and clean up overlay state on retry, success and disposal.
 - [x] 4.3 Verify collected audio controls and full transcripts survive navigation/re-entry, and real mode continues monitoring after stale, inaccurate or server-rejected samples.
+- [x] 4.4 Remove build-time location-mode gating so route preparation and active journeys always expose and persist the real/simulated switch, with manual arrival available whenever simulated mode is selected.
+- [x] 4.5 Replace the single-route home presentation with an animated horizontal selector over all routes returned for the selected backend city; remove destination-specific fallback names and content from API-mode presentation.
 
 ## 5. Automated Verification
 
@@ -29,9 +31,11 @@
 - [x] 5.2 Add independent admin server/UI tests for complete content CRUD/import, validation paths, publish state, media protection and compatibility with backend-owned schema.
 - [x] 5.3 Add Flutter widget/controller tests that reproduce the modal occlusion bug and prove the root mismatch overlay, count, row highlighting, configured options and correct completion flow.
 - [x] 5.4 Run backend format/lint/tests, admin server and web tests/build, Flutter format/analyze/tests, and clean plus existing-data MySQL integration smoke tests.
+- [x] 5.5 Add Flutter tests for a release-equivalent runtime location switch, two backend routes in one city, swipe selection, selected-route navigation and neutral empty catalog behavior; rerun format, analyze and the complete Flutter suite.
 
 ## 6. Field and Delivery
 
 - [x] 6.1 Add a Dameisha Android field checklist recording at least eight samples per stop, accuracy/drift, trigger timing, safe surface, false-entry checks and background/re-entry behavior.
-- [ ] 6.2 Smoke-test both deployed services and all media over their production addresses, then install a release APK configured for `http://115.29.221.190:5001` with simulation disabled.
+- [ ] 6.2 Smoke-test both deployed services and all media over their production addresses, then install a release APK configured for `http://115.29.221.190:5001` with both location modes available and execute the field pass with real mode selected.
 - [x] 6.3 Commit scoped changes, push `main` to both `DeepTravel` and `DeepTravel-admin`, and provide idempotent server pull/migration/redeploy commands plus the APK artifact.
+- [ ] 6.4 Commit the location-switch and backend-driven discovery corrections, push `main` to `DeepTravel`, and rebuild the production-address APK without compiling out simulated location.

@@ -108,6 +108,8 @@ class RouteExperience {
     required this.heroImage,
     required this.contentStatus,
     required this.stops,
+    this.isFeatured = false,
+    this.stopCount,
     this.audioTour,
   });
 
@@ -123,9 +125,13 @@ class RouteExperience {
   final String heroImage;
   final String contentStatus;
   final List<ExperienceStop> stops;
+  final bool isFeatured;
+  final int? stopCount;
   final AudioTourManifest? audioTour;
 
   bool get isVerified => contentStatus == 'verified';
+  int get numberOfStops =>
+      stopCount ?? audioTour?.fragments.length ?? stops.length;
 
   factory RouteExperience.fromJson(Map<String, dynamic> json) =>
       RouteExperience(
@@ -140,6 +146,8 @@ class RouteExperience {
         theme: json['theme'] as String,
         heroImage: json['hero_image'] as String,
         contentStatus: json['content_status'] as String,
+        isFeatured: json['is_featured'] as bool? ?? false,
+        stopCount: json['stop_count'] as int?,
         stops: (json['stops'] as List<dynamic>? ?? const [])
             .map(
                 (item) => ExperienceStop.fromJson(item as Map<String, dynamic>))

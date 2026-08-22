@@ -14,15 +14,17 @@ class DiscoveryPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final route = ref.watch(featuredRouteProvider);
+    final cities = ref.watch(citiesProvider);
+    final routes = ref.watch(cityRoutesProvider);
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(citiesProvider);
-            ref.invalidate(featuredRouteProvider);
-            await ref.read(featuredRouteProvider.future);
+            ref.invalidate(cityRoutesProvider);
+            await ref.read(citiesProvider.future);
+            await ref.read(cityRoutesProvider.future);
           },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -43,14 +45,51 @@ class DiscoveryPage extends ConsumerWidget {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 0),
                 sliver: SliverToBoxAdapter(
-                  child: route.when(
-                    loading: () => const _RouteSkeleton(),
-                    error: (error, _) => _ErrorCard(
-                      onRetry: () => ref.invalidate(featuredRouteProvider),
+                  child: cities.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _RouteSkeleton(),
                     ),
-                    data: (value) => _FeaturedRouteCard(route: value),
+                    error: (error, _) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _ErrorCard(
+                        onRetry: () => ref.invalidate(citiesProvider),
+                      ),
+                    ),
+                    data: (availableCities) {
+                      if (availableCities.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: _EmptyCatalog(
+                            title: '还没有开放的城市',
+                            message: '新目的地发布后会出现在这里。',
+                          ),
+                        );
+                      }
+                      return routes.when(
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: _RouteSkeleton(),
+                        ),
+                        error: (error, _) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _ErrorCard(
+                            onRetry: () => ref.invalidate(cityRoutesProvider),
+                          ),
+                        ),
+                        data: (items) => items.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 20),
+                                child: _EmptyCatalog(
+                                  title: '这座城市还没有开放路线',
+                                  message: '可以先切换城市，或稍后再来看看。',
+                                ),
+                              )
+                            : _RouteCarousel(routes: items),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -70,12 +109,9 @@ class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cities = ref.watch(citiesProvider);
-    final selectedSlug = ref.watch(selectedCityProvider);
+    final selectedCity = ref.watch(activeCityProvider);
+    final selectedSlug = selectedCity?.slug;
     final availableCities = cities.value ?? const <CityExperience>[];
-    String? selectedName;
-    for (final city in availableCities) {
-      if (city.slug == selectedSlug) selectedName = city.name;
-    }
 
     return Row(
       children: [
@@ -127,7 +163,7 @@ class _Header extends ConsumerWidget {
                 const Icon(Icons.location_on_outlined, size: 16),
                 const SizedBox(width: 5),
                 Text(
-                  selectedName ?? (selectedSlug == 'shenzhen' ? '深圳' : '上海'),
+                  selectedCity?.name ?? '选择城市',
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const SizedBox(width: 2),
@@ -141,100 +177,211 @@ class _Header extends ConsumerWidget {
   }
 }
 
-class _FeaturedRouteCard extends StatelessWidget {
-  const _FeaturedRouteCard({required this.route});
-  final RouteExperience route;
+class _RouteCarousel extends StatefulWidget {
+  const _RouteCarousel({required this.routes});
+
+  final List<RouteExperience> routes;
+
+  @override
+  State<_RouteCarousel> createState() => _RouteCarouselState();
+}
+
+class _RouteCarouselState extends State<_RouteCarousel> {
+  late final PageController _controller;
+  var _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(viewportFraction: .88);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return FadeSlideIn(
       delay: const Duration(milliseconds: 80),
-      child: Semantics(
-        button: true,
-        label: '查看路线 ${route.title}',
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => context.push('/route/${route.slug}'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                EditorialImage(
-                  source: route.heroImage,
-                  height: 290,
-                  heroTag: 'route-${route.slug}',
-                  child: Padding(
-                    padding: const EdgeInsets.all(22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            _GlassPill(label: '本周精选'),
-                          ],
-                        ),
-                        const Spacer(),
-                        Text(
-                          route.theme,
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: AppColors.gold,
-                                  ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          route.title,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
-                                color: AppColors.white,
-                              ),
-                        ),
-                      ],
+      child: Column(
+        children: [
+          SizedBox(
+            height: 505,
+            child: PageView.builder(
+              key: const ValueKey('route-carousel'),
+              controller: _controller,
+              physics: const BouncingScrollPhysics(),
+              itemCount: widget.routes.length,
+              onPageChanged: (index) => setState(() => _selectedIndex = index),
+              itemBuilder: (context, index) => AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  final page = _controller.hasClients &&
+                          _controller.position.hasContentDimensions
+                      ? _controller.page ?? _selectedIndex.toDouble()
+                      : _selectedIndex.toDouble();
+                  final distance = (page - index).abs().clamp(0.0, 1.0);
+                  final scale = 1 - distance * .045;
+                  return Transform.translate(
+                    offset: Offset(0, distance * 12),
+                    child: Transform.scale(
+                      scale: scale,
+                      alignment: Alignment.center,
+                      child: Opacity(
+                        opacity: 1 - distance * .22,
+                        child: child,
+                      ),
                     ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: _RouteCard(
+                    route: widget.routes[index],
+                    onTap: () {
+                      if (_selectedIndex != index) {
+                        _controller.animateToPage(
+                          index,
+                          duration: const Duration(milliseconds: 420),
+                          curve: Curves.easeOutCubic,
+                        );
+                        return;
+                      }
+                      context.push('/route/${widget.routes[index].slug}');
+                    },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Semantics(
+            label: '第 ${_selectedIndex + 1} 条，共 ${widget.routes.length} 条路线',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(widget.routes.length, (index) {
+                final selected = index == _selectedIndex;
+                return AnimatedContainer(
+                  key: ValueKey('route-indicator-$index'),
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  width: selected ? 24 : 7,
+                  height: 7,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.ink
+                        : AppColors.ink.withValues(alpha: .22),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteCard extends StatelessWidget {
+  const _RouteCard({required this.route, required this.onTap});
+  final RouteExperience route;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '查看路线 ${route.title}',
+      child: Card(
+        key: ValueKey('route-card-${route.slug}'),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              EditorialImage(
+                source: route.heroImage,
+                height: 276,
+                heroTag: 'route-${route.slug}',
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(route.subtitle,
-                          style: Theme.of(context).textTheme.bodyLarge),
-                      const SizedBox(height: 18),
                       Row(
                         children: [
-                          _Metric(
-                              icon: Icons.schedule_rounded,
-                              text: '${route.durationMinutes} 分钟'),
-                          _Metric(
-                              icon: Icons.route_rounded,
-                              text: '${route.distanceKm} km'),
-                          _Metric(
-                              icon: Icons.flag_outlined,
-                              text: '${route.stops.length} 站'),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Text('打开城市手册',
-                              style: Theme.of(context).textTheme.labelLarge),
-                          const Spacer(),
-                          const CircleAvatar(
-                            radius: 20,
-                            backgroundColor: AppColors.ink,
-                            foregroundColor: AppColors.white,
-                            child: Icon(Icons.arrow_forward_rounded, size: 19),
+                          _GlassPill(
+                            label: route.isFeatured ? '本周精选' : '城市路线',
                           ),
                         ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        route.theme,
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: AppColors.gold,
+                                ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        route.title,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
+                              color: AppColors.white,
+                            ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(route.subtitle,
+                        style: Theme.of(context).textTheme.bodyLarge),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        _Metric(
+                            icon: Icons.schedule_rounded,
+                            text: '${route.durationMinutes} 分钟'),
+                        _Metric(
+                            icon: Icons.route_rounded,
+                            text: '${route.distanceKm} km'),
+                        _Metric(
+                            icon: Icons.flag_outlined,
+                            text: '${route.numberOfStops} 站'),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Text('打开城市手册',
+                            style: Theme.of(context).textTheme.labelLarge),
+                        const Spacer(),
+                        const CircleAvatar(
+                          radius: 20,
+                          backgroundColor: AppColors.ink,
+                          foregroundColor: AppColors.white,
+                          child: Icon(Icons.arrow_forward_rounded, size: 19),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -336,6 +483,39 @@ class _RouteSkeleton extends StatelessWidget {
           color: AppColors.paperDeep, borderRadius: BorderRadius.circular(24)),
       alignment: Alignment.center,
       child: const CircularProgressIndicator(),
+    );
+  }
+}
+
+class _EmptyCatalog extends StatelessWidget {
+  const _EmptyCatalog({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 300,
+      decoration: BoxDecoration(
+        color: AppColors.paperDeep,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.map_outlined, size: 40, color: AppColors.moss),
+          const SizedBox(height: 16),
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -9,9 +9,9 @@ abstract final class AppConfig {
     'API_BASE_URL',
     defaultValue: 'http://127.0.0.1:5001/api/v1',
   );
-  static const enableDemoTriggers = bool.fromEnvironment(
-    'ENABLE_DEMO_TRIGGERS',
-    defaultValue: true,
+  static const defaultCitySlug = String.fromEnvironment(
+    'DEFAULT_CITY_SLUG',
+    defaultValue: 'shenzhen',
   );
   static const runtimeLogEndpoint = String.fromEnvironment(
     'RUNTIME_LOG_ENDPOINT',

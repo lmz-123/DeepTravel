@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/fragment_models.dart';
 import '../domain/tour_runtime.dart';
@@ -148,8 +147,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                           clueCount: ledger.totalCount,
                           onPressed: () => _showReconstruction(ledger))),
               ],
-              if (AppConfig.enableDemoTriggers &&
-                  state.locationMode == TourLocationMode.simulated) ...[
+              if (state.locationMode == TourLocationMode.simulated) ...[
                 const SizedBox(height: 18),
                 OutlinedButton.icon(
                     onPressed: state.isBusy || state.status != 'simulated'
@@ -515,45 +513,42 @@ class _StatusPanel extends ConsumerWidget {
                       style: TextStyle(
                           color: AppColors.white.withValues(alpha: .72),
                           height: 1.45)))),
-        if (AppConfig.enableDemoTriggers) ...[
-          const SizedBox(height: 12),
-          Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
-          const SizedBox(height: 8),
-          Semantics(
-            label: '模拟定位测试开关',
-            hint: state.locationMode == TourLocationMode.simulated
-                ? '当前忽略真实位置'
-                : '当前使用真实位置',
-            child: Row(children: [
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    const Text('模拟定位（测试）',
-                        style: TextStyle(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(
-                        state.locationMode == TourLocationMode.simulated
-                            ? '手动模拟到达，不申请定位权限'
-                            : '读取真实位置，稳定靠近后触发',
-                        style: TextStyle(
-                            color: AppColors.white.withValues(alpha: .66),
-                            fontSize: 12)),
-                  ])),
-              Switch.adaptive(
-                  value: state.locationMode == TourLocationMode.simulated,
-                  onChanged: state.isBusy || state.status == 'preparing'
-                      ? null
-                      : (value) => ref
-                          .read(activeTourControllerProvider.notifier)
-                          .setLocationMode(value
-                              ? TourLocationMode.simulated
-                              : TourLocationMode.real)),
-            ]),
-          ),
-        ],
+        const SizedBox(height: 12),
+        Divider(color: AppColors.white.withValues(alpha: .16), height: 1),
+        const SizedBox(height: 8),
+        Semantics(
+          label: '模拟定位测试开关',
+          hint: state.locationMode == TourLocationMode.simulated
+              ? '当前忽略真实位置'
+              : '当前使用真实位置',
+          child: Row(children: [
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  const Text('模拟定位（测试）',
+                      style: TextStyle(
+                          color: AppColors.white, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(
+                      state.locationMode == TourLocationMode.simulated
+                          ? '手动模拟到达，不申请定位权限'
+                          : '读取真实位置，稳定靠近后触发',
+                      style: TextStyle(
+                          color: AppColors.white.withValues(alpha: .66),
+                          fontSize: 12)),
+                ])),
+            Switch.adaptive(
+                value: state.locationMode == TourLocationMode.simulated,
+                onChanged: state.isBusy || state.status == 'preparing'
+                    ? null
+                    : (value) => ref
+                        .read(activeTourControllerProvider.notifier)
+                        .setLocationMode(value
+                            ? TourLocationMode.simulated
+                            : TourLocationMode.real)),
+          ]),
+        ),
       ]),
     );
   }

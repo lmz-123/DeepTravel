@@ -16,10 +16,12 @@ flutter run
 flutter run \
   --dart-define=APP_MODE=api \
   --dart-define=API_BASE_URL=http://127.0.0.1:5001/api/v1 \
-  --dart-define=ENABLE_DEMO_TRIGGERS=true \
+  --dart-define=DEFAULT_CITY_SLUG=shenzhen \
   --dart-define=RUNTIME_LOG_ENDPOINT=http://127.0.0.1:5100/api/runtime/client-logs \
   --dart-define=RUNTIME_LOG_TOKEN=DeepTravelClientLogs2026
 ```
+
+城市名称、路线卡片、封面和路线内容均由后端公共目录返回。首页会横向展示所选城市的全部已发布路线。真实/模拟定位是持久化的运行时选择，在 debug 与 release 中均始终可切换。
 
 客户端会把框架异常、接口失败、照片上传状态和少量生命周期事件写入有上限的本地队列，并发送到独立管理后台。日志不包含照片、令牌、请求正文或精确位置；网络恢复或应用回到前台时会继续发送。
 
