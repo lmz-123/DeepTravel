@@ -25,6 +25,14 @@ abstract final class AppConfig {
     'APP_VERSION',
     defaultValue: '0.1.0+1',
   );
+  static const testAuthEnabled = bool.fromEnvironment(
+    'TEST_AUTH_ENABLED',
+    defaultValue: false,
+  );
+  static const defaultTestUser = String.fromEnvironment(
+    'DEFAULT_TEST_USER',
+    defaultValue: 'tester-a',
+  );
 
   static AppMode get mode => modeValue == 'api' ? AppMode.api : AppMode.demo;
 }

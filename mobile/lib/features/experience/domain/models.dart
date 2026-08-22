@@ -129,7 +129,7 @@ class RouteExperience {
   final int? stopCount;
   final AudioTourManifest? audioTour;
 
-  bool get isVerified => contentStatus == 'verified';
+  bool get isPublished => contentStatus == 'published';
   int get numberOfStops =>
       stopCount ?? audioTour?.fragments.length ?? stops.length;
 
@@ -208,6 +208,21 @@ class JourneySession {
         arrivedStopId: json['arrived_stop_id'] as String?,
         answeredStopIds: Set<String>.from(json['answered_stop_ids'] as List),
         progress: (json['progress'] as num).toDouble(),
+      );
+}
+
+class ResumableJourney {
+  const ResumableJourney({required this.route, required this.session});
+
+  final RouteExperience route;
+  final JourneySession session;
+
+  factory ResumableJourney.fromJson(Map<String, dynamic> json) =>
+      ResumableJourney(
+        route: RouteExperience.fromJson(json['route'] as Map<String, dynamic>),
+        session: JourneySession.fromJson(
+          json['journey'] as Map<String, dynamic>,
+        ),
       );
 }
 

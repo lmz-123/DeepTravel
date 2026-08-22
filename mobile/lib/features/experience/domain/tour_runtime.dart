@@ -57,6 +57,7 @@ class OutboxEvent {
 }
 
 abstract interface class TourStore {
+  Future<void> clearPrivateData();
   Future<void> saveJson(String key, Map<String, dynamic> value);
   Future<Map<String, dynamic>?> readJson(String key);
   Future<void> enqueue(OutboxEvent event);

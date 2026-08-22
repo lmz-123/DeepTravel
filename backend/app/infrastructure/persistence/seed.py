@@ -260,7 +260,7 @@ def _ensure_city_route(
             theme=route_theme,
             hero_image=hero_image,
             is_featured=True,
-            content_status="demo_unverified",
+            content_status="published",
             published_at=datetime.now(UTC),
         )
         session.add(route)

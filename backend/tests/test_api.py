@@ -18,7 +18,7 @@ def test_health_and_catalog(client):
 
     detail = client.get("/api/v1/routes/wukang-urban-slices")
     route = detail.get_json()["data"]
-    assert route["content_status"] == "demo_unverified"
+    assert route["content_status"] == "published"
     assert route["hero_image"].startswith("http://localhost/api/v1/assets/")
     assert [stop["position"] for stop in route["stops"]] == [1, 2, 3, 4, 5]
     assert "correct_option" not in route["stops"][0]["challenge"]
@@ -39,7 +39,7 @@ def test_shenzhen_featured_route_and_media(client):
 
     detail = client.get("/api/v1/routes/nantou-time-layers")
     route = detail.get_json()["data"]
-    assert route["content_status"] == "demo_unverified"
+    assert route["content_status"] == "published"
     assert [stop["position"] for stop in route["stops"]] == [1, 2, 3, 4, 5]
     assert route["hero_image"].endswith("/assets/images/route_shenzhen.png")
 
@@ -168,7 +168,7 @@ def test_seed_is_idempotent(app):
     session.close()
 
 
-def test_legacy_admin_published_status_remains_public(app, client):
+def test_published_status_remains_public_and_truthful(app, client):
     database = app.extensions["database"]
     session = database.session_factory()
     route = session.query(RouteModel).filter_by(slug="nantou-time-layers").one()
@@ -179,4 +179,61 @@ def test_legacy_admin_published_status_remains_public(app, client):
     response = client.get("/api/v1/routes/nantou-time-layers")
 
     assert response.status_code == 200
-    assert response.get_json()["data"]["content_status"] == "verified"
+    assert response.get_json()["data"]["content_status"] == "published"
+
+
+def test_verified_route_is_offline_and_city_without_published_routes_is_hidden(app, client):
+    database = app.extensions["database"]
+    session = database.session_factory()
+    route = session.query(RouteModel).filter_by(slug="wukang-urban-slices").one()
+    route.content_status = "verified"
+    route.published_at = None
+    session.commit()
+    session.close()
+
+    assert client.get("/api/v1/routes/wukang-urban-slices").status_code == 404
+    cities = client.get("/api/v1/cities").get_json()["data"]
+    assert "shanghai" not in {item["slug"] for item in cities}
+    assert client.get("/api/v1/cities/shanghai/routes").status_code == 404
+
+
+def test_archived_route_rejects_new_start_but_existing_owner_continues(app, client, user_headers):
+    route = client.get("/api/v1/routes/wukang-urban-slices").get_json()["data"]
+    journey = client.post(
+        "/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers
+    ).get_json()["data"]
+
+    database = app.extensions["database"]
+    session = database.session_factory()
+    model = session.get(RouteModel, route["id"])
+    model.content_status = "archived"
+    session.commit()
+    session.close()
+
+    assert client.get("/api/v1/routes/wukang-urban-slices").status_code == 404
+    other = _register_test_user(client, "archived-new-user")
+    rejected = client.post("/api/v1/journeys", json={"route_id": route["id"]}, headers=other)
+    assert rejected.status_code == 404
+    assert client.get(f"/api/v1/journeys/{journey['id']}", headers=user_headers).status_code == 200
+    active = client.get("/api/v1/journeys/active", headers=user_headers)
+    assert active.status_code == 200
+    archived_entry = next(
+        item for item in active.get_json()["data"] if item["journey"]["id"] == journey["id"]
+    )
+    assert archived_entry["route"]["content_status"] == "archived"
+    assert archived_entry["route"]["slug"] == "wukang-urban-slices"
+    continued = client.post(
+        f"/api/v1/journeys/{journey['id']}/arrivals",
+        json={"demo": True},
+        headers=user_headers,
+    )
+    assert continued.status_code == 200
+
+
+def _register_test_user(client, username: str) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "password": "field-test-123"},
+    )
+    token = response.get_json()["data"]["token"]
+    return {"Authorization": f"Bearer {token}"}

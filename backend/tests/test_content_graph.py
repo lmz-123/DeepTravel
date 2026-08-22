@@ -74,8 +74,7 @@ def _graph() -> dict:
             "script_version": "route-v1",
             "review_state": "in_review",
             "causal_model": [
-                {"id": f"cause-{index + 1}", "text": f"关系 {index + 1}"}
-                for index in range(3)
+                {"id": f"cause-{index + 1}", "text": f"关系 {index + 1}"} for index in range(3)
             ],
         },
         "sources": [
@@ -136,22 +135,49 @@ def test_legacy_reconstruction_items_get_stable_ids_and_deterministic_shuffle():
 
 def test_dameisha_package_graph_and_media_are_complete():
     root = Path(__file__).parents[2]
-    package = json.loads(
-        (root / "docs/content-packages/dameisha-remade-coast-v1.json").read_text()
-    )
+    package = json.loads((root / "docs/content-packages/dameisha-remade-coast-v1.json").read_text())
     media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
 
     result = validate_content_graph(package, media_assets=media)
 
     assert result["valid"] is True, result["errors"]
     assert len(package["fragments"]) == 5
-    assert sum(
-        bool((item.get("photo_mission") or {}).get("required"))
-        for item in package["fragments"]
-    ) == 3
+    assert (
+        sum(
+            bool((item.get("photo_mission") or {}).get("required")) for item in package["fragments"]
+        )
+        == 3
+    )
     for item in package["media"]:
         path = root / "backend/media" / item["storage_path"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
     for fragment in package["fragments"]:
         assert fragment["narration_script"] == fragment["transcript"]
+
+
+def test_shanghai_readable_city_package_is_generic_audio_photo_content():
+    root = Path(__file__).parents[2]
+    package = json.loads(
+        (root / "docs/content-packages/shanghai-readable-city-v1.json").read_text()
+    )
+    media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
+
+    result = validate_content_graph(package, media_assets=media)
+
+    assert result["valid"] is True, result["errors"]
+    assert package["route"]["slug"] == "shanghai-readable-city"
+    assert len(package["fragments"]) == 5
+    assert sum(item["interaction_type"] == "photo" for item in package["fragments"]) == 3
+    assert {item["interaction_type"] for item in package["fragments"]} <= {
+        "passive",
+        "photo",
+    }
+    assert all(
+        item["trigger_region"]["coordinate_system"] == "WGS84" for item in package["fragments"]
+    )
+    assert all("answer" not in item for item in package["fragments"])
+    for item in package["media"]:
+        path = root / "backend/media" / item["storage_path"]
+        assert path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]

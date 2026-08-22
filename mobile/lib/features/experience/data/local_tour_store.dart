@@ -30,6 +30,15 @@ class SqliteTourStore implements TourStore {
   }
 
   @override
+  Future<void> clearPrivateData() async {
+    final db = await _db;
+    await db.transaction((transaction) async {
+      await transaction.delete('snapshots');
+      await transaction.delete('outbox');
+    });
+  }
+
+  @override
   Future<void> saveJson(String key, Map<String, dynamic> value) async {
     final db = await _db;
     await db.insert(

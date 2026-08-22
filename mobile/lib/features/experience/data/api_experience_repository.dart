@@ -1,6 +1,8 @@
-import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:developer' as developer;
 
+import 'package:dio/dio.dart';
+
+import '../../auth/data/auth_repository.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
@@ -14,24 +16,21 @@ class ExperienceFailure implements Exception {
 }
 
 class ApiExperienceRepository implements ExperienceRepository {
-  ApiExperienceRepository(this._dio);
+  ApiExperienceRepository(this._dio, this._auth, {this.onUnauthorized});
 
   final Dio _dio;
-  String? _token;
+  final AuthRepository _auth;
+  final Future<void> Function()? onUnauthorized;
   final Map<String, RouteExperience> _cachedRoutes = {};
 
-  Future<void> _ensureGuest() async {
-    if (_token != null) return;
-    final preferences = await SharedPreferences.getInstance();
-    _token = preferences.getString('guest_token');
-    if (_token != null) return;
-    final response = await _request(() => _dio.post('/sessions/guest'));
-    _token = (response.data['data'] as Map<String, dynamic>)['token'] as String;
-    await preferences.setString('guest_token', _token!);
+  Future<void> _ensureAuth() async {
+    if (_auth.token == null) {
+      throw const ExperienceFailure('请先登录后再开始旅程');
+    }
   }
 
   Options get _authorized =>
-      Options(headers: {'Authorization': 'Bearer $_token'});
+      Options(headers: {'Authorization': 'Bearer ${_auth.token}'});
 
   @override
   Future<List<CityExperience>> cities() async {
@@ -46,9 +45,19 @@ class ApiExperienceRepository implements ExperienceRepository {
     final response = await _request(() => _dio.get('/cities/$citySlug/routes'));
     final data = response.data['data'] as Map<String, dynamic>;
     final summaries = data['routes'] as List<dynamic>;
-    return summaries
+    final routes = summaries
         .map((item) => RouteExperience.fromJson(item as Map<String, dynamic>))
         .toList();
+    final published = routes
+        .where((route) => route.contentStatus == 'published')
+        .toList(growable: false);
+    if (published.length != routes.length) {
+      developer.log(
+        'catalog_contract_warning: omitted non-published routes',
+        name: 'jiandi.catalog',
+      );
+    }
+    return published;
   }
 
   @override
@@ -71,13 +80,32 @@ class ApiExperienceRepository implements ExperienceRepository {
     final route = RouteExperience.fromJson(
       response.data['data'] as Map<String, dynamic>,
     );
+    if (route.contentStatus != 'published') {
+      developer.log(
+        'catalog_contract_warning: rejected non-published route detail',
+        name: 'jiandi.catalog',
+      );
+      throw const ExperienceFailure('这条路线尚未发布');
+    }
     _cachedRoutes[slug] = route;
     return route;
   }
 
+  Future<List<ResumableJourney>> archivedActiveJourneys() async {
+    await _ensureAuth();
+    final response = await _request(
+        () => _dio.get('/journeys/active', options: _authorized));
+    return (response.data['data'] as List<dynamic>)
+        .map(
+          (item) => ResumableJourney.fromJson(item as Map<String, dynamic>),
+        )
+        .where((item) => item.route.contentStatus == 'archived')
+        .toList(growable: false);
+  }
+
   @override
   Future<JourneySession> startOrResume(String routeId) async {
-    await _ensureGuest();
+    await _ensureAuth();
     final response = await _request(
       () => _dio.post('/journeys',
           data: {'route_id': routeId}, options: _authorized),
@@ -147,14 +175,14 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   @override
   Future<void> startActiveTour(String journeyId) async {
-    await _ensureGuest();
+    await _ensureAuth();
     await _request(() =>
         _dio.post('/journeys/$journeyId/active-tour', options: _authorized));
   }
 
   @override
   Future<void> stopActiveTour(String journeyId) async {
-    await _ensureGuest();
+    await _ensureAuth();
     await _request(() =>
         _dio.delete('/journeys/$journeyId/active-tour', options: _authorized));
   }
@@ -169,7 +197,7 @@ class ApiExperienceRepository implements ExperienceRepository {
     double? longitude,
     double? accuracyM,
   }) async {
-    await _ensureGuest();
+    await _ensureAuth();
     final response = await _request(() => _dio.post(
           '/journeys/$journeyId/fragments/$fragmentId/triggers',
           data: {
@@ -189,7 +217,7 @@ class ApiExperienceRepository implements ExperienceRepository {
   @override
   Future<StoryFragment> acknowledgePlayback(String journeyId, String fragmentId,
       double progress, String idempotencyKey) async {
-    await _ensureGuest();
+    await _ensureAuth();
     final response = await _request(() => _dio.post(
           '/journeys/$journeyId/fragments/$fragmentId/playback',
           data: {'progress': progress, 'idempotency_key': idempotencyKey},
@@ -202,7 +230,7 @@ class ApiExperienceRepository implements ExperienceRepository {
   @override
   Future<EvidenceRecord> uploadEvidence(String journeyId, String fragmentId,
       String filePath, String idempotencyKey) async {
-    await _ensureGuest();
+    await _ensureAuth();
     final form = FormData.fromMap({
       'photo': await MultipartFile.fromFile(filePath),
       'idempotency_key': idempotencyKey,
@@ -223,7 +251,7 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   @override
   Future<StoryLedger> ledger(String journeyId) async {
-    await _ensureGuest();
+    await _ensureAuth();
     final response = await _request(
         () => _dio.get('/journeys/$journeyId/ledger', options: _authorized));
     return StoryLedger.fromJson(response.data['data'] as Map<String, dynamic>);
@@ -232,7 +260,7 @@ class ApiExperienceRepository implements ExperienceRepository {
   @override
   Future<ReconstructionResult> reconstruct(
       String journeyId, List<String> relationships) async {
-    await _ensureGuest();
+    await _ensureAuth();
     final response = await _request(() => _dio.post(
         '/journeys/$journeyId/reconstruction',
         data: {'relationships': relationships},
@@ -243,7 +271,7 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   @override
   Future<FragmentRecap> fragmentRecap(String journeyId) async {
-    await _ensureGuest();
+    await _ensureAuth();
     final response = await _request(
         () => _dio.get('/journeys/$journeyId/recap', options: _authorized));
     return FragmentRecap.fromJson(
@@ -256,6 +284,10 @@ class ApiExperienceRepository implements ExperienceRepository {
     try {
       return await action();
     } on DioException catch (error) {
+      if (error.response?.statusCode == 401) {
+        await onUnauthorized?.call();
+        throw const ExperienceFailure('登录已过期，请重新登录');
+      }
       final responseData = error.response?.data;
       if (responseData is Map<String, dynamic>) {
         final envelope = responseData['error'];

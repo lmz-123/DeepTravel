@@ -7,6 +7,7 @@ import '../data/api_experience_repository.dart';
 import '../data/demo_experience_repository.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
+import '../../auth/presentation/auth_provider.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final reporter = ref.watch(runtimeLogReporterProvider);
@@ -37,7 +38,11 @@ final dioProvider = Provider<Dio>((ref) {
 
 final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {
   if (AppConfig.mode == AppMode.api) {
-    return ApiExperienceRepository(ref.watch(dioProvider));
+    return ApiExperienceRepository(
+      ref.watch(dioProvider),
+      ref.watch(authRepositoryProvider),
+      onUnauthorized: () => ref.read(authControllerProvider.notifier).expire(),
+    );
   }
   return DemoExperienceRepository();
 });
@@ -72,6 +77,15 @@ final cityRoutesProvider = FutureProvider<List<RouteExperience>>((ref) {
   final city = ref.watch(activeCityProvider);
   if (city == null) return const <RouteExperience>[];
   return ref.watch(experienceRepositoryProvider).routesForCity(city.slug);
+});
+
+final archivedActiveJourneysProvider =
+    FutureProvider<List<ResumableJourney>>((ref) {
+  final repository = ref.watch(experienceRepositoryProvider);
+  if (repository is ApiExperienceRepository) {
+    return repository.archivedActiveJourneys();
+  }
+  return const <ResumableJourney>[];
 });
 
 final routeProvider =
@@ -134,6 +148,11 @@ class JourneyController extends Notifier<JourneyUiState> {
       state = state.copyWith(isBusy: false, errorMessage: _message(error));
       return null;
     }
+  }
+
+  String resume(RouteExperience route, JourneySession session) {
+    state = JourneyUiState(route: route, session: session);
+    return session.id;
   }
 
   Future<void> arrive() async {

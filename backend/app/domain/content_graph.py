@@ -83,8 +83,7 @@ def validate_content_graph(
             if not str(source.get(key) or "").strip():
                 error(f"sources[{index}].{key}", "required", "来源缺少标题、发布机构或链接")
     claim_sources = {
-        str(item.get("id") or ""): set(map(str, item.get("source_ids") or []))
-        for item in claims
+        str(item.get("id") or ""): set(map(str, item.get("source_ids") or [])) for item in claims
     }
     for index, claim in enumerate(claims):
         claim_id = str(claim.get("id") or "")

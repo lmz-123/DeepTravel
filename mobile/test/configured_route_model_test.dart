@@ -14,7 +14,7 @@ void main() {
       'difficulty': '轻松',
       'theme': '历史',
       'hero_image': 'https://example.test/cover.png',
-      'content_status': 'verified',
+      'content_status': 'published',
       'stops': [
         {
           'id': 'stop-1',
@@ -61,7 +61,7 @@ void main() {
       'difficulty': '轻松',
       'theme': '城市故事',
       'hero_image': 'https://example.test/cover.png',
-      'content_status': 'verified',
+      'content_status': 'published',
       'is_featured': true,
       'stop_count': 5,
     });

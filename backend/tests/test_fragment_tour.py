@@ -87,9 +87,7 @@ def test_trigger_accuracy_distance_and_idempotency(client, guest_headers, caplog
 def test_ledger_logs_state_summary(client, guest_headers, caplog):
     _, journey = _start(client, guest_headers)
 
-    response = client.get(
-        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
-    )
+    response = client.get(f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers)
 
     assert response.status_code == 200
     assert "journey_ledger_loaded" in caplog.text

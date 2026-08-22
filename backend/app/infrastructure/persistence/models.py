@@ -26,8 +26,31 @@ class MediaAssetModel(Base):
     key: Mapped[str] = mapped_column(String(120), primary_key=True)
     storage_path: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     mime_type: Mapped[str] = mapped_column(String(100))
+    storage_provider: Mapped[str] = mapped_column(String(20), default="local")
+    object_key: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
+    canonical_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    visibility: Mapped[str] = mapped_column(String(20), default="public")
+    size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    checksum_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    username: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    account_kind: Mapped[str] = mapped_column(String(20), default="registered", index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    auth_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    guest_sessions: Mapped[list[GuestSessionModel]] = relationship(back_populates="user")
+    journeys: Mapped[list[JourneyModel]] = relationship(back_populates="user")
 
 
 class CityModel(Base):
@@ -120,9 +143,11 @@ class GuestSessionModel(Base):
     __tablename__ = "guest_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
+    user: Mapped[UserModel] = relationship(back_populates="guest_sessions")
     journeys: Mapped[list[JourneyModel]] = relationship(back_populates="guest_session")
 
 
@@ -130,7 +155,10 @@ class JourneyModel(Base):
     __tablename__ = "journeys"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    guest_session_id: Mapped[str] = mapped_column(ForeignKey("guest_sessions.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    guest_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("guest_sessions.id"), index=True, nullable=True
+    )
     route_id: Mapped[str] = mapped_column(ForeignKey("routes.id"), index=True)
     status: Mapped[str] = mapped_column(String(20), index=True)
     current_stop_position: Mapped[int] = mapped_column(Integer, default=1)
@@ -139,6 +167,7 @@ class JourneyModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    user: Mapped[UserModel] = relationship(back_populates="journeys")
     guest_session: Mapped[GuestSessionModel] = relationship(back_populates="journeys")
     answers: Mapped[list[JourneyAnswerModel]] = relationship(
         back_populates="journey", cascade="all, delete-orphan"
@@ -359,6 +388,8 @@ class EvidenceModel(Base):
     journey_id: Mapped[str] = mapped_column(ForeignKey("journeys.id"), index=True)
     mission_id: Mapped[str] = mapped_column(ForeignKey("photo_missions.id"), index=True)
     object_key: Mapped[str] = mapped_column(String(255), unique=True)
+    storage_provider: Mapped[str] = mapped_column(String(20), default="local")
+    canonical_reference: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     mime_type: Mapped[str] = mapped_column(String(80))
     size_bytes: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
@@ -369,6 +400,28 @@ class EvidenceModel(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(80))
+
+
+class NarrationPreviewModel(Base):
+    __tablename__ = "narration_previews"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    fragment_id: Mapped[str] = mapped_column(ForeignKey("story_fragments.id"), index=True)
+    transcript_hash: Mapped[str] = mapped_column(String(64), index=True)
+    provider: Mapped[str] = mapped_column(String(40))
+    model: Mapped[str] = mapped_column(String(80))
+    voice_id: Mapped[str] = mapped_column(String(120))
+    emotion: Mapped[str] = mapped_column(String(40), default="calm")
+    speed: Mapped[float] = mapped_column(Float, default=1.0)
+    pitch: Mapped[int] = mapped_column(Integer, default=0)
+    pronunciation_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    object_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ReconstructionModel(Base):

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from hashlib import sha256
 from io import BytesIO
-from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import BinaryIO
 from uuid import uuid4
 
@@ -11,6 +9,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.domain.errors import DomainError
 from app.domain.evidence import StoredEvidence
+from app.infrastructure.object_storage import LocalObjectStorage
 
 
 class EvidenceInvalidError(DomainError):
@@ -31,29 +30,33 @@ class EvidenceStorageUnavailableError(DomainError):
     default_message = "照片暂时无法安全保存，请稍后重试"
 
 
-class LocalEvidenceStorage:
+class EvidenceStorage:
     supported = {
         "JPEG": ("image/jpeg", ".jpg"),
         "PNG": ("image/png", ".png"),
         "WEBP": ("image/webp", ".webp"),
     }
 
-    def __init__(self, root: str, max_bytes: int, max_edge: int):
-        self.root = Path(root).resolve()
+    def __init__(self, object_storage, max_bytes: int, max_edge: int, prefix: str):
+        self.object_storage = object_storage
         self.max_bytes = max_bytes
         self.max_edge = max_edge
-        self.root.mkdir(parents=True, exist_ok=True)
+        self.prefix = prefix.strip("/")
+
+    @property
+    def provider(self) -> str:
+        return self.object_storage.provider
 
     def healthy(self) -> bool:
         try:
-            probe = self.root / ".health"
-            probe.write_bytes(b"ok")
-            probe.unlink(missing_ok=True)
+            self.object_storage.exists(f"{self.prefix}/.health")
             return True
-        except OSError:
+        except Exception:
             return False
 
-    def put(self, stream: BinaryIO, declared_mime: str) -> StoredEvidence:
+    def put(
+        self, stream: BinaryIO, declared_mime: str, *, scope: str = "unscoped"
+    ) -> StoredEvidence:
         raw = stream.read(self.max_bytes + 1)
         if len(raw) > self.max_bytes:
             raise EvidenceTooLargeError()
@@ -85,30 +88,33 @@ class LocalEvidenceStorage:
             if isinstance(exc, EvidenceInvalidError):
                 raise
             raise EvidenceInvalidError() from exc
-        object_key = f"{uuid4().hex[:2]}/{uuid4().hex}{suffix}"
-        target = (self.root / object_key).resolve()
-        if self.root not in target.parents:
-            raise EvidenceStorageUnavailableError()
+        safe_scope = "/".join(
+            part for part in scope.strip("/").split("/") if part and part not in {".", ".."}
+        )
+        object_key = f"{self.prefix}/{safe_scope}/{uuid4().hex}{suffix}"
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with NamedTemporaryFile(dir=target.parent, delete=False) as temporary:
-                temporary.write(payload)
-                temporary.flush()
-                temporary_path = Path(temporary.name)
-            temporary_path.replace(target)
-        except OSError as exc:
+            self.object_storage.put(object_key, payload, output_mime)
+        except Exception as exc:
             raise EvidenceStorageUnavailableError() from exc
         return StoredEvidence(
             object_key, output_mime, len(payload), sha256(payload).hexdigest(), width, height
         )
 
     def open(self, object_key: str) -> BinaryIO:
-        target = (self.root / object_key).resolve()
-        if self.root not in target.parents or not target.is_file():
-            raise FileNotFoundError(object_key)
-        return target.open("rb")
+        return self.object_storage.open(object_key)
 
     def delete(self, object_key: str) -> None:
-        target = (self.root / object_key).resolve()
-        if self.root in target.parents:
-            target.unlink(missing_ok=True)
+        self.object_storage.delete(object_key)
+
+    def canonical_reference(self, object_key: str) -> str:
+        if self.provider == "oss":
+            return f"oss://{self.object_storage.bucket}/{object_key}"
+        return f"local://{object_key}"
+
+    def sign_get(self, object_key: str, expires_seconds: int) -> str:
+        return self.object_storage.sign_get(object_key, expires_seconds)
+
+
+class LocalEvidenceStorage(EvidenceStorage):
+    def __init__(self, root: str, max_bytes: int, max_edge: int):
+        super().__init__(LocalObjectStorage(root), max_bytes, max_edge, prefix="private/evidence")

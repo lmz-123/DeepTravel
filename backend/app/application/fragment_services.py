@@ -25,6 +25,7 @@ from app.infrastructure.persistence.models import (
     IdempotencyRecordModel,
     JourneyFragmentModel,
     JourneyModel,
+    MediaAssetModel,
     PhotoMissionModel,
     ReconstructionModel,
     StoryArcModel,
@@ -93,14 +94,14 @@ class FragmentTourService:
                 dependency_map.setdefault(fragment_id, []).append(required_id)
             fragments = [
                 {
-                    **self._public_fragment(item),
+                    **self._public_fragment(item, session),
                     "dependency_ids": dependency_map.get(item.id, []),
                 }
                 for item in arc.fragments
             ]
             total_bytes = sum(item.audio_size_bytes for item in arc.fragments)
             assets_exist = all(
-                (self.media_root / item.audio_path).is_file() for item in arc.fragments
+                self._asset_exists(session, item.audio_path) for item in arc.fragments
             )
             production_ready = (
                 arc.review_state == "reviewed"
@@ -169,9 +170,9 @@ class FragmentTourService:
                     )
             session.commit()
 
-    def start_active_tour(self, guest_id: str, journey_id: str) -> dict:
+    def start_active_tour(self, user_id: str, journey_id: str) -> dict:
         with self._session() as session:
-            journey = self._owned_journey(session, guest_id, journey_id)
+            journey = self._owned_journey(session, user_id, journey_id)
             now = datetime.now(UTC)
             active = session.get(ActiveTourModel, journey_id)
             if active is None:
@@ -190,9 +191,9 @@ class FragmentTourService:
                 "updated_at": _iso(active.updated_at),
             }
 
-    def stop_active_tour(self, guest_id: str, journey_id: str) -> dict:
+    def stop_active_tour(self, user_id: str, journey_id: str) -> dict:
         with self._session() as session:
-            self._owned_journey(session, guest_id, journey_id)
+            self._owned_journey(session, user_id, journey_id)
             active = session.get(ActiveTourModel, journey_id)
             if active is not None:
                 active.status = "stopped"
@@ -200,7 +201,7 @@ class FragmentTourService:
                 session.commit()
             return {"journey_id": journey_id, "status": "stopped"}
 
-    def trigger(self, guest_id: str, journey_id: str, fragment_id: str, payload: dict) -> dict:
+    def trigger(self, user_id: str, journey_id: str, fragment_id: str, payload: dict) -> dict:
         key = str(payload.get("idempotency_key") or "")
         if not key:
             raise FragmentOperationError(
@@ -208,10 +209,10 @@ class FragmentTourService:
             )
         scope = f"trigger:{journey_id}:{fragment_id}"
         with self._session() as session:
+            journey = self._owned_journey(session, user_id, journey_id)
             duplicate = self._idempotent(session, scope, key)
             if duplicate is not None:
                 return duplicate
-            journey = self._owned_journey(session, guest_id, journey_id)
             fragment, state = self._fragment_state(session, journey, fragment_id)
             dependencies = set(
                 session.scalars(
@@ -285,7 +286,7 @@ class FragmentTourService:
             session.commit()
             return response
 
-    def playback(self, guest_id: str, journey_id: str, fragment_id: str, payload: dict) -> dict:
+    def playback(self, user_id: str, journey_id: str, fragment_id: str, payload: dict) -> dict:
         key = str(payload.get("idempotency_key") or "")
         if not key:
             raise FragmentOperationError(
@@ -293,10 +294,10 @@ class FragmentTourService:
             )
         scope = f"playback:{journey_id}:{fragment_id}"
         with self._session() as session:
+            journey = self._owned_journey(session, user_id, journey_id)
             duplicate = self._idempotent(session, scope, key)
             if duplicate is not None:
                 return duplicate
-            journey = self._owned_journey(session, guest_id, journey_id)
             fragment, state = self._fragment_state(session, journey, fragment_id)
             if state.triggered_at is None:
                 raise FragmentOperationError("fragment_locked", "线索尚未触发")
@@ -318,7 +319,7 @@ class FragmentTourService:
 
     def upload_evidence(
         self,
-        guest_id: str,
+        user_id: str,
         journey_id: str,
         fragment_id: str,
         file,
@@ -330,7 +331,7 @@ class FragmentTourService:
                 "evidence_upload_disabled", "当前环境未启用照片证据", status_code=503
             )
         with self._session() as session:
-            journey = self._owned_journey(session, guest_id, journey_id)
+            journey = self._owned_journey(session, user_id, journey_id)
             fragment, state = self._fragment_state(session, journey, fragment_id)
             mission = session.scalar(
                 select(PhotoMissionModel).where(PhotoMissionModel.fragment_id == fragment_id)
@@ -353,7 +354,9 @@ class FragmentTourService:
                     "journey_state_conflict", "请先听完这段故事再提交线索照片"
                 )
             stored = self.evidence_storage.put(
-                file.stream, file.mimetype or "application/octet-stream"
+                file.stream,
+                file.mimetype or "application/octet-stream",
+                scope=f"{user_id}/{journey_id}",
             )
             now = datetime.now(UTC)
             evidence = EvidenceModel(
@@ -361,6 +364,8 @@ class FragmentTourService:
                 journey_id=journey_id,
                 mission_id=mission.id,
                 object_key=stored.object_key,
+                storage_provider=self.evidence_storage.provider,
+                canonical_reference=self.evidence_storage.canonical_reference(stored.object_key),
                 mime_type=stored.mime_type,
                 size_bytes=stored.size_bytes,
                 sha256=stored.sha256,
@@ -383,9 +388,9 @@ class FragmentTourService:
                 raise
             return self._evidence_dict(evidence)
 
-    def open_evidence(self, guest_id: str, journey_id: str, evidence_id: str):
+    def open_evidence(self, user_id: str, journey_id: str, evidence_id: str):
         with self._session() as session:
-            self._owned_journey(session, guest_id, journey_id)
+            self._owned_journey(session, user_id, journey_id)
             evidence = session.scalar(
                 select(EvidenceModel).where(
                     EvidenceModel.id == evidence_id,
@@ -399,9 +404,9 @@ class FragmentTourService:
                 )
             return self.evidence_storage.open(evidence.object_key), evidence.mime_type
 
-    def delete_evidence(self, guest_id: str, journey_id: str, evidence_id: str) -> dict:
+    def delete_evidence(self, user_id: str, journey_id: str, evidence_id: str) -> dict:
         with self._session() as session:
-            self._owned_journey(session, guest_id, journey_id)
+            self._owned_journey(session, user_id, journey_id)
             evidence = session.scalar(
                 select(EvidenceModel).where(
                     EvidenceModel.id == evidence_id,
@@ -437,9 +442,9 @@ class FragmentTourService:
             self.evidence_storage.delete(evidence.object_key)
             return {"id": evidence_id, "deleted": True}
 
-    def ledger(self, guest_id: str, journey_id: str) -> dict:
+    def ledger(self, user_id: str, journey_id: str) -> dict:
         with self._session() as session:
-            journey = self._owned_journey(session, guest_id, journey_id)
+            journey = self._owned_journey(session, user_id, journey_id)
             arc = session.scalar(
                 select(StoryArcModel)
                 .where(StoryArcModel.route_id == journey.route_id)
@@ -463,7 +468,9 @@ class FragmentTourService:
                 if state.state in {"triggered", "playing", "mission_pending", "collected"}:
                     entries.append(self._revealed_fragment(session, fragment, state))
                 else:
-                    entries.append({**self._public_fragment(fragment), "state": state.state})
+                    entries.append(
+                        {**self._public_fragment(fragment, session), "state": state.state}
+                    )
             collected = sum(1 for item in states.values() if item.state == "collected")
             reconstruction_unlocked = collected == len(entries)
             return {
@@ -480,9 +487,9 @@ class FragmentTourService:
                 "entries": entries,
             }
 
-    def reconstruct(self, guest_id: str, journey_id: str, submitted: list[str]) -> dict:
+    def reconstruct(self, user_id: str, journey_id: str, submitted: list[str]) -> dict:
         with self._session() as session:
-            journey = self._owned_journey(session, guest_id, journey_id)
+            journey = self._owned_journey(session, user_id, journey_id)
             arc = session.scalar(
                 select(StoryArcModel).where(StoryArcModel.route_id == journey.route_id)
             )
@@ -540,9 +547,9 @@ class FragmentTourService:
                 "complete_story_unlocked": correct,
             }
 
-    def recap(self, guest_id: str, journey_id: str) -> dict:
+    def recap(self, user_id: str, journey_id: str) -> dict:
         with self._session() as session:
-            journey = self._owned_journey(session, guest_id, journey_id)
+            journey = self._owned_journey(session, user_id, journey_id)
             reconstruction = session.scalar(
                 select(ReconstructionModel).where(
                     ReconstructionModel.journey_id == journey_id,
@@ -585,17 +592,27 @@ class FragmentTourService:
 
     def health(self) -> dict:
         assets = list((self.media_root / "audio").glob("*.m4a"))
+        with self._session() as session:
+            cloud_assets = list(
+                session.scalars(
+                    select(MediaAssetModel).where(
+                        MediaAssetModel.mime_type.like("audio/%"),
+                        MediaAssetModel.object_key.is_not(None),
+                    )
+                )
+            )
+        count = max(len(assets), len(cloud_assets))
         return {
             "evidence_storage": "up" if self.evidence_storage.healthy() else "down",
-            "narration_assets": "up" if len(assets) >= 5 else "down",
-            "narration_asset_count": len(assets),
+            "narration_assets": "up" if count >= 5 else "down",
+            "narration_asset_count": count,
         }
 
     @staticmethod
-    def _owned_journey(session: Session, guest_id: str, journey_id: str) -> JourneyModel:
+    def _owned_journey(session: Session, user_id: str, journey_id: str) -> JourneyModel:
         journey = session.scalar(
             select(JourneyModel).where(
-                JourneyModel.id == journey_id, JourneyModel.guest_session_id == guest_id
+                JourneyModel.id == journey_id, JourneyModel.user_id == user_id
             )
         )
         if journey is None:
@@ -657,7 +674,34 @@ class FragmentTourService:
             )
         )
 
-    def _public_fragment(self, fragment: StoryFragmentModel) -> dict:
+    def _asset_reference(self, session: Session, value: str) -> str:
+        if value.startswith(("http://", "https://")):
+            return value
+        asset = session.scalar(
+            select(MediaAssetModel).where(
+                (MediaAssetModel.storage_path == value)
+                | (MediaAssetModel.object_key == value)
+                | (MediaAssetModel.key == value)
+            )
+        )
+        return asset.canonical_url if asset and asset.canonical_url else value
+
+    def _asset_exists(self, session: Session, value: str) -> bool:
+        if value.startswith(("http://", "https://")):
+            return True
+        asset = session.scalar(
+            select(MediaAssetModel).where(
+                (MediaAssetModel.storage_path == value)
+                | (MediaAssetModel.object_key == value)
+                | (MediaAssetModel.key == value)
+            )
+        )
+        return (
+            bool(asset and (asset.canonical_url or asset.object_key))
+            or (self.media_root / value).is_file()
+        )
+
+    def _public_fragment(self, fragment: StoryFragmentModel, session: Session) -> dict:
         region = fragment.trigger_region
         mission = fragment.photo_mission
         return {
@@ -678,7 +722,7 @@ class FragmentTourService:
                 "audit_state": region.audit_state,
             },
             "audio": {
-                "url": self.asset_url_builder(fragment.audio_path),
+                "url": self.asset_url_builder(self._asset_reference(session, fragment.audio_path)),
                 "mime_type": fragment.audio_mime_type,
                 "size_bytes": fragment.audio_size_bytes,
                 "script_version": fragment.script_version,
@@ -691,7 +735,7 @@ class FragmentTourService:
     def _revealed_fragment(
         self, session: Session, fragment: StoryFragmentModel, state: JourneyFragmentModel
     ) -> dict:
-        data = self._public_fragment(fragment)
+        data = self._public_fragment(fragment, session)
         mission = fragment.photo_mission
         claims = list(
             session.scalars(

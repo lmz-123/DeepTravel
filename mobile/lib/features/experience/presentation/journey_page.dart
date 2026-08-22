@@ -434,6 +434,9 @@ class _LegacyJourneyView extends ConsumerWidget {
             Text(stop.storyBody),
             const SizedBox(height: 22),
             const Text('观察一下'),
+            const SizedBox(height: 6),
+            Text(stop.challenge.prompt,
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 10),
             ...stop.challenge.options.indexed.map(
               (entry) => Padding(

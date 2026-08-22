@@ -162,6 +162,49 @@ void main() {
     expect(find.text('南头古城的时间叠层'), findsNothing);
     expect(find.text('被打开的海湾'), findsNothing);
   });
+
+  testWidgets('archived active journey resumes the legacy answer flow',
+      (tester) async {
+    appRouter.go('/');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          experienceRepositoryProvider.overrideWithValue(
+            _ArchivedResumeRepository(),
+          ),
+          archivedActiveJourneysProvider.overrideWith(
+            (ref) async => const [
+              ResumableJourney(
+                route: _archivedQuizRoute,
+                session: JourneySession(
+                  id: 'archived-journey',
+                  routeId: 'archived-route',
+                  status: 'active',
+                  currentStopPosition: 1,
+                  arrivedStopId: null,
+                  answeredStopIds: {},
+                  progress: 0,
+                ),
+              ),
+            ],
+          ),
+        ],
+        child: const JiandiApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('继续未完成的旧路线'), findsOneWidget);
+    await tester.tap(find.text('旧版上海观察路线'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('我已到达，开始观察'), findsOneWidget);
+    await tester.tap(find.text('我已到达，开始观察'));
+    await tester.pumpAndSettle();
+    expect(find.text('观察一下'), findsOneWidget);
+    expect(find.text('旧版问题'), findsOneWidget);
+    expect(find.text('A'), findsOneWidget);
+  });
 }
 
 class _RecordingRepository extends DemoExperienceRepository {
@@ -211,6 +254,21 @@ class _EmptyCatalogRepository extends _TwoRouteRepository {
       const [];
 }
 
+class _ArchivedResumeRepository extends DemoExperienceRepository {
+  _ArchivedResumeRepository() : super(latency: Duration.zero);
+
+  @override
+  Future<JourneySession> arrive(String journeyId) async => const JourneySession(
+        id: 'archived-journey',
+        routeId: 'archived-route',
+        status: 'active',
+        currentStopPosition: 1,
+        arrivedStopId: 'old-stop',
+        answeredStopIds: {},
+        progress: 0,
+      );
+}
+
 const _oldHarborRoute = RouteExperience(
   id: 'route-old-harbor',
   slug: 'old-harbor',
@@ -222,7 +280,7 @@ const _oldHarborRoute = RouteExperience(
   difficulty: '轻松',
   theme: '港口生活',
   heroImage: '',
-  contentStatus: 'verified',
+  contentStatus: 'published',
   isFeatured: true,
   stopCount: 5,
   stops: [],
@@ -242,4 +300,39 @@ const _mountainCoastRoute = RouteExperience(
   contentStatus: 'in_review',
   stopCount: 5,
   stops: [],
+);
+
+const _archivedQuizRoute = RouteExperience(
+  id: 'archived-route',
+  slug: 'archived-shanghai-quiz',
+  title: '旧版上海观察路线',
+  subtitle: '仅供已有旅程继续',
+  description: '已归档路线',
+  durationMinutes: 30,
+  distanceKm: 1,
+  difficulty: '轻松',
+  theme: '城市观察',
+  heroImage: '',
+  contentStatus: 'archived',
+  stops: [
+    ExperienceStop(
+      id: 'old-stop',
+      position: 1,
+      title: '旧站点',
+      kicker: '继续观察',
+      address: '上海',
+      latitude: 31.2,
+      longitude: 121.4,
+      storyTitle: '旧版故事',
+      storyBody: '旧版故事正文',
+      image: '',
+      insight: '旧版观察',
+      challenge: Challenge(
+        id: 'old-question',
+        prompt: '旧版问题',
+        hint: '提示',
+        options: ['A', 'B'],
+      ),
+    ),
+  ],
 );

@@ -2,7 +2,7 @@
 
 > 走进一座城，也读懂它。
 
-见地是一个“定位音频 + 碎片叙事 + 现场线索”驱动的深度城市探索 MVP。深圳南头古城路线会在行走中自动播放五段相互关联的历史，穿插三次私密拍照任务，最后由旅行者重构完整因果故事；上海路线保留原五站观察模式。
+见地是一个“定位音频 + 碎片叙事 + 现场线索”驱动的深度城市探索 MVP。深圳南头古城、大梅沙和上海衡复街区都可由后台内容包配置为五段式耳机导览，穿插私密拍照任务，最后由旅行者重构完整因果故事。旧版上海答题路线可归档，但已开始的旅程仍可继续。
 
 当前仓库包含完整 Flask API、Flutter 客户端、MySQL Docker 环境、OpenSpec 变更、测试与后端托管的媒体资产。
 
@@ -37,9 +37,9 @@ docker compose up -d --build
 - 导览音频：`http://localhost:5001/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-review.1.m4a`
 - MySQL：`localhost:3307`
 
-游客照片保存在独立 Docker 卷 `jiandi_evidence`，不会经过公开 `/assets` 路径。默认限制 10 MB、最长边 4096 像素、保留 30 天；服务端会重新编码并移除 EXIF。
+用户通过普通用户名和密码注册登录，密码使用 scrypt 哈希。路线进度和照片按用户隔离；测试构建可在后台白名单中的 A/B 测试账号间一键切换，生产配置会拒绝启用该入口。照片保存在私有存储，不会经过公开 `/assets` 路径；默认限制 10 MB、最长边 4096 像素、保留 30 天，服务端会重新编码并移除 EXIF。
 
-部署到服务器时，将 `.env` 中的 `PUBLIC_BASE_URL` 设置为客户端可访问的 API 公网根地址，例如 `https://api.example.com`，然后执行：
+完整的幂等部署、OSS 迁移和上海内容发布命令见 [生产部署说明](docs/deployment-production.md)。部署到服务器时，将 `.env` 中的 `PUBLIC_BASE_URL` 设置为客户端可访问的 API 公网根地址，例如 `https://api.example.com`，然后执行：
 
 ```bash
 git clone git@github.com:lmz-123/DeepTravel.git
@@ -127,7 +127,11 @@ Travel/
 
 所有业务端点位于 `/api/v1`：
 
-- `POST /sessions/guest`
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/test-login`（仅非生产测试环境）
+- `POST /sessions/guest`（旧客户端兼容窗口）
 - `GET /cities`
 - `GET /cities/{slug}/routes`
 - `GET /routes/{slug}`
@@ -146,7 +150,7 @@ Travel/
 - `POST /journeys/{id}/reconstruction`
 - `GET /journeys/{id}/recap`
 
-Journey 端点需要 `Authorization: Bearer <guest-token>`。错误统一为：
+Journey 端点需要 `Authorization: Bearer <user-token>`。错误统一为：
 
 ```json
 {
@@ -163,7 +167,7 @@ Journey 端点需要 `Authorization: Bearer <guest-token>`。错误统一为：
 - 南头五段历史已拆成逐条 claim 并关联政府/博物馆来源，但仍是 `in_review` 研究稿；现场坐标、安静收听点、物件原构/复原/解释性关系和普通话录音仍需实地与编辑审核；
 - 客户端与 API 始终显示研究预览标签，不会把种子数据标成已核验史实；
 - 两张路线视觉图由 ImageGen 为本项目原创生成，存放在 `backend/media/images/`，并通过 `media_assets` 数据表登记；
-- MVP 不采集姓名、手机号或连续位置轨迹；触发请求只保存碎片、时间、方式和验证结果，不保留原始经纬度；游客 JWT 仅包含随机会话 ID 与过期时间；
+- MVP 不采集姓名、手机号或连续位置轨迹；触发请求只保存碎片、时间、方式和验证结果，不保留原始经纬度；用户 JWT 仅包含随机用户 ID、认证版本与过期时间；
 - 旅行者照片默认私密、按旅程鉴权、随机对象键存储，可在最终重构前删除。删除会使对应任务回到待完成状态。
 
 ## 已知 MVP 边界
@@ -171,7 +175,7 @@ Journey 端点需要 `Authorization: Bearer <guest-token>`。错误统一为：
 - 当前五段音频为与版本化文字稿一致的本地合成预览声线，不是正式旁白；
 - Android 已配置活动旅程前台通知，iOS 已声明 location/audio 后台模式，但系统仍可能因电量与生命周期策略暂停监测，客户端会显示受限状态；
 - 真机锁屏、来电、导航提示、蓝牙耳机断开、弱 GPS、进程终止及一次南头实地行走仍是发布前硬门槛，因此路线保持 `in_review`；
-- 未实现离线地图瓦片、付费、账户、CMS、AR、视觉正确性判断和多人同步；
+- 未实现离线地图瓦片、付费、找回密码、AR、视觉正确性判断和多人同步；
 - 正式在中国大陆使用地图前，需要确定供应商及坐标系转换策略。
 
 ## 回滚与数据安全

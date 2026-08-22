@@ -23,7 +23,18 @@ class NotFoundError(DomainError):
 class UnauthorizedError(DomainError):
     code = "unauthorized"
     status_code = 401
-    default_message = "请先创建游客会话"
+    default_message = "请先登录"
+
+
+class AuthenticationError(UnauthorizedError):
+    code = "invalid_credentials"
+    default_message = "用户名或密码不正确"
+
+
+class AccountConflictError(DomainError):
+    code = "account_conflict"
+    status_code = 409
+    default_message = "用户名不可用"
 
 
 class ValidationError(DomainError):

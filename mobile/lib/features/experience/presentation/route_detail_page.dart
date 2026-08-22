@@ -141,7 +141,7 @@ class _RouteDetail extends ConsumerWidget {
                       _FragmentPreviewRow(
                           fragment: fragment,
                           isLast: fragment == route.audioTour!.fragments.last)),
-                if (!route.isVerified) ...[
+                if (!route.isPublished) ...[
                   const SizedBox(height: 22),
                   const _EditorialNotice(),
                 ],

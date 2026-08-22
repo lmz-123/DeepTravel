@@ -613,6 +613,9 @@ class _MemoryTourStore implements TourStore {
   final snapshots = <String, Map<String, dynamic>>{};
 
   @override
+  Future<void> clearPrivateData() async => snapshots.clear();
+
+  @override
   Future<void> acknowledge(String id) async {}
 
   @override

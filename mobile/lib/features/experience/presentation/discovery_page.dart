@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/fade_slide_in.dart';
 import '../domain/models.dart';
+import '../../auth/presentation/auth_provider.dart';
+import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 
 class DiscoveryPage extends ConsumerWidget {
@@ -16,6 +19,7 @@ class DiscoveryPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cities = ref.watch(citiesProvider);
     final routes = ref.watch(cityRoutesProvider);
+    final archivedJourneys = ref.watch(archivedActiveJourneysProvider);
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -23,6 +27,7 @@ class DiscoveryPage extends ConsumerWidget {
           onRefresh: () async {
             ref.invalidate(citiesProvider);
             ref.invalidate(cityRoutesProvider);
+            ref.invalidate(archivedActiveJourneysProvider);
             await ref.read(citiesProvider.future);
             await ref.read(cityRoutesProvider.future);
           },
@@ -41,6 +46,17 @@ class DiscoveryPage extends ConsumerWidget {
                       '今天，慢一点\n看见城市的里层。',
                       style: Theme.of(context).textTheme.displaySmall,
                     ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                sliver: SliverToBoxAdapter(
+                  child: archivedJourneys.maybeWhen(
+                    data: (items) => items.isEmpty
+                        ? const SizedBox.shrink()
+                        : _ArchivedJourneyCard(journey: items.first),
+                    orElse: () => const SizedBox.shrink(),
                   ),
                 ),
               ),
@@ -105,6 +121,53 @@ class DiscoveryPage extends ConsumerWidget {
   }
 }
 
+class _ArchivedJourneyCard extends ConsumerWidget {
+  const _ArchivedJourneyCard({required this.journey});
+
+  final ResumableJourney journey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FadeSlideIn(
+      child: Material(
+        color: AppColors.paperDeep,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () {
+            final id = ref
+                .read(journeyControllerProvider.notifier)
+                .resume(journey.route, journey.session);
+            context.go('/journey/$id');
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                const Icon(Icons.history_rounded, color: AppColors.moss),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('继续未完成的旧路线',
+                          style: Theme.of(context).textTheme.labelLarge),
+                      const SizedBox(height: 3),
+                      Text(journey.route.title,
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_rounded),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -117,6 +180,33 @@ class _Header extends ConsumerWidget {
       children: [
         const BrandMark(),
         const Spacer(),
+        PopupMenuButton<String>(
+          tooltip: AppConfig.testAuthEnabled ? '账号与测试用户' : '账号',
+          onSelected: (action) async {
+            ref.invalidate(activeTourControllerProvider);
+            await ref.read(tourStoreProvider).clearPrivateData();
+            if (action == 'logout') {
+              await ref.read(authControllerProvider.notifier).logout();
+            } else {
+              await ref
+                  .read(authControllerProvider.notifier)
+                  .switchTestUser(action);
+            }
+            ref.invalidate(journeyControllerProvider);
+            ref.invalidate(activeTourControllerProvider);
+            ref.invalidate(archivedActiveJourneysProvider);
+          },
+          itemBuilder: (context) => [
+            if (AppConfig.testAuthEnabled) ...const [
+              PopupMenuItem(value: 'tester-a', child: Text('切换到测试账号 A')),
+              PopupMenuItem(value: 'tester-b', child: Text('切换到测试账号 B')),
+              PopupMenuDivider(),
+            ],
+            const PopupMenuItem(value: 'logout', child: Text('退出登录')),
+          ],
+          icon: const Icon(Icons.account_circle_outlined),
+        ),
+        const SizedBox(width: 4),
         PopupMenuButton<String>(
           tooltip: '选择城市',
           initialValue: selectedSlug,

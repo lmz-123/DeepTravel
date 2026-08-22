@@ -15,6 +15,8 @@ def app(tmp_path):
             "DATABASE_URL": f"sqlite:///{database_path}",
             "SECRET_KEY": "test-secret",
             "ALLOW_DEMO_ARRIVAL": True,
+            "TEST_AUTH_ENABLED": True,
+            "TEST_AUTH_USERS": ("tester-a", "tester-b"),
             "EVIDENCE_ROOT": str(tmp_path / "private-evidence"),
         }
     )
@@ -36,5 +38,15 @@ def client(app):
 @pytest.fixture()
 def guest_headers(client):
     response = client.post("/api/v1/sessions/guest")
+    token = response.get_json()["data"]["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture()
+def user_headers(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": "traveler-one", "password": "field-test-123"},
+    )
     token = response.get_json()["data"]["token"]
     return {"Authorization": f"Bearer {token}"}

@@ -7,8 +7,12 @@ from math import asin, cos, radians, sin, sqrt
 
 
 class ContentStatus(StrEnum):
+    DRAFT = "draft"
+    IN_REVIEW = "in_review"
     DEMO_UNVERIFIED = "demo_unverified"
     VERIFIED = "verified"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
 
 
 class JourneyStatus(StrEnum):
@@ -78,8 +82,20 @@ class City:
 @dataclass(frozen=True, slots=True)
 class GuestSession:
     id: str
+    user_id: str
     created_at: datetime
     expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class User:
+    id: str
+    username: str | None
+    account_kind: str
+    is_active: bool
+    auth_version: int
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass(slots=True)
@@ -93,7 +109,7 @@ class JourneyAnswer:
 @dataclass(slots=True)
 class Journey:
     id: str
-    guest_session_id: str
+    user_id: str
     route_id: str
     status: JourneyStatus
     current_stop_position: int
@@ -101,6 +117,7 @@ class Journey:
     started_at: datetime
     updated_at: datetime
     completed_at: datetime | None = None
+    guest_session_id: str | None = None
     answers: list[JourneyAnswer] = field(default_factory=list)
 
     def answer_for(self, stop_id: str) -> JourneyAnswer | None:
