@@ -31,6 +31,41 @@ void main() {
     expect(find.text('我已到达，开始观察'), findsOneWidget);
   });
 
+  testWidgets('home story action opens reviewed story without autoplay',
+      (tester) async {
+    appRouter.go('/');
+    final repository = DemoExperienceRepository(latency: Duration.zero);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
+        child: const JiandiApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('home-random-story-action')),
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('home-random-story-action')));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('城墙今天想说点什么'),
+      320,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('城墙今天想说点什么'), findsOneWidget);
+    expect(find.text('给自己三分钟，听一阵海风如何吹进一座老城。'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('home-story-play-pause')),
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.byTooltip('播放故事'), findsOneWidget);
+  });
+
   testWidgets('arrival reveals story and observation challenge',
       (tester) async {
     appRouter.go('/');
@@ -103,6 +138,31 @@ void main() {
 
     expect(find.text('上海'), findsOneWidget);
     expect(repository.requestedCity, 'shanghai');
+  });
+
+  testWidgets('large backend city catalog filters immediately', (tester) async {
+    appRouter.go('/');
+    final repository = _ManyCityRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
+        child: const JiandiApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('选择城市'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '第 19 城');
+    await tester.pump();
+    expect(find.text('第 19 城'), findsNWidgets(2));
+    expect(find.text('第 18 城'), findsNothing);
+
+    await tester.tap(find.text('第 19 城').last);
+    await tester.pumpAndSettle();
+    expect(repository.requestedCity, 'city-19');
   });
 
   testWidgets('swipes between every route returned by the backend',
@@ -245,6 +305,30 @@ class _TwoRouteRepository extends DemoExperienceRepository {
     return slug == _mountainCoastRoute.slug
         ? _mountainCoastRoute
         : _oldHarborRoute;
+  }
+}
+
+class _ManyCityRepository extends DemoExperienceRepository {
+  _ManyCityRepository() : super(latency: Duration.zero);
+
+  String? requestedCity;
+
+  @override
+  Future<List<CityExperience>> cities() async => List.generate(
+        20,
+        (index) => CityExperience(
+          id: 'city-$index',
+          slug: 'city-$index',
+          name: '第 $index 城',
+          subtitle: '后台配置的第 $index 个目的地',
+          heroImage: '',
+        ),
+      );
+
+  @override
+  Future<List<RouteExperience>> routesForCity(String citySlug) async {
+    requestedCity = citySlug;
+    return const [];
   }
 }
 

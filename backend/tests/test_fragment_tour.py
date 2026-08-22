@@ -42,12 +42,13 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     assert tour["production_ready"] is False
     assert tour["fragment_count"] == 5
     assert tour["photo_mission_count"] == 3
-    assert tour["download_size_bytes"] > 0
+    assert tour["download_size_bytes"] == 0
     assert "transcript" not in tour["fragments"][0]
     assert tour["fragments"][0]["audio"]["url"].endswith(".m4a")
-    audio = client.get("/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-review.1.m4a")
-    assert audio.status_code == 200
-    assert audio.content_type == "audio/mp4"
+    audio = client.get(
+        "/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-conversational.2.m4a"
+    )
+    assert audio.status_code == 404
 
 
 def test_public_voice_profiles_require_complete_current_coverage_and_preserve_default(
@@ -331,7 +332,7 @@ def test_complete_fragment_arc_with_private_evidence_and_reconstruction(client, 
     recap = client.get(f"/api/v1/journeys/{journey_id}/recap", headers=guest_headers).get_json()[
         "data"
     ]
-    assert "不同制度反复使用" in recap["complete_story"]
+    assert "每次中心搬走、身份改变之后" in recap["complete_story"]
     assert len(recap["evidence"]) == 3
     photo = client.get(
         f"/api/v1/journeys/{journey_id}/evidence/{evidence_ids[0]}", headers=guest_headers

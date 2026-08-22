@@ -211,6 +211,23 @@ def get_route(route_slug: str):
     return jsonify({"data": _route_payload(route)})
 
 
+@api.get("/stories/random")
+def random_story():
+    return jsonify(
+        {
+            "data": _services()["story_listening"].random_story(
+                str(request.args.get("city_slug") or ""),
+                request.args.get("exclude_id"),
+            )
+        }
+    )
+
+
+@api.get("/stories/<publication_id>")
+def get_listening_story(publication_id: str):
+    return jsonify({"data": _services()["story_listening"].get(publication_id)})
+
+
 @api.post("/journeys")
 @require_user
 def start_journey():
@@ -558,8 +575,9 @@ def list_community_comments(post_id: str):
 @require_user
 def create_community_comment(post_id: str):
     body = _json_body()
-    if body.get("parent_id") is not None:
-        raise ValidationError("首版仅支持一级评论")
+    reply_to_comment_id = body.get("reply_to_comment_id")
+    if reply_to_comment_id is None and body.get("parent_id") is not None:
+        reply_to_comment_id = body.get("parent_id")
     return (
         jsonify(
             {
@@ -568,10 +586,28 @@ def create_community_comment(post_id: str):
                     post_id,
                     body=str(body.get("body") or ""),
                     idempotency_key=str(body.get("idempotency_key") or ""),
+                    reply_to_comment_id=(
+                        str(reply_to_comment_id) if reply_to_comment_id is not None else None
+                    ),
                 )
             }
         ),
         201,
+    )
+
+
+@api.get("/community-comments/<comment_id>/replies")
+@require_user
+def list_community_replies(comment_id: str):
+    return jsonify(
+        {
+            "data": _services()["community"].replies(
+                g.current_user.id,
+                comment_id,
+                cursor=request.args.get("cursor"),
+                limit=_page_limit(),
+            )
+        }
     )
 
 

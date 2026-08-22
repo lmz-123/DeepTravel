@@ -76,7 +76,7 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0009"
+    assert version == "20260823_0010"
 
 
 def test_narration_voice_migration_backfills_once_and_round_trips(tmp_path):
@@ -337,7 +337,7 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0009"
+    assert version == "20260823_0010"
 
 
 def test_node_community_migration_round_trips_without_touching_existing_data(tmp_path):
@@ -360,8 +360,13 @@ def test_node_community_migration_round_trips_without_touching_existing_data(tmp
         "community_post_likes",
         "community_comments",
         "community_reports",
+        "home_story_publications",
+        "story_narration_tracks",
     }
     assert community_tables <= set(inspect(engine).get_table_names())
+    assert {"root_comment_id", "reply_to_comment_id"} <= {
+        column["name"] for column in inspect(engine).get_columns("community_comments")
+    }
 
     command.downgrade(config, "20260823_0008")
     assert community_tables.isdisjoint(inspect(engine).get_table_names())

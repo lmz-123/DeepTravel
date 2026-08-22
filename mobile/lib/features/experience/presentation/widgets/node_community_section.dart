@@ -606,10 +606,13 @@ class _PostDetail extends ConsumerStatefulWidget {
 
 class _PostDetailState extends ConsumerState<_PostDetail> {
   final _comment = TextEditingController();
+  final _commentFocus = FocusNode();
+  CommunityComment? _replyTarget;
 
   @override
   void dispose() {
     _comment.dispose();
+    _commentFocus.dispose();
     super.dispose();
   }
 
@@ -728,13 +731,33 @@ class _PostDetailState extends ConsumerState<_PostDetail> {
                         child: Center(child: Text('还没有回应，留下第一句友善的补充。')),
                       )
                     else
-                      ...state.comments.map((comment) => _CommentTile(
-                            comment: comment,
-                            onDelete: () => ref
+                      ...state.comments.map((comment) => _CommentThread(
+                            root: comment,
+                            replies: state.repliesByRoot[comment.id] ??
+                                comment.replyPreview,
+                            isLoading:
+                                state.loadingReplyRoots.contains(comment.id),
+                            hasMore: (state.replyCursorByRoot
+                                    .containsKey(comment.id)
+                                ? state.replyCursorByRoot[comment.id] != null
+                                : comment.replyCount >
+                                    (state.repliesByRoot[comment.id] ??
+                                            comment.replyPreview)
+                                        .length),
+                            onReply: _beginReply,
+                            onDelete: (item) => ref
                                 .read(communityDetailControllerProvider(key)
                                     .notifier)
-                                .deleteComment(comment),
-                            onReport: () => _reportComment(comment, key),
+                                .deleteComment(item),
+                            onReport: (item) => _reportComment(item, key),
+                            onLoadReplies: () => ref
+                                .read(communityDetailControllerProvider(key)
+                                    .notifier)
+                                .loadReplies(
+                                  comment,
+                                  more: state.replyCursorByRoot
+                                      .containsKey(comment.id),
+                                ),
                           )),
                     if (state.commentCursor != null)
                       Align(
@@ -763,8 +786,11 @@ class _PostDetailState extends ConsumerState<_PostDetail> {
           ),
           _CommentComposer(
             controller: _comment,
+            focusNode: _commentFocus,
+            replyTarget: _replyTarget,
             enabled: !state.isMutating,
             onSend: () => _submitComment(key),
+            onCancelReply: () => setState(() => _replyTarget = null),
           ),
         ],
       );
@@ -787,8 +813,17 @@ class _PostDetailState extends ConsumerState<_PostDetail> {
     if (body.isEmpty) return;
     final success = await ref
         .read(communityDetailControllerProvider(key).notifier)
-        .comment(body, const Uuid().v4());
-    if (success) _comment.clear();
+        .comment(body, const Uuid().v4(), replyTo: _replyTarget);
+    if (success) {
+      _comment.clear();
+      setState(() => _replyTarget = null);
+    }
+  }
+
+  void _beginReply(CommunityComment comment) {
+    if (comment.isTombstone) return;
+    setState(() => _replyTarget = comment);
+    _commentFocus.requestFocus();
   }
 
   Future<void> _action(
@@ -1039,58 +1074,177 @@ class _LikerSummary extends StatelessWidget {
       );
 }
 
+class _CommentThread extends StatelessWidget {
+  const _CommentThread({
+    required this.root,
+    required this.replies,
+    required this.isLoading,
+    required this.hasMore,
+    required this.onReply,
+    required this.onDelete,
+    required this.onReport,
+    required this.onLoadReplies,
+  });
+
+  final CommunityComment root;
+  final List<CommunityComment> replies;
+  final bool isLoading;
+  final bool hasMore;
+  final ValueChanged<CommunityComment> onReply;
+  final ValueChanged<CommunityComment> onDelete;
+  final ValueChanged<CommunityComment> onReport;
+  final VoidCallback onLoadReplies;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 10),
+        decoration: BoxDecoration(
+          color: AppColors.white.withValues(alpha: .72),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.paperDeep),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _CommentTile(
+              comment: root,
+              onReply: () => onReply(root),
+              onDelete: () => onDelete(root),
+              onReport: () => onReport(root),
+            ),
+            if (replies.isNotEmpty || root.replyCount > 0)
+              Container(
+                margin: const EdgeInsets.fromLTRB(48, 0, 12, 12),
+                padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                decoration: BoxDecoration(
+                  color: AppColors.paperDeep.withValues(alpha: .72),
+                  borderRadius: BorderRadius.circular(14),
+                  border: const Border(
+                    left: BorderSide(color: AppColors.moss, width: 2),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    ...replies.map((reply) => _CommentTile(
+                          comment: reply,
+                          compact: true,
+                          onReply: () => onReply(reply),
+                          onDelete: () => onDelete(reply),
+                          onReport: () => onReport(reply),
+                        )),
+                    if (hasMore || isLoading)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: isLoading ? null : onLoadReplies,
+                          icon: isLoading
+                              ? const SizedBox.square(
+                                  dimension: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.unfold_more_rounded, size: 17),
+                          label: Text(isLoading
+                              ? '正在展开…'
+                              : '查看全部 ${root.replyCount} 条回复'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+}
+
 class _CommentTile extends StatelessWidget {
   const _CommentTile({
     required this.comment,
+    required this.onReply,
     required this.onDelete,
     required this.onReport,
+    this.compact = false,
   });
 
   final CommunityComment comment;
+  final VoidCallback onReply;
   final VoidCallback onDelete;
   final VoidCallback onReport;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 0 : 12,
+          vertical: compact ? 9 : 12,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _CommunityAvatar(radius: 19),
-            const SizedBox(width: 12),
+            _CommunityAvatar(radius: compact ? 15 : 19),
+            SizedBox(width: compact ? 9 : 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
                     Expanded(
-                      child: Text(comment.author.displayName,
+                      child: Text(
+                          comment.isTombstone
+                              ? '这条回应已删除'
+                              : comment.author.displayName,
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                     ),
                     Text(_formatCommunityTime(comment.createdAt),
                         style: Theme.of(context).textTheme.bodySmall),
                   ]),
-                  const SizedBox(height: 6),
-                  Text(comment.body,
+                  if (!comment.isTombstone) ...[
+                    const SizedBox(height: 6),
+                    Text.rich(
+                      TextSpan(children: [
+                        if (comment.replyTo != null)
+                          TextSpan(
+                            text: '回复 ${comment.replyTo!.displayName}  ',
+                            style: const TextStyle(
+                              color: AppColors.moss,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        TextSpan(text: comment.body),
+                      ]),
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
-                          ?.copyWith(height: 1.5)),
+                          ?.copyWith(height: 1.5),
+                    ),
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: onReply,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: const Size(40, 30),
+                      ),
+                      child: const Text('回复'),
+                    ),
+                  ],
                 ],
               ),
             ),
-            PopupMenuButton<String>(
-              tooltip: '评论操作',
-              iconSize: 20,
-              onSelected: (action) =>
-                  action == 'delete' ? onDelete() : onReport(),
-              itemBuilder: (_) => [
-                if (comment.viewerIsAuthor)
-                  const PopupMenuItem(value: 'delete', child: Text('删除评论'))
-                else
-                  const PopupMenuItem(value: 'report', child: Text('举报评论')),
-              ],
-            ),
+            if (!comment.isTombstone)
+              PopupMenuButton<String>(
+                tooltip: '评论操作',
+                iconSize: 20,
+                onSelected: (action) =>
+                    action == 'delete' ? onDelete() : onReport(),
+                itemBuilder: (_) => [
+                  if (comment.viewerIsAuthor)
+                    const PopupMenuItem(value: 'delete', child: Text('删除评论'))
+                  else
+                    const PopupMenuItem(value: 'report', child: Text('举报评论')),
+                ],
+              ),
           ],
         ),
       );
@@ -1099,13 +1253,19 @@ class _CommentTile extends StatelessWidget {
 class _CommentComposer extends StatelessWidget {
   const _CommentComposer({
     required this.controller,
+    required this.focusNode,
+    required this.replyTarget,
     required this.enabled,
     required this.onSend,
+    required this.onCancelReply,
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
+  final CommunityComment? replyTarget;
   final bool enabled;
   final VoidCallback onSend;
+  final VoidCallback onCancelReply;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -1114,38 +1274,65 @@ class _CommentComposer extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: Row(children: [
-              const _CommunityAvatar(radius: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  enabled: enabled,
-                  maxLength: 300,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.newline,
-                  decoration: InputDecoration(
-                    hintText: '友善地回应这条现场笔记…',
-                    counterText: '',
-                    filled: true,
-                    fillColor: AppColors.paperDeep,
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide.none,
-                      borderRadius: BorderRadius.circular(22),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (replyTarget != null)
+                Row(children: [
+                  const Icon(Icons.reply_rounded,
+                      size: 17, color: AppColors.moss),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '回复 ${replyTarget!.author.displayName}',
+                      style: const TextStyle(
+                        color: AppColors.moss,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 15, vertical: 10),
+                  ),
+                  IconButton(
+                    tooltip: '取消回复，保留已输入内容',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onCancelReply,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                  ),
+                ]),
+              Row(children: [
+                const _CommunityAvatar(radius: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    enabled: enabled,
+                    maxLength: 300,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText: replyTarget == null
+                          ? '友善地回应这条现场笔记…'
+                          : '写下给 ${replyTarget!.author.displayName} 的回复…',
+                      counterText: '',
+                      filled: true,
+                      fillColor: AppColors.paperDeep,
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 15, vertical: 10),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                tooltip: '发表评论',
-                onPressed: enabled ? onSend : null,
-                icon: const Icon(Icons.arrow_upward_rounded),
-              ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  tooltip: replyTarget == null ? '发表评论' : '发表回复',
+                  onPressed: enabled ? onSend : null,
+                  icon: const Icon(Icons.arrow_upward_rounded),
+                ),
+              ]),
             ]),
           ),
         ),

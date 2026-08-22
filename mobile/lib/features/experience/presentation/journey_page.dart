@@ -132,12 +132,6 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
             children: [
               _StatusPanel(state: state),
               const SizedBox(height: 20),
-              Text('你正在追问',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelMedium
-                      ?.copyWith(color: AppColors.terracotta)),
-              const SizedBox(height: 7),
               Text(manifest.centralQuestion,
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 18),
@@ -157,12 +151,6 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                     child:
                         _MissionCard(fragment: selectedFragment!, state: state),
                   ),
-                if (ledger.reconstructionUnlocked)
-                  Padding(
-                      padding: const EdgeInsets.only(top: 22),
-                      child: _ReconstructionCard(
-                          clueCount: ledger.totalCount,
-                          onPressed: () => _showReconstruction(ledger))),
               ],
               if (state.locationMode == TourLocationMode.simulated) ...[
                 const SizedBox(height: 18),
@@ -228,6 +216,21 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
               Text(
                   '${ledger.collectedCount} / ${ledger.totalCount} 条线索已收集。未发现的内容不会提前剧透。'),
               const SizedBox(height: 20),
+              _LedgerReconstructionEntry(
+                ledger: ledger,
+                onPressed: () async {
+                  Navigator.pop(context);
+                  if (ledger.reconstructionCompleted) {
+                    final recap = await ref
+                        .read(activeTourControllerProvider.notifier)
+                        .loadRecap();
+                    if (mounted) _showCompleteStory(recap);
+                  } else if (ledger.reconstructionUnlocked) {
+                    await _showReconstruction(ledger);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
               ...ledger.entries
                   .map((fragment) => _LedgerEntry(fragment: fragment)),
             ]),
@@ -1094,28 +1097,80 @@ class _LedgerEntry extends StatelessWidget {
   }
 }
 
-class _ReconstructionCard extends StatelessWidget {
-  const _ReconstructionCard({required this.clueCount, required this.onPressed});
-  final int clueCount;
+class _LedgerReconstructionEntry extends StatelessWidget {
+  const _LedgerReconstructionEntry({
+    required this.ledger,
+    required this.onPressed,
+  });
+  final StoryLedger ledger;
   final VoidCallback onPressed;
   @override
-  Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-          color: AppColors.moss, borderRadius: BorderRadius.circular(24)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.account_tree_outlined,
-            color: AppColors.white, size: 32),
-        const SizedBox(height: 12),
-        Text('$clueCount 条线索已经齐了',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(color: AppColors.white)),
-        const SizedBox(height: 8),
-        const Text('把年代知识拼成一条真正的因果故事。',
-            style: TextStyle(color: AppColors.white)),
-        const SizedBox(height: 16),
-        FilledButton.tonal(onPressed: onPressed, child: const Text('开始重构故事'))
-      ]));
+  Widget build(BuildContext context) {
+    final completed = ledger.reconstructionCompleted;
+    final unlocked = ledger.reconstructionUnlocked;
+    return Material(
+      color: completed
+          ? AppColors.moss.withValues(alpha: .14)
+          : unlocked
+              ? AppColors.moss
+              : AppColors.paperDeep,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: unlocked ? onPressed : null,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            CircleAvatar(
+              backgroundColor: unlocked ? AppColors.gold : AppColors.white,
+              foregroundColor: AppColors.ink,
+              child: Icon(completed
+                  ? Icons.check_rounded
+                  : unlocked
+                      ? Icons.account_tree_outlined
+                      : Icons.lock_outline_rounded),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    completed
+                        ? '完整故事已经拼好'
+                        : unlocked
+                            ? '把线索拼成完整故事'
+                            : '完整故事还差一点',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: unlocked && !completed
+                          ? AppColors.white
+                          : AppColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    completed
+                        ? '点开重温你走出来的故事'
+                        : unlocked
+                            ? '${ledger.totalCount} 条线索已齐，试着排出它们的关系'
+                            : '${ledger.collectedCount}/${ledger.totalCount}，收集齐后在这里解锁',
+                    style: TextStyle(
+                      color: unlocked && !completed
+                          ? Colors.white70
+                          : AppColors.ink.withValues(alpha: .62),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (unlocked)
+              Icon(Icons.chevron_right_rounded,
+                  color: completed ? AppColors.moss : AppColors.white),
+          ]),
+        ),
+      ),
+    );
+  }
 }

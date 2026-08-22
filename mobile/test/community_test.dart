@@ -24,6 +24,28 @@ void main() {
     expect(post.body, isEmpty);
     expect(post.likeCount, 0);
     expect(post.author.avatar, 'default');
+
+    final root = CommunityComment.fromJson({
+      'id': 'root-1',
+      'post_id': 'post-1',
+      'body': '根评论',
+      'author': {'display_name': '旅行者甲'},
+      'reply_count': 1,
+      'reply_preview': [
+        {
+          'id': 'reply-1',
+          'post_id': 'post-1',
+          'root_comment_id': 'root-1',
+          'reply_to_comment_id': 'root-1',
+          'body': '回复内容',
+          'author': {'display_name': '旅行者乙'},
+          'reply_to': {'display_name': '旅行者甲'},
+        }
+      ],
+    });
+    expect(root.replyCount, 1);
+    expect(root.replyPreview.single.rootCommentId, 'root-1');
+    expect(root.replyPreview.single.replyTo?.displayName, '旅行者甲');
   });
 
   testWidgets(
@@ -76,6 +98,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('现场回应'), findsOneWidget);
     expect(find.text('确实是好机位。'), findsOneWidget);
+    expect(find.text('旅行者丙'), findsOneWidget);
+    expect(find.textContaining('回复 旅行者乙'), findsOneWidget);
 
     await tester.ensureVisible(find.text('3 个赞'));
     await tester.pumpAndSettle();
@@ -377,6 +401,22 @@ class _CommunityRepository extends DemoExperienceRepository {
           author: const CommunityAuthor(displayName: '旅行者乙', avatar: 'default'),
           viewerIsAuthor: false,
           createdAt: DateTime(2026, 8, 23),
+          replyCount: 1,
+          replyPreview: [
+            CommunityComment(
+              id: 'reply-1',
+              postId: postId,
+              rootCommentId: 'comment-1',
+              replyToCommentId: 'comment-1',
+              body: '这个角度我也试过，下午四点更柔和。',
+              author:
+                  const CommunityAuthor(displayName: '旅行者丙', avatar: 'default'),
+              replyTo:
+                  const CommunityAuthor(displayName: '旅行者乙', avatar: 'default'),
+              viewerIsAuthor: false,
+              createdAt: DateTime(2026, 8, 23),
+            ),
+          ],
         ),
       ]);
 

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'community_models.dart';
 import 'fragment_models.dart';
 import 'models.dart';
+import 'home_story.dart';
 
 abstract interface class ExperienceRepository {
   Future<List<CityExperience>> cities();
@@ -12,6 +13,11 @@ abstract interface class ExperienceRepository {
   Future<RouteExperience> featuredRoute(String citySlug);
 
   Future<RouteExperience> routeBySlug(String slug);
+
+  Future<HomeStory> randomHomeStory({
+    String? citySlug,
+    String? excludeId,
+  });
 
   Future<JourneySession> startOrResume(String routeId);
 
@@ -106,6 +112,12 @@ abstract interface class ExperienceRepository {
     CommunityPostDraft draft,
   );
 
+  Future<CommunityPage<CommunityComment>> communityReplies(
+    String rootCommentId, {
+    String? cursor,
+    int limit = 20,
+  });
+
   Future<Uint8List> communityMediaBytes(CommunityMedia media);
 
   Future<CommunityLikeResult> setCommunityLike(String postId, bool liked);
@@ -113,8 +125,9 @@ abstract interface class ExperienceRepository {
   Future<CommunityComment> createCommunityComment(
     String postId,
     String body,
-    String idempotencyKey,
-  );
+    String idempotencyKey, {
+    String? replyToCommentId,
+  });
 
   Future<void> deleteCommunityPost(String postId);
 

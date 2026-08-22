@@ -7,6 +7,7 @@ import '../../features/experience/presentation/journey_page.dart';
 import '../../features/experience/presentation/recap_page.dart';
 import '../../features/experience/presentation/route_detail_page.dart';
 import '../../features/experience/presentation/settings_page.dart';
+import '../../features/experience/presentation/home_story_page.dart';
 import '../../features/experience/presentation/traveler_shell.dart';
 
 final appRouter = GoRouter(
@@ -38,6 +39,10 @@ final appRouter = GoRouter(
           path: '/footprints/:id',
           builder: (context, state) =>
               FootprintDetailPage(journeyId: state.pathParameters['id']!),
+        ),
+        GoRoute(
+          path: '/story',
+          builder: (context, state) => const HomeStoryPage(),
         ),
         GoRoute(
           path: '/settings',

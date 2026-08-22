@@ -180,6 +180,12 @@ class CommunityComment {
     required this.author,
     required this.viewerIsAuthor,
     required this.createdAt,
+    this.rootCommentId,
+    this.replyToCommentId,
+    this.replyTo,
+    this.isTombstone = false,
+    this.replyCount = 0,
+    this.replyPreview = const [],
   });
   final String id;
   final String postId;
@@ -187,6 +193,33 @@ class CommunityComment {
   final CommunityAuthor author;
   final bool viewerIsAuthor;
   final DateTime? createdAt;
+  final String? rootCommentId;
+  final String? replyToCommentId;
+  final CommunityAuthor? replyTo;
+  final bool isTombstone;
+  final int replyCount;
+  final List<CommunityComment> replyPreview;
+
+  CommunityComment copyWith({
+    String? body,
+    int? replyCount,
+    List<CommunityComment>? replyPreview,
+    bool? isTombstone,
+  }) =>
+      CommunityComment(
+        id: id,
+        postId: postId,
+        body: body ?? this.body,
+        author: author,
+        viewerIsAuthor: viewerIsAuthor,
+        createdAt: createdAt,
+        rootCommentId: rootCommentId,
+        replyToCommentId: replyToCommentId,
+        replyTo: replyTo,
+        isTombstone: isTombstone ?? this.isTombstone,
+        replyCount: replyCount ?? this.replyCount,
+        replyPreview: replyPreview ?? this.replyPreview,
+      );
 
   factory CommunityComment.fromJson(Map<String, dynamic> json) =>
       CommunityComment(
@@ -196,6 +229,16 @@ class CommunityComment {
         author: CommunityAuthor.fromJson(_map(json['author'])),
         viewerIsAuthor: json['viewer_is_author'] == true,
         createdAt: DateTime.tryParse(_text(json['created_at']) ?? ''),
+        rootCommentId: _text(json['root_comment_id']),
+        replyToCommentId: _text(json['reply_to_comment_id']),
+        replyTo: json['reply_to'] is Map
+            ? CommunityAuthor.fromJson(_map(json['reply_to']))
+            : null,
+        isTombstone: json['is_tombstone'] == true,
+        replyCount: _integer(json['reply_count'], 0),
+        replyPreview: _maps(json['reply_preview'])
+            .map(CommunityComment.fromJson)
+            .toList(growable: false),
       );
 }
 

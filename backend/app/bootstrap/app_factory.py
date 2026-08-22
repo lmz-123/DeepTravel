@@ -17,6 +17,7 @@ from app.application.services import (
     GuestSessionService,
     JourneyService,
 )
+from app.application.story_listening_service import StoryListeningService
 from app.bootstrap.config import Config
 from app.infrastructure.community_media_storage import CommunityMediaStorage
 from app.infrastructure.evidence_storage import EvidenceStorage, LocalEvidenceStorage
@@ -130,6 +131,7 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
             asset_url_builder=asset_url,
         ),
         "historical_content": HistoricalContentService(database.session_factory),
+        "story_listening": StoryListeningService(database.session_factory, asset_url),
         "community": CommunityService(
             database.session_factory,
             community_media_storage,

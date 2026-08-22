@@ -368,6 +368,10 @@ class StoryLedger {
   final String? defaultNarrationProfileId;
   final List<NarrationVoiceProfile> narrationProfiles;
 
+  bool get reconstructionCompleted =>
+      entries.isNotEmpty &&
+      entries.every((entry) => entry.state == 'reconstructed');
+
   factory StoryLedger.fromJson(Map<String, dynamic> json) => StoryLedger(
         centralQuestion: json['central_question'] as String,
         collectedCount: json['collected_count'] as int,

@@ -455,6 +455,9 @@ class CommunityDetailState {
     required this.comments,
     this.likerCursor,
     this.commentCursor,
+    this.repliesByRoot = const {},
+    this.replyCursorByRoot = const {},
+    this.loadingReplyRoots = const {},
     this.isMutating = false,
     this.message,
   });
@@ -463,6 +466,9 @@ class CommunityDetailState {
   final List<CommunityComment> comments;
   final String? likerCursor;
   final String? commentCursor;
+  final Map<String, List<CommunityComment>> repliesByRoot;
+  final Map<String, String?> replyCursorByRoot;
+  final Set<String> loadingReplyRoots;
   final bool isMutating;
   final String? message;
 
@@ -472,6 +478,9 @@ class CommunityDetailState {
     List<CommunityComment>? comments,
     String? likerCursor,
     String? commentCursor,
+    Map<String, List<CommunityComment>>? repliesByRoot,
+    Map<String, String?>? replyCursorByRoot,
+    Set<String>? loadingReplyRoots,
     bool? isMutating,
     String? message,
   }) =>
@@ -481,6 +490,9 @@ class CommunityDetailState {
         comments: comments ?? this.comments,
         likerCursor: likerCursor ?? this.likerCursor,
         commentCursor: commentCursor ?? this.commentCursor,
+        repliesByRoot: repliesByRoot ?? this.repliesByRoot,
+        replyCursorByRoot: replyCursorByRoot ?? this.replyCursorByRoot,
+        loadingReplyRoots: loadingReplyRoots ?? this.loadingReplyRoots,
         isMutating: isMutating ?? this.isMutating,
         message: message,
       );
@@ -507,6 +519,9 @@ class CommunityDetailController extends AsyncNotifier<CommunityDetailState> {
       comments: comments.items,
       likerCursor: likers.nextCursor,
       commentCursor: comments.nextCursor,
+      repliesByRoot: {
+        for (final root in comments.items) root.id: root.replyPreview,
+      },
     );
   }
 
@@ -538,7 +553,11 @@ class CommunityDetailController extends AsyncNotifier<CommunityDetailState> {
     }
   }
 
-  Future<bool> comment(String body, String idempotencyKey) async {
+  Future<bool> comment(
+    String body,
+    String idempotencyKey, {
+    CommunityComment? replyTo,
+  }) async {
     final current = state.asData?.value;
     if (current == null || current.isMutating) return false;
     state = AsyncData(current.copyWith(isMutating: true));
@@ -547,14 +566,46 @@ class CommunityDetailController extends AsyncNotifier<CommunityDetailState> {
         key.postId,
         body,
         idempotencyKey,
+        replyToCommentId: replyTo?.id,
       );
-      state = AsyncData(current.copyWith(
-        post:
-            current.post.copyWith(commentCount: current.post.commentCount + 1),
-        comments: [
+      final rootId =
+          replyTo == null ? null : (replyTo.rootCommentId ?? replyTo.id);
+      final replies = <String, List<CommunityComment>>{
+        ...current.repliesByRoot,
+      };
+      var comments = current.comments;
+      var inserted = false;
+      if (rootId == null) {
+        inserted = !current.comments.any((item) => item.id == comment.id);
+        comments = [
           ...current.comments.where((item) => item.id != comment.id),
-          comment
-        ],
+          comment,
+        ];
+      } else {
+        final existing = replies[rootId] ?? const <CommunityComment>[];
+        inserted = !existing.any((item) => item.id == comment.id);
+        replies[rootId] = [
+          ...existing.where((item) => item.id != comment.id),
+          comment,
+        ];
+        comments = [
+          for (final root in current.comments)
+            if (root.id == rootId)
+              root.copyWith(
+                replyCount: root.replyCount +
+                    (existing.any((item) => item.id == comment.id) ? 0 : 1),
+                replyPreview: replies[rootId]!.take(2).toList(growable: false),
+              )
+            else
+              root,
+        ];
+      }
+      state = AsyncData(current.copyWith(
+        post: current.post.copyWith(
+          commentCount: current.post.commentCount + (inserted ? 1 : 0),
+        ),
+        comments: comments,
+        repliesByRoot: replies,
         isMutating: false,
       ));
       ref.invalidate(communityFeedControllerProvider);
@@ -570,12 +621,40 @@ class CommunityDetailController extends AsyncNotifier<CommunityDetailState> {
     if (current == null) return;
     try {
       await _repository.deleteCommunityComment(comment.id);
+      final rootId = comment.rootCommentId;
+      final replies = <String, List<CommunityComment>>{
+        ...current.repliesByRoot,
+      };
+      var comments = current.comments;
+      if (rootId == null) {
+        comments = [
+          for (final root in current.comments)
+            if (root.id == comment.id && root.replyCount > 0)
+              root.copyWith(body: '', isTombstone: true)
+            else if (root.id != comment.id)
+              root,
+        ];
+      } else {
+        replies[rootId] = (replies[rootId] ?? const [])
+            .where((item) => item.id != comment.id)
+            .toList(growable: false);
+        comments = [
+          for (final root in current.comments)
+            if (root.id == rootId)
+              root.copyWith(
+                replyCount: (root.replyCount - 1).clamp(0, 999999),
+                replyPreview: replies[rootId]!.take(2).toList(growable: false),
+              )
+            else
+              root,
+        ];
+      }
       state = AsyncData(current.copyWith(
         post: current.post.copyWith(
           commentCount: (current.post.commentCount - 1).clamp(0, 999999),
         ),
-        comments:
-            current.comments.where((item) => item.id != comment.id).toList(),
+        comments: comments,
+        repliesByRoot: replies,
       ));
       ref.invalidate(communityFeedControllerProvider);
     } catch (error) {
@@ -602,10 +681,58 @@ class CommunityDetailController extends AsyncNotifier<CommunityDetailState> {
         comments: byId.values.toList(growable: false),
         likerCursor: current.likerCursor,
         commentCursor: page.nextCursor,
+        repliesByRoot: {
+          ...current.repliesByRoot,
+          for (final root in page.items) root.id: root.replyPreview,
+        },
+        replyCursorByRoot: current.replyCursorByRoot,
+        loadingReplyRoots: current.loadingReplyRoots,
       ));
     } catch (error) {
       state = AsyncData(current.copyWith(
         isMutating: false,
+        message: _communityMessage(error),
+      ));
+    }
+  }
+
+  Future<void> loadReplies(CommunityComment root, {bool more = false}) async {
+    final current = state.asData?.value;
+    if (current == null || current.loadingReplyRoots.contains(root.id)) return;
+    final cursor = more ? current.replyCursorByRoot[root.id] : null;
+    if (more && cursor == null) return;
+    state = AsyncData(current.copyWith(
+      loadingReplyRoots: {...current.loadingReplyRoots, root.id},
+      message: null,
+    ));
+    try {
+      final page = await _repository.communityReplies(
+        root.id,
+        cursor: cursor,
+      );
+      final latest = state.requireValue;
+      final existing = more
+          ? latest.repliesByRoot[root.id] ?? const <CommunityComment>[]
+          : const <CommunityComment>[];
+      final byId = <String, CommunityComment>{
+        for (final item in existing) item.id: item,
+        for (final item in page.items) item.id: item,
+      };
+      state = AsyncData(latest.copyWith(
+        repliesByRoot: {
+          ...latest.repliesByRoot,
+          root.id: byId.values.toList(growable: false),
+        },
+        replyCursorByRoot: {
+          ...latest.replyCursorByRoot,
+          root.id: page.nextCursor,
+        },
+        loadingReplyRoots: {...latest.loadingReplyRoots}..remove(root.id),
+      ));
+    } catch (error) {
+      final latest = state.requireValue;
+      state = AsyncData(latest.copyWith(
+        loadingReplyRoots: {...latest.loadingReplyRoots}..remove(root.id),
         message: _communityMessage(error),
       ));
     }
@@ -632,6 +759,9 @@ class CommunityDetailController extends AsyncNotifier<CommunityDetailState> {
         comments: current.comments,
         likerCursor: page.nextCursor,
         commentCursor: current.commentCursor,
+        repliesByRoot: current.repliesByRoot,
+        replyCursorByRoot: current.replyCursorByRoot,
+        loadingReplyRoots: current.loadingReplyRoots,
       ));
     } catch (error) {
       state = AsyncData(current.copyWith(

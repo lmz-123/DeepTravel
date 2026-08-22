@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/user_preferences_repository.dart';
 import '../active_tour_controller.dart';
+import '../audio_ownership_controller.dart';
 import '../experience_providers.dart';
 import '../location_mode_controller.dart';
 
@@ -46,15 +47,28 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(activeTourControllerProvider);
+    final ownership = ref.watch(audioOwnershipProvider);
+    final tour = ref.watch(activeTourControllerProvider);
     final userId = ref.watch(currentUserIdProvider);
-    final visible = userId != null &&
-        state.route != null &&
-        state.session != null &&
-        state.current != null &&
-        state.status != 'idle' &&
-        state.status != 'stopped';
+    final hasLegacyTour = tour.route != null &&
+        tour.session != null &&
+        tour.current != null &&
+        tour.status != 'idle' &&
+        tour.status != 'stopped';
+    final visible = userId != null && (ownership.isActive || hasLegacyTour);
     if (!visible) return const SizedBox.shrink();
+    final isPlaying = ownership.isActive ? ownership.isPlaying : tour.isPlaying;
+    final title = ownership.isActive ? ownership.title : tour.route!.title;
+    final subtitle = ownership.isActive
+        ? ownership.subtitle
+        : tour.current!.title ?? '第 ${tour.current!.position} 条线索';
+    final destination = ownership.isActive
+        ? ownership.destination
+        : '/journey/${tour.session!.id}';
+    final artwork =
+        ownership.isActive ? ownership.artwork : tour.route!.heroImage;
+    final position = ownership.isActive ? ownership.position : tour.position;
+    final duration = ownership.isActive ? ownership.duration : tour.duration;
     final stored = ref.watch(orbPositionProvider(userId)).value;
     if (_loadedUserId != userId) {
       _loadedUserId = userId;
@@ -64,12 +78,12 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
           _edgePosition(stored ?? const NormalizedOrbPosition(1, .72));
     }
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
-    final rotating = state.isPlaying && !reducedMotion;
+    final rotating = isPlaying && !reducedMotion;
     _syncRotation(rotating);
-    final durationMs = state.duration?.inMilliseconds ?? 0;
+    final durationMs = duration?.inMilliseconds ?? 0;
     final progress = durationMs <= 0
         ? 0.0
-        : (state.position.inMilliseconds / durationMs).clamp(0.0, 1.0);
+        : (position.inMilliseconds / durationMs).clamp(0.0, 1.0);
 
     return LayoutBuilder(builder: (context, constraints) {
       final mediaPadding = MediaQuery.paddingOf(context);
@@ -94,9 +108,8 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
             curve: Curves.easeOutCubic,
             child: Semantics(
               button: true,
-              label:
-                  '${state.isPlaying ? '正在播放' : '已暂停'} ${state.route!.title}，${state.current!.title ?? '第 ${state.current!.position} 条线索'}',
-              hint: '双击回到当前旅程；也可以上下拖动并吸附到左右侧边',
+              label: '${isPlaying ? '正在播放' : '已暂停'} $title，$subtitle',
+              hint: '双击回到当前播放页面；也可以上下拖动并吸附到左右侧边',
               customSemanticsActions: {
                 const CustomSemanticsAction(label: '向左移动'): () =>
                     _move(const Offset(-.08, 0), userId),
@@ -109,7 +122,7 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
               },
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => context.go('/journey/${state.session!.id}'),
+                onTap: () => context.go(destination),
                 onPanStart: (_) {
                   _isDragging = true;
                   _dragOffset = offset;
@@ -138,7 +151,7 @@ class _RotatingTourOrbOverlayState extends ConsumerState<RotatingTourOrbOverlay>
                       ),
                       child: CustomPaint(
                         foregroundPainter: _OrbProgressPainter(progress),
-                        child: _VinylDisc(artwork: state.route!.heroImage),
+                        child: _VinylDisc(artwork: artwork),
                       ),
                     ),
                   ),

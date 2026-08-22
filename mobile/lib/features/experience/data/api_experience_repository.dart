@@ -8,6 +8,7 @@ import '../domain/community_models.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
+import '../domain/home_story.dart';
 
 class ExperienceFailure implements Exception {
   const ExperienceFailure(this.message, {this.code, this.statusCode});
@@ -90,6 +91,22 @@ class ApiExperienceRepository implements ExperienceRepository {
       throw const ExperienceFailure('这条路线尚未发布');
     }
     return route;
+  }
+
+  @override
+  Future<HomeStory> randomHomeStory({
+    String? citySlug,
+    String? excludeId,
+  }) async {
+    final response = await _request(() => _dio.get(
+          '/stories/random',
+          queryParameters: {
+            if (citySlug != null && citySlug.isNotEmpty) 'city_slug': citySlug,
+            if (excludeId != null && excludeId.isNotEmpty)
+              'exclude_id': excludeId,
+          },
+        ));
+    return HomeStory.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
   Future<List<ResumableJourney>> archivedActiveJourneys() async {
@@ -441,6 +458,24 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
+  Future<CommunityPage<CommunityComment>> communityReplies(
+    String rootCommentId, {
+    String? cursor,
+    int limit = 20,
+  }) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/community-comments/$rootCommentId/replies',
+          queryParameters: {
+            'limit': limit,
+            if (cursor != null) 'cursor': cursor,
+          },
+          options: _authorized,
+        ));
+    return _communityPage(response.data['data'], CommunityComment.fromJson);
+  }
+
+  @override
   Future<CommunityPostDetail> createCommunityPost(
     String journeyId,
     String fragmentId,
@@ -498,12 +533,18 @@ class ApiExperienceRepository implements ExperienceRepository {
   Future<CommunityComment> createCommunityComment(
     String postId,
     String body,
-    String idempotencyKey,
-  ) async {
+    String idempotencyKey, {
+    String? replyToCommentId,
+  }) async {
     await _ensureAuth();
     final response = await _request(() => _dio.post(
           '/community-posts/$postId/comments',
-          data: {'body': body, 'idempotency_key': idempotencyKey},
+          data: {
+            'body': body,
+            'idempotency_key': idempotencyKey,
+            if (replyToCommentId != null)
+              'reply_to_comment_id': replyToCommentId,
+          },
           options: _authorized,
         ));
     return CommunityComment.fromJson(

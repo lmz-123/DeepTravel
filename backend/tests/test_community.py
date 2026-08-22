@@ -169,9 +169,31 @@ def test_shared_feed_detail_like_comment_pagination_and_privacy(client):
         },
         headers=headers_a,
     )
-    assert nested.status_code == 422
+    assert nested.status_code == 201
+    reply = nested.get_json()["data"]
+    assert reply["root_comment_id"] == comment.get_json()["data"]["id"]
+    assert reply["reply_to"]["display_name"] == "tester-b"
     comments = client.get(f"{comment_url}?limit=1", headers=headers_a).get_json()["data"]
     assert len(comments["items"]) == 1
+    assert comments["items"][0]["reply_count"] == 1
+    assert comments["items"][0]["reply_preview"][0]["id"] == reply["id"]
+    reply_to_reply = client.post(
+        comment_url,
+        json={
+            "body": "继续交流",
+            "reply_to_comment_id": reply["id"],
+            "idempotency_key": "reply-to-reply",
+        },
+        headers=headers_b,
+    )
+    assert reply_to_reply.status_code == 201
+    assert reply_to_reply.get_json()["data"]["root_comment_id"] == comment.get_json()["data"]["id"]
+    replies = client.get(
+        f"/api/v1/community-comments/{comment.get_json()['data']['id']}/replies?limit=1",
+        headers=headers_a,
+    ).get_json()["data"]
+    assert len(replies["items"]) == 1
+    assert replies["next_cursor"]
     assert account_b["user"]["id"] not in str(comments)
     assert (
         client.delete(

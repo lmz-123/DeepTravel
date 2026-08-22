@@ -355,11 +355,75 @@ class CommunityService:
         with self.session_factory() as session:
             self._visible_post(session, user_id, post_id)
             hidden = self._reported_exists(user_id, "comment", CommunityCommentModel.id)
+            # Use an explicit reply alias so the correlated EXISTS remains
+            # unambiguous on both SQLite and MySQL.
+            from sqlalchemy.orm import aliased
+
+            reply = aliased(CommunityCommentModel)
+            visible_reply_exists = exists(
+                select(reply.id).where(
+                    reply.root_comment_id == CommunityCommentModel.id,
+                    reply.status == "visible",
+                    ~self._reported_exists(user_id, "comment", reply.id),
+                )
+            )
             query = (
                 select(CommunityCommentModel, UserModel)
                 .join(UserModel, UserModel.id == CommunityCommentModel.author_user_id)
                 .where(
                     CommunityCommentModel.post_id == post_id,
+                    CommunityCommentModel.root_comment_id.is_(None),
+                    or_(
+                        and_(CommunityCommentModel.status == "visible", ~hidden),
+                        visible_reply_exists,
+                    ),
+                )
+            )
+            if boundary:
+                created_at, item_id = boundary
+                query = query.where(
+                    or_(
+                        CommunityCommentModel.created_at > created_at,
+                        and_(
+                            CommunityCommentModel.created_at == created_at,
+                            CommunityCommentModel.id > item_id,
+                        ),
+                    )
+                )
+            rows = session.execute(
+                query.order_by(
+                    CommunityCommentModel.created_at.asc(), CommunityCommentModel.id.asc()
+                ).limit(limit + 1)
+            ).all()
+            has_more = len(rows) > limit
+            rows = rows[:limit]
+            items = self._thread_payloads(session, rows, user_id)
+            next_cursor = None
+            if has_more and rows:
+                comment = rows[-1][0]
+                next_cursor = self._encode_cursor(scope, comment.created_at, comment.id)
+            return {"items": items, "next_cursor": next_cursor}
+
+    def replies(
+        self, user_id: str, root_comment_id: str, *, cursor: str | None, limit: int
+    ) -> dict:
+        self._require_enabled()
+        limit = self._limit(limit)
+        scope = f"replies:{root_comment_id}"
+        boundary = self._decode_cursor(cursor, scope) if cursor else None
+        with self.session_factory() as session:
+            root = session.get(CommunityCommentModel, root_comment_id)
+            if root is None or root.root_comment_id is not None:
+                raise FragmentOperationError(
+                    "community_comment_not_found", "评论不存在", status_code=404
+                )
+            self._visible_post(session, user_id, root.post_id)
+            hidden = self._reported_exists(user_id, "comment", CommunityCommentModel.id)
+            query = (
+                select(CommunityCommentModel, UserModel)
+                .join(UserModel, UserModel.id == CommunityCommentModel.author_user_id)
+                .where(
+                    CommunityCommentModel.root_comment_id == root_comment_id,
                     CommunityCommentModel.status == "visible",
                     ~hidden,
                 )
@@ -382,15 +446,49 @@ class CommunityService:
             ).all()
             has_more = len(rows) > limit
             rows = rows[:limit]
-            items = [self._comment_payload(comment, author, user_id) for comment, author in rows]
+            target_ids = {item.reply_to_comment_id for item, _ in rows if item.reply_to_comment_id}
+            target_author_ids = set(
+                session.scalars(
+                    select(CommunityCommentModel.author_user_id).where(
+                        CommunityCommentModel.id.in_(target_ids)
+                    )
+                )
+            )
+            target_authors = {
+                item.id: item
+                for item in session.scalars(
+                    select(UserModel).where(UserModel.id.in_(target_author_ids))
+                )
+            }
+            target_author_by_comment = {
+                item.id: target_authors.get(item.author_user_id)
+                for item in session.scalars(
+                    select(CommunityCommentModel).where(CommunityCommentModel.id.in_(target_ids))
+                )
+            }
+            items = [
+                self._comment_payload(
+                    comment,
+                    author,
+                    user_id,
+                    reply_to_author=target_author_by_comment.get(comment.reply_to_comment_id),
+                )
+                for comment, author in rows
+            ]
             next_cursor = None
             if has_more and rows:
-                comment = rows[-1][0]
-                next_cursor = self._encode_cursor(scope, comment.created_at, comment.id)
+                last = rows[-1][0]
+                next_cursor = self._encode_cursor(scope, last.created_at, last.id)
             return {"items": items, "next_cursor": next_cursor}
 
     def create_comment(
-        self, user_id: str, post_id: str, *, body: str, idempotency_key: str
+        self,
+        user_id: str,
+        post_id: str,
+        *,
+        body: str,
+        idempotency_key: str,
+        reply_to_comment_id: str | None = None,
     ) -> dict:
         self._require_enabled()
         body = body.strip()
@@ -400,6 +498,36 @@ class CommunityService:
             raise ValidationError("idempotency_key 为必填字段且不得超过 80 字符")
         with self.session_factory() as session:
             self._visible_post(session, user_id, post_id)
+            root_comment_id = None
+            reply_to = None
+            if reply_to_comment_id:
+                reply_to = session.get(CommunityCommentModel, reply_to_comment_id)
+                reported = session.scalar(
+                    select(CommunityReportModel.id).where(
+                        CommunityReportModel.reporter_user_id == user_id,
+                        CommunityReportModel.target_type == "comment",
+                        CommunityReportModel.target_id == reply_to_comment_id,
+                    )
+                )
+                if (
+                    reply_to is None
+                    or reply_to.post_id != post_id
+                    or reply_to.status != "visible"
+                    or reported is not None
+                ):
+                    raise FragmentOperationError(
+                        "community_comment_not_found", "评论不存在", status_code=404
+                    )
+                root = (
+                    reply_to
+                    if reply_to.root_comment_id is None
+                    else session.get(CommunityCommentModel, reply_to.root_comment_id)
+                )
+                if root is None or root.post_id != post_id:
+                    raise FragmentOperationError(
+                        "community_comment_not_found", "评论不存在", status_code=404
+                    )
+                root_comment_id = root.id
             duplicate = session.scalar(
                 select(CommunityCommentModel).where(
                     CommunityCommentModel.author_user_id == user_id,
@@ -410,11 +538,21 @@ class CommunityService:
                 if duplicate.post_id != post_id:
                     raise ValidationError("idempotency_key 已用于另一条评论")
                 author = session.get(UserModel, user_id)
-                return self._comment_payload(duplicate, author, user_id)
+                target_author = None
+                if duplicate.reply_to_comment_id:
+                    target = session.get(CommunityCommentModel, duplicate.reply_to_comment_id)
+                    target_author = (
+                        session.get(UserModel, target.author_user_id) if target else None
+                    )
+                return self._comment_payload(
+                    duplicate, author, user_id, reply_to_author=target_author
+                )
             now = datetime.now(UTC)
             comment = CommunityCommentModel(
                 id=str(uuid4()),
                 post_id=post_id,
+                root_comment_id=root_comment_id,
+                reply_to_comment_id=reply_to_comment_id or None,
                 author_user_id=user_id,
                 body=body,
                 status="visible",
@@ -439,7 +577,12 @@ class CommunityService:
                     raise
                 comment = duplicate
             author = session.get(UserModel, user_id)
-            return self._comment_payload(comment, author, user_id)
+            reply_to_author = (
+                session.get(UserModel, reply_to.author_user_id) if reply_to is not None else None
+            )
+            return self._comment_payload(
+                comment, author, user_id, reply_to_author=reply_to_author
+            )
 
     def delete_post(self, user_id: str, post_id: str) -> dict:
         self._require_enabled()
@@ -645,15 +788,138 @@ class CommunityService:
             "position": media.position,
         }
 
-    def _comment_payload(self, comment, author, user_id: str) -> dict:
+    def _comment_payload(
+        self,
+        comment,
+        author,
+        user_id: str,
+        *,
+        reply_to_author=None,
+        reply_count: int = 0,
+        reply_preview: list[dict] | None = None,
+        tombstone: bool = False,
+    ) -> dict:
         return {
             "id": comment.id,
             "post_id": comment.post_id,
-            "body": comment.body,
-            "author": self._author_payload(author),
-            "viewer_is_author": comment.author_user_id == user_id,
+            "root_comment_id": comment.root_comment_id,
+            "reply_to_comment_id": comment.reply_to_comment_id,
+            "body": "" if tombstone else comment.body,
+            "author": None if tombstone else self._author_payload(author),
+            "reply_to": (
+                self._author_payload(reply_to_author) if reply_to_author is not None else None
+            ),
+            "viewer_is_author": not tombstone and comment.author_user_id == user_id,
+            "is_tombstone": tombstone,
+            "reply_count": reply_count,
+            "reply_preview": reply_preview or [],
             "created_at": _iso(comment.created_at),
         }
+
+    def _thread_payloads(self, session, rows, user_id: str) -> list[dict]:
+        if not rows:
+            return []
+        roots = [comment for comment, _ in rows]
+        root_ids = [comment.id for comment in roots]
+        hidden_ids = set(
+            session.scalars(
+                select(CommunityReportModel.target_id).where(
+                    CommunityReportModel.reporter_user_id == user_id,
+                    CommunityReportModel.target_type == "comment",
+                    CommunityReportModel.target_id.in_(root_ids),
+                )
+            )
+        )
+        hidden_reply = self._reported_exists(user_id, "comment", CommunityCommentModel.id)
+        reply_counts = dict(
+            session.execute(
+                select(CommunityCommentModel.root_comment_id, func.count())
+                .where(
+                    CommunityCommentModel.root_comment_id.in_(root_ids),
+                    CommunityCommentModel.status == "visible",
+                    ~hidden_reply,
+                )
+                .group_by(CommunityCommentModel.root_comment_id)
+            ).all()
+        )
+        ranked_replies = (
+            select(
+                CommunityCommentModel.id.label("comment_id"),
+                func.row_number()
+                .over(
+                    partition_by=CommunityCommentModel.root_comment_id,
+                    order_by=(
+                        CommunityCommentModel.created_at.asc(),
+                        CommunityCommentModel.id.asc(),
+                    ),
+                )
+                .label("reply_rank"),
+            )
+            .where(
+                CommunityCommentModel.root_comment_id.in_(root_ids),
+                CommunityCommentModel.status == "visible",
+                ~hidden_reply,
+            )
+            .subquery()
+        )
+        reply_rows = session.execute(
+            select(CommunityCommentModel, UserModel)
+            .join(UserModel, UserModel.id == CommunityCommentModel.author_user_id)
+            .join(ranked_replies, ranked_replies.c.comment_id == CommunityCommentModel.id)
+            .where(ranked_replies.c.reply_rank <= 2)
+            .order_by(
+                CommunityCommentModel.root_comment_id,
+                CommunityCommentModel.created_at.asc(),
+                CommunityCommentModel.id.asc(),
+            )
+        ).all()
+        preview_rows: dict[str, list[tuple]] = {root_id: [] for root_id in root_ids}
+        target_ids = set()
+        for reply, author in reply_rows:
+            root_id = reply.root_comment_id
+            preview_rows[root_id].append((reply, author))
+            if reply.reply_to_comment_id:
+                target_ids.add(reply.reply_to_comment_id)
+        targets = {
+            item.id: item
+            for item in session.scalars(
+                select(CommunityCommentModel).where(CommunityCommentModel.id.in_(target_ids))
+            )
+        }
+        target_authors = {
+            item.id: item
+            for item in session.scalars(
+                select(UserModel).where(
+                    UserModel.id.in_({target.author_user_id for target in targets.values()})
+                )
+            )
+        }
+        result = []
+        for root, author in rows:
+            previews = []
+            for reply, reply_author in preview_rows[root.id]:
+                target = targets.get(reply.reply_to_comment_id)
+                previews.append(
+                    self._comment_payload(
+                        reply,
+                        reply_author,
+                        user_id,
+                        reply_to_author=(
+                            target_authors.get(target.author_user_id) if target else None
+                        ),
+                    )
+                )
+            result.append(
+                self._comment_payload(
+                    root,
+                    author,
+                    user_id,
+                    reply_count=reply_counts.get(root.id, 0),
+                    reply_preview=previews,
+                    tombstone=root.status != "visible" or root.id in hidden_ids,
+                )
+            )
+        return result
 
     def _visible_post(self, session, user_id: str, post_id: str) -> CommunityPostModel:
         post = session.get(CommunityPostModel, post_id)

@@ -378,11 +378,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.dragUntilVisible(find.text('开始重构故事'),
-        find.byType(ListView).first, const Offset(0, -260));
-    await tester.ensureVisible(find.text('开始重构故事'));
+    await tester.tap(find.byTooltip('故事线索簿'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('开始重构故事'));
+    expect(find.text('把线索拼成完整故事'), findsOneWidget);
+    await tester.tap(find.text('把线索拼成完整故事'));
     await tester.pumpAndSettle();
     expect(find.text('服务器给出的第二项'), findsOneWidget);
     expect(find.text('服务器给出的第一项'), findsOneWidget);

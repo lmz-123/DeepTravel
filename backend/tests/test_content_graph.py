@@ -138,7 +138,7 @@ def test_legacy_reconstruction_items_get_stable_ids_and_deterministic_shuffle():
 
 def test_dameisha_package_graph_and_media_are_complete():
     root = Path(__file__).parents[2]
-    package = json.loads((root / "docs/content-packages/dameisha-remade-coast-v1.json").read_text())
+    package = json.loads((root / "docs/content-packages/dameisha-remade-coast-v2.json").read_text())
     media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
 
     result = validate_content_graph(package, media_assets=media)
@@ -165,13 +165,41 @@ def test_dameisha_package_graph_and_media_are_complete():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
     for fragment in package["fragments"]:
         assert fragment["narration_script"] == fragment["transcript"]
+        assert fragment["script_version"] == "dameisha-2026.08-conversational.2"
+
+
+def test_nantou_conversational_package_matches_seed_and_media():
+    root = Path(__file__).parents[2]
+    package = json.loads(
+        (root / "docs/content-packages/nantou-conversational-city-v2.json").read_text()
+    )
+    media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
+
+    result = validate_content_graph(package, media_assets=media)
+
+    assert result["valid"] is True, result["errors"]
+    assert package["city"]["slug"] == "shenzhen"
+    assert package["story_arc"]["script_version"] == "nantou-2026.08-conversational.2"
+    assert len(package["fragments"]) == 5
+    assert all(item["narration_script"] == item["transcript"] for item in package["fragments"])
+    assert all(
+        not (item.get("photo_mission") or {}).get("required")
+        for item in package["fragments"]
+    )
+    for item in package["media"]:
+        path = root / "backend/media" / item["storage_path"]
+        assert path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
 
 
 def test_shanghai_readable_city_package_is_generic_audio_photo_content():
     root = Path(__file__).parents[2]
-    package = json.loads(
-        (root / "docs/content-packages/shanghai-readable-city-v1.json").read_text()
+    package_path = root / "docs/content-packages/shanghai-readable-city-v1.json"
+    package_bytes = package_path.read_bytes()
+    assert hashlib.sha256(package_bytes).hexdigest() == (
+        "8ef3902958d7d5ac14308121b91eedce8c8fe9defea4f0f3d1491ea5b3b70109"
     )
+    package = json.loads(package_bytes)
     media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
 
     result = validate_content_graph(package, media_assets=media)

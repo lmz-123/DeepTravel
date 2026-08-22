@@ -11,12 +11,14 @@ import '../data/narration_voice_preference_repository.dart';
 import '../data/platform_tour_adapters.dart';
 import '../data/prepared_route_service.dart';
 import '../data/user_preferences_repository.dart';
+import '../data/home_story_audio_player.dart';
 import '../domain/experience_repository.dart';
 import '../domain/fragment_models.dart';
 import '../domain/models.dart';
 import '../domain/tour_runtime.dart';
 import 'experience_providers.dart';
 import 'location_mode_controller.dart';
+import 'audio_ownership_controller.dart';
 import '../../auth/presentation/auth_provider.dart';
 
 final tourStoreProvider = Provider<TourStore>((ref) => SqliteTourStore());
@@ -222,6 +224,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   String? _loadedProfileId;
   int _transitionGeneration = 0;
   int _playbackGeneration = 0;
+  int? _audioOwnershipGeneration;
 
   ExperienceRepository get _repository =>
       ref.read(experienceRepositoryProvider);
@@ -505,16 +508,32 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     _playing = _player.playingStream.listen((value) {
       if (_isPlaybackCurrent(generation)) {
         state = state.copyWith(isPlaying: value);
+        final token = _audioOwnershipGeneration;
+        if (token != null) {
+          ref.read(audioOwnershipProvider.notifier).playing(token, value);
+        }
       }
     });
     _position = _player.positionStream.listen((value) {
       if (_isPlaybackCurrent(generation)) {
         state = state.copyWith(position: value);
+        final token = _audioOwnershipGeneration;
+        if (token != null) {
+          ref
+              .read(audioOwnershipProvider.notifier)
+              .progress(token, value, state.duration);
+        }
       }
     });
     _duration = _player.durationStream.listen((value) {
       if (_isPlaybackCurrent(generation)) {
         state = state.copyWith(duration: value);
+        final token = _audioOwnershipGeneration;
+        if (token != null) {
+          ref
+              .read(audioOwnershipProvider.notifier)
+              .progress(token, state.position, value);
+        }
       }
     });
   }
@@ -864,11 +883,21 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   Future<void> _playNarration(StoryFragment fragment) async {
     final generation = ++_playbackGeneration;
     await _cancelPlayerBindings();
+    await ref.read(homeStoryAudioPlayerProvider).stop();
     await _player.stop();
     if (generation != _playbackGeneration) return;
     final route = state.route;
     final session = state.session;
     if (route == null || session == null) return;
+    final ownership = ref.read(audioOwnershipProvider.notifier).acquire(
+          kind: AudioOwnerKind.route,
+          destination: '/journey/${session.id}',
+          title: fragment.title ?? '第 ${fragment.position} 条线索',
+          subtitle: route.title,
+          artwork: route.heroImage,
+          duration: state.duration,
+        );
+    _audioOwnershipGeneration = ownership;
     state = state.copyWith(
       current: fragment,
       selectedFragmentId: fragment.id,
@@ -901,6 +930,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       await _bindPlayer(generation);
       if (!_isPlaybackCurrent(generation)) return;
       state = state.copyWith(isPlaying: true);
+      ref.read(audioOwnershipProvider.notifier).playing(ownership, true);
     } catch (error, stackTrace) {
       if (!_isPlaybackCurrent(generation)) return;
       if (_loadedFragmentId == fragment.id) _loadedFragmentId = null;
@@ -909,6 +939,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         isPlaying: false,
         errorMessage: '故事音频暂时无法播放，可以先查看文字稿后重试。',
       );
+      ref.read(audioOwnershipProvider.notifier).clear(ownership);
+      if (_audioOwnershipGeneration == ownership) {
+        _audioOwnershipGeneration = null;
+      }
       unawaited(ref.read(runtimeLogReporterProvider)?.error(
         'audio',
         'narration_playback_failed',
@@ -1159,6 +1193,20 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       isPlaying: false,
       locationMessage: '自动故事已暂停，线索和照片不会丢失。',
     );
+    final token = _audioOwnershipGeneration;
+    if (token != null) {
+      ref.read(audioOwnershipProvider.notifier).playing(token, false);
+    }
+  }
+
+  Future<void> pauseForExternalAudio() async {
+    if (!state.isPlaying) return;
+    await _player.pause();
+    state = state.copyWith(isPlaying: false);
+    final token = _audioOwnershipGeneration;
+    if (token != null) {
+      ref.read(audioOwnershipProvider.notifier).playing(token, false);
+    }
   }
 
   Future<void> resumeTour() async {
@@ -1175,6 +1223,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     if (state.current != null && _loadedFragmentId == state.current!.id) {
       await _player.resume();
       state = state.copyWith(isPlaying: true);
+      final token = _audioOwnershipGeneration;
+      if (token != null) {
+        ref.read(audioOwnershipProvider.notifier).playing(token, true);
+      }
     }
   }
 
@@ -1229,6 +1281,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     await _cancelPlayerBindings();
     await _stopLocationMonitoring();
     await _player.stop();
+    final ownership = _audioOwnershipGeneration;
+    if (ownership != null) {
+      ref.read(audioOwnershipProvider.notifier).clear(ownership);
+      _audioOwnershipGeneration = null;
+    }
     _loadedFragmentId = null;
     _loadedProfileId = null;
     if (session != null && wasLive) {
@@ -1253,6 +1310,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     try {
       await _player.stop();
     } catch (_) {}
+    final ownership = _audioOwnershipGeneration;
+    if (ownership != null) {
+      ref.read(audioOwnershipProvider.notifier).clear(ownership);
+      _audioOwnershipGeneration = null;
+    }
     if (session != null && wasLive) {
       try {
         await _repository.stopActiveTour(session.id);
@@ -1280,6 +1342,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     if (state.isPlaying) {
       await _player.pause();
       state = state.copyWith(isPlaying: false);
+      final token = _audioOwnershipGeneration;
+      if (token != null) {
+        ref.read(audioOwnershipProvider.notifier).playing(token, false);
+      }
       return;
     }
     final current = state.current;
@@ -1299,6 +1365,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     } else {
       await _player.resume();
       state = state.copyWith(isPlaying: true);
+    }
+    final token = _audioOwnershipGeneration;
+    if (token != null) {
+      ref.read(audioOwnershipProvider.notifier).playing(token, true);
     }
   }
 

@@ -188,58 +188,63 @@ class _Header extends ConsumerWidget {
       children: [
         BrandMark(onPressed: () => TravelerShellScope.showDrawer(context)),
         const Spacer(),
-        PopupMenuButton<String>(
-          tooltip: '选择城市',
-          initialValue: selectedSlug,
-          enabled: availableCities.isNotEmpty,
-          onSelected: (slug) =>
-              ref.read(selectedCityProvider.notifier).select(slug),
-          itemBuilder: (context) => availableCities
-              .map(
-                (city) => PopupMenuItem<String>(
-                  value: city.slug,
-                  child: Row(
-                    children: [
-                      Icon(
-                        city.slug == selectedSlug
-                            ? Icons.check_circle_rounded
-                            : Icons.circle_outlined,
-                        size: 18,
-                        color: AppColors.moss,
+        Semantics(
+          button: true,
+          label: '选择城市，当前${selectedCity?.name ?? '未选择'}',
+          child: Tooltip(
+            message: '选择城市',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: availableCities.isEmpty
+                    ? null
+                    : () => showModalBottomSheet<void>(
+                          context: context,
+                          useRootNavigator: true,
+                          useSafeArea: true,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => _CitySelectionSheet(
+                            cities: availableCities,
+                            selectedSlug: selectedSlug,
+                            onSelected: (slug) {
+                              ref
+                                  .read(selectedCityProvider.notifier)
+                                  .select(slug);
+                              ref.invalidate(cityRoutesProvider);
+                            },
+                          ),
+                        ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 9, 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.ink.withValues(alpha: 0.06),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
                       ),
-                      const SizedBox(width: 10),
-                      Text(city.name),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 16),
+                      const SizedBox(width: 5),
+                      Text(
+                        selectedCity?.name ?? '选择城市',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.expand_more_rounded, size: 18),
                     ],
                   ),
                 ),
-              )
-              .toList(),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            padding: const EdgeInsets.fromLTRB(12, 8, 9, 8),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.ink.withValues(alpha: 0.06),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.location_on_outlined, size: 16),
-                const SizedBox(width: 5),
-                Text(
-                  selectedCity?.name ?? '选择城市',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(width: 2),
-                const Icon(Icons.expand_more_rounded, size: 18),
-              ],
+              ),
             ),
           ),
         ),
@@ -247,6 +252,202 @@ class _Header extends ConsumerWidget {
     );
   }
 }
+
+class _CitySelectionSheet extends StatefulWidget {
+  const _CitySelectionSheet({
+    required this.cities,
+    required this.selectedSlug,
+    required this.onSelected,
+  });
+
+  final List<CityExperience> cities;
+  final String? selectedSlug;
+  final ValueChanged<String> onSelected;
+
+  @override
+  State<_CitySelectionSheet> createState() => _CitySelectionSheetState();
+}
+
+class _CitySelectionSheetState extends State<_CitySelectionSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = _normalizeCitySearch(_query);
+    final filtered = widget.cities.where((city) {
+      if (normalized.isEmpty) return true;
+      return _normalizeCitySearch('${city.name} ${city.subtitle} ${city.slug}')
+          .contains(normalized);
+    }).toList(growable: false);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return FractionallySizedBox(
+      heightFactor: .82,
+      child: Material(
+        color: AppColors.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 10),
+            child: Row(children: [
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.ink.withValues(alpha: .16),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: '关闭城市选择',
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('下一站，想去哪里？',
+                    style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 5),
+                Text('城市和路线都由后台发布，新的目的地会自动来到这里。',
+                    style: Theme.of(context).textTheme.bodySmall),
+                if (widget.cities.length >= 8) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    autofocus: false,
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: InputDecoration(
+                      hintText: '搜城市或它的气质…',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: AppColors.white,
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? const Center(child: Text('没有找到这座城市，换个关键词试试。'))
+                : GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: MediaQuery.sizeOf(context).width >= 1100
+                          ? 3
+                          : MediaQuery.sizeOf(context).width >= 700
+                              ? 2
+                              : 1,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio:
+                          MediaQuery.sizeOf(context).width < 700 ? 2.05 : 1.05,
+                    ),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final city = filtered[index];
+                      final selected = city.slug == widget.selectedSlug;
+                      return AnimatedScale(
+                        duration: reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 180),
+                        scale: selected ? .97 : 1,
+                        child: Semantics(
+                          selected: selected,
+                          button: true,
+                          label: '${city.name}，${city.subtitle}',
+                          child: Material(
+                            color: AppColors.paperDeep,
+                            borderRadius: BorderRadius.circular(22),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () {
+                                widget.onSelected(city.slug);
+                                Navigator.of(context).pop();
+                              },
+                              child: Stack(fit: StackFit.expand, children: [
+                                city.heroImage.isEmpty
+                                    ? const ColoredBox(color: AppColors.moss)
+                                    : Image.network(
+                                        city.heroImage,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const ColoredBox(
+                                                color: AppColors.moss),
+                                      ),
+                                const DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black87
+                                      ],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: 14,
+                                  right: 14,
+                                  bottom: 14,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(city.name,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w700,
+                                          )),
+                                      const SizedBox(height: 3),
+                                      Text(city.subtitle,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 11,
+                                          )),
+                                    ],
+                                  ),
+                                ),
+                                if (selected)
+                                  const Positioned(
+                                    top: 12,
+                                    right: 12,
+                                    child: CircleAvatar(
+                                      radius: 15,
+                                      backgroundColor: AppColors.gold,
+                                      child: Icon(Icons.check_rounded,
+                                          size: 18, color: AppColors.ink),
+                                    ),
+                                  ),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+String _normalizeCitySearch(String value) =>
+    value.toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
 class _RouteCarousel extends ConsumerStatefulWidget {
   const _RouteCarousel({required this.routes});
@@ -548,9 +749,9 @@ class _ExperiencePromise extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = [
-      (Icons.headphones_rounded, '听一个短故事'),
-      (Icons.visibility_outlined, '观察真实细节'),
-      (Icons.auto_awesome_outlined, '带走一条见识'),
+      (Icons.headphones_rounded, '听一个短故事', true),
+      (Icons.visibility_outlined, '观察真实细节', false),
+      (Icons.auto_awesome_outlined, '带走一条见识', false),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,18 +761,36 @@ class _ExperiencePromise extends StatelessWidget {
         ...items.map(
           (item) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                      color: AppColors.paperDeep, shape: BoxShape.circle),
-                  child: Icon(item.$1, color: AppColors.ink, size: 20),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key:
+                    item.$3 ? const ValueKey('home-random-story-action') : null,
+                borderRadius: BorderRadius.circular(18),
+                onTap: item.$3 ? () => context.push('/story') : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                            color: AppColors.paperDeep, shape: BoxShape.circle),
+                        child: Icon(item.$1, color: AppColors.ink, size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(item.$2,
+                            style: Theme.of(context).textTheme.bodyLarge),
+                      ),
+                      if (item.$3)
+                        const Icon(Icons.arrow_forward_rounded,
+                            color: AppColors.moss),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 14),
-                Text(item.$2, style: Theme.of(context).textTheme.bodyLarge),
-              ],
+              ),
             ),
           ),
         ),

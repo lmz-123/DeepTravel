@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../domain/community_models.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
+import '../domain/home_story.dart';
 import '../domain/fragment_models.dart';
 import 'demo_content.dart';
 
@@ -14,6 +15,29 @@ class DemoExperienceRepository implements ExperienceRepository {
   final Map<String, AnswerFeedback> _answers = {};
   final List<CommunityPost> _communityPosts = [];
   final Map<String, List<CommunityComment>> _communityComments = {};
+
+  @override
+  Future<HomeStory> randomHomeStory({
+    String? citySlug,
+    String? excludeId,
+  }) async {
+    await _pause();
+    return const HomeStory(
+      id: 'demo-home-story',
+      arcId: 'demo-arc',
+      title: '城墙今天想说点什么',
+      introduction: '给自己三分钟，听一阵海风如何吹进一座老城。',
+      coverImage: '',
+      duration: Duration(minutes: 3),
+      transcript: '这是演示模式的完整故事。连接正式服务后，这里会播放后台审核发布的城市故事。',
+      audioUrl: '',
+      cityName: '深圳',
+      citySlug: 'shenzhen',
+      routeTitle: '南头古城',
+      routeSlug: 'nantou-ancient-city',
+      narratorName: '见地讲述者',
+    );
+  }
 
   Future<void> _pause() => Future<void>.delayed(latency);
 
@@ -296,7 +320,23 @@ class DemoExperienceRepository implements ExperienceRepository {
     int limit = 20,
   }) async =>
       CommunityPage(
-          items: List.unmodifiable(_communityComments[postId] ?? const []));
+          items: List.unmodifiable((_communityComments[postId] ?? const [])
+              .where((item) => item.rootCommentId == null)));
+
+  @override
+  Future<CommunityPage<CommunityComment>> communityReplies(
+    String rootCommentId, {
+    String? cursor,
+    int limit = 20,
+  }) async {
+    final comments = _communityComments.values.expand((items) => items);
+    return CommunityPage(
+      items: comments
+          .where((item) => item.rootCommentId == rootCommentId)
+          .take(limit)
+          .toList(growable: false),
+    );
+  }
 
   @override
   Future<CommunityPostDetail> createCommunityPost(
@@ -346,12 +386,16 @@ class DemoExperienceRepository implements ExperienceRepository {
   Future<CommunityComment> createCommunityComment(
     String postId,
     String body,
-    String idempotencyKey,
-  ) async {
+    String idempotencyKey, {
+    String? replyToCommentId,
+  }) async {
     final comments = _communityComments.putIfAbsent(postId, () => []);
     final existing =
         comments.where((item) => item.id == idempotencyKey).firstOrNull;
     if (existing != null) return existing;
+    final replyTo = replyToCommentId == null
+        ? null
+        : comments.firstWhere((item) => item.id == replyToCommentId);
     final comment = CommunityComment(
       id: idempotencyKey,
       postId: postId,
@@ -359,6 +403,10 @@ class DemoExperienceRepository implements ExperienceRepository {
       author: const CommunityAuthor(displayName: '演示旅行者', avatar: 'default'),
       viewerIsAuthor: true,
       createdAt: DateTime.now(),
+      rootCommentId:
+          replyTo == null ? null : (replyTo.rootCommentId ?? replyTo.id),
+      replyToCommentId: replyToCommentId,
+      replyTo: replyTo?.author,
     );
     comments.add(comment);
     final index = _communityPosts.indexWhere((post) => post.id == postId);
