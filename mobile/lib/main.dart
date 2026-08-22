@@ -6,10 +6,19 @@ import 'app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.jiandi.jiandi.narration',
-    androidNotificationChannelName: '见地行走故事',
-    androidNotificationOngoing: true,
-  );
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.jiandi.jiandi.narration',
+      androidNotificationChannelName: '见地行走故事',
+      androidNotificationOngoing: true,
+    );
+  } catch (error, stackTrace) {
+    FlutterError.reportError(FlutterErrorDetails(
+      exception: error,
+      stack: stackTrace,
+      library: 'background audio startup',
+      context: ErrorDescription('initializing Android background narration'),
+    ));
+  }
   runApp(const ProviderScope(child: JiandiApp()));
 }
