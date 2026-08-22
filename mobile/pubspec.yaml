@@ -1,7 +1,7 @@
 name: jiandi
 description: 见地——故事与观察驱动的深度城市探索 MVP。
 publish_to: none
-version: 0.3.1+5
+version: 0.3.2+6
 
 environment:
   sdk: ^3.6.0

@@ -21,7 +21,6 @@ class ApiExperienceRepository implements ExperienceRepository {
   final Dio _dio;
   final AuthRepository _auth;
   final Future<void> Function()? onUnauthorized;
-  final Map<String, RouteExperience> _cachedRoutes = {};
 
   Future<void> _ensureAuth() async {
     if (_auth.token == null) {
@@ -75,7 +74,6 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   @override
   Future<RouteExperience> routeBySlug(String slug) async {
-    if (_cachedRoutes[slug] case final cached?) return cached;
     final response = await _request(() => _dio.get('/routes/$slug'));
     final route = RouteExperience.fromJson(
       response.data['data'] as Map<String, dynamic>,
@@ -87,7 +85,6 @@ class ApiExperienceRepository implements ExperienceRepository {
       );
       throw const ExperienceFailure('这条路线尚未发布');
     }
-    _cachedRoutes[slug] = route;
     return route;
   }
 

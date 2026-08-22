@@ -90,7 +90,7 @@ final archivedActiveJourneysProvider =
 });
 
 final routeProvider =
-    FutureProvider.family<RouteExperience, String>((ref, slug) {
+    FutureProvider.autoDispose.family<RouteExperience, String>((ref, slug) {
   return ref.watch(experienceRepositoryProvider).routeBySlug(slug);
 });
 
