@@ -1,10 +1,39 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
+
+
+def test_node_community_migration_uses_mysql_compatible_text_columns(monkeypatch):
+    migration_path = (
+        Path(__file__).parents[1]
+        / "migrations"
+        / "versions"
+        / "20260823_0009_node_community.py"
+    )
+    spec = importlib.util.spec_from_file_location("node_community_migration", migration_path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    tables = {}
+    monkeypatch.setattr(
+        migration.op,
+        "create_table",
+        lambda name, *columns, **_kwargs: tables.setdefault(name, columns),
+    )
+    monkeypatch.setattr(migration.op, "create_index", lambda *_args, **_kwargs: None)
+
+    migration.upgrade()
+
+    post_body = next(
+        column for column in tables["community_posts"] if column.name == "body"
+    )
+    assert post_body.server_default is None
 
 
 def test_content_review_migration_is_safe_when_model_created_audit_columns(tmp_path):

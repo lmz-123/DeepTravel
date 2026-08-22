@@ -25,7 +25,9 @@ def upgrade() -> None:
         sa.Column("author_user_id", sa.String(36), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("category", sa.String(40), nullable=False),
         sa.Column("title", sa.String(120), nullable=True),
-        sa.Column("body", sa.Text(), nullable=False, server_default=""),
+        # Keep the empty-string fallback in the application model. Older MySQL
+        # releases reject defaults on TEXT columns (error 1101).
+        sa.Column("body", sa.Text(), nullable=False),
         sa.Column("status", sa.String(20), nullable=False, server_default="visible"),
         sa.Column("report_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("idempotency_key", sa.String(80), nullable=False),
