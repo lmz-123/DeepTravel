@@ -94,6 +94,11 @@ def main() -> int:
     parser.add_argument("package", type=Path)
     parser.add_argument("--archive-route-id")
     parser.add_argument("--media-root", type=Path)
+    parser.add_argument(
+        "--draft-only",
+        action="store_true",
+        help="Import and validate as a draft without advancing route publication",
+    )
     args = parser.parse_args()
     base = os.getenv("ADMIN_API_BASE", "http://127.0.0.1:5100")
     token = os.getenv("ADMIN_TOKEN", "").strip()
@@ -130,6 +135,12 @@ def main() -> int:
     if not imported["validation"]["valid"]:
         print(json.dumps(imported["validation"], ensure_ascii=False, indent=2))
         raise RuntimeError("content graph validation failed")
+    if args.draft_only:
+        route = imported["route"]
+        if route["content_status"] != "draft" or route.get("is_public_visible"):
+            raise RuntimeError(f"draft import unexpectedly became public: {route}")
+        print(f"imported draft {route['slug']} ({route['id']})")
+        return 0
     route = advance(base, token, imported["route"])
     print(f"published {route['slug']} ({route['id']})")
 

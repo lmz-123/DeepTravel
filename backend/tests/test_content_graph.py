@@ -138,7 +138,7 @@ def test_legacy_reconstruction_items_get_stable_ids_and_deterministic_shuffle():
 
 def test_dameisha_package_graph_and_media_are_complete():
     root = Path(__file__).parents[2]
-    package = json.loads((root / "docs/content-packages/dameisha-remade-coast-v2.json").read_text())
+    package = json.loads((root / "docs/content-packages/dameisha-remade-coast-v3.json").read_text())
     media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
 
     result = validate_content_graph(package, media_assets=media)
@@ -165,13 +165,13 @@ def test_dameisha_package_graph_and_media_are_complete():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
     for fragment in package["fragments"]:
         assert fragment["narration_script"] == fragment["transcript"]
-        assert fragment["script_version"] == "dameisha-2026.08-conversational.2"
+        assert fragment["script_version"] == "dameisha-2026.08-conversational.3"
 
 
 def test_nantou_conversational_package_matches_seed_and_media():
     root = Path(__file__).parents[2]
     package = json.loads(
-        (root / "docs/content-packages/nantou-conversational-city-v2.json").read_text()
+        (root / "docs/content-packages/nantou-conversational-city-v3.json").read_text()
     )
     media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
 
@@ -179,7 +179,7 @@ def test_nantou_conversational_package_matches_seed_and_media():
 
     assert result["valid"] is True, result["errors"]
     assert package["city"]["slug"] == "shenzhen"
-    assert package["story_arc"]["script_version"] == "nantou-2026.08-conversational.2"
+    assert package["story_arc"]["script_version"] == "nantou-2026.08-conversational.3"
     assert len(package["fragments"]) == 5
     assert all(item["narration_script"] == item["transcript"] for item in package["fragments"])
     assert all(
@@ -190,6 +190,34 @@ def test_nantou_conversational_package_matches_seed_and_media():
         path = root / "backend/media" / item["storage_path"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
+
+
+def test_every_shenzhen_node_opens_as_on_site_companion_narration():
+    root = Path(__file__).parents[2]
+    package_paths = (
+        root / "docs/content-packages/nantou-conversational-city-v3.json",
+        root / "docs/content-packages/dameisha-remade-coast-v3.json",
+    )
+    observation_openings = (
+        "到啦",
+        "穿过门洞",
+        "到县治展示区域",
+        "这一站",
+        "走到北街口",
+        "这次看看",
+        "海风已经很近",
+        "先把目光",
+        "最后一站",
+    )
+    banned_system_copy = ("第一个线索", "第一条线索", "本节点", "请完成任务", "解锁下一条")
+
+    for package_path in package_paths:
+        package = json.loads(package_path.read_text())
+        for fragment in package["fragments"]:
+            script = fragment["narration_script"]
+            assert script.startswith(observation_openings), fragment["id"]
+            assert "你" in script or "我们" in script or "我" in script
+            assert not any(phrase in script for phrase in banned_system_copy)
 
 
 def test_shanghai_readable_city_package_is_generic_audio_photo_content():
