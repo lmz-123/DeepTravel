@@ -23,7 +23,7 @@ void main() {
       const ValueKey('scenic-card-8fa6c9b1-5e3a-40df-b5c8-100000000001'),
     );
     expect(firstSpot, findsOneWidget);
-    await tester.ensureVisible(firstSpot);
+    await _scrollToScenic(tester);
     await tester.tap(firstSpot);
     await tester.pumpAndSettle();
 
@@ -49,7 +49,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('home-random-story-action')),
       420,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: _verticalScrollable(),
     );
     await tester.tap(find.byKey(const ValueKey('home-random-story-action')));
     await tester.pumpAndSettle();
@@ -83,7 +83,7 @@ void main() {
     final firstSpot = find.byKey(
       const ValueKey('scenic-card-8fa6c9b1-5e3a-40df-b5c8-100000000001'),
     );
-    await tester.ensureVisible(firstSpot);
+    await _scrollToScenic(tester);
     await tester.tap(firstSpot);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开始这段探索'));
@@ -111,7 +111,7 @@ void main() {
     final firstSpot = find.byKey(
       const ValueKey('scenic-card-8fa6c9b1-5e3a-40df-b5c8-100000000001'),
     );
-    await tester.ensureVisible(firstSpot);
+    await _scrollToScenic(tester);
     await tester.tap(firstSpot);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开始这段探索'));
@@ -190,6 +190,8 @@ void main() {
         findsOneWidget);
     expect(find.byKey(const ValueKey('scenic-card-mountain-coast-spot')),
         findsOneWidget);
+
+    await _scrollToScenic(tester);
 
     await tester.fling(
       find.byKey(const ValueKey('scenic-carousel')),
@@ -277,6 +279,16 @@ void main() {
     expect(find.text('旧版问题'), findsOneWidget);
     expect(find.text('A'), findsOneWidget);
   });
+}
+
+Finder _verticalScrollable() => find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+
+Future<void> _scrollToScenic(WidgetTester tester) async {
+  await tester.drag(_verticalScrollable(), const Offset(0, -300));
+  await tester.pumpAndSettle();
 }
 
 class _RecordingRepository extends DemoExperienceRepository {

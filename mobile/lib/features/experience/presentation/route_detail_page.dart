@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/primary_action.dart';
 import '../domain/tour_runtime.dart';
+import '../domain/city_story.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
 import 'experience_providers.dart';
@@ -121,6 +122,10 @@ class _RouteDetail extends ConsumerWidget {
                   const SizedBox(height: 26),
                   _AudioTourBrief(manifest: route.audioTour!),
                 ],
+                if (route.pretrip?.available ?? false) ...[
+                  const SizedBox(height: 26),
+                  _PretripSection(pretrip: route.pretrip!),
+                ],
                 const SizedBox(height: 28),
                 Text(route.audioTour == null ? '这一路，你会看见什么' : '这一路，你会追问什么',
                     style: Theme.of(context).textTheme.headlineMedium),
@@ -157,6 +162,150 @@ class _RouteDetail extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _PretripSection extends ConsumerStatefulWidget {
+  const _PretripSection({required this.pretrip});
+
+  final PretripExperience pretrip;
+
+  @override
+  ConsumerState<_PretripSection> createState() => _PretripSectionState();
+}
+
+class _PretripSectionState extends ConsumerState<_PretripSection> {
+  var _busy = false;
+  var _complete = 0;
+  String? _message;
+
+  @override
+  Widget build(BuildContext context) {
+    final pretrip = widget.pretrip;
+    final tips = <(String, IconData, List<String>)>[
+      ('安全', Icons.shield_outlined, pretrip.tips.safety),
+      ('休息', Icons.chair_outlined, pretrip.tips.rest),
+      ('无障碍', Icons.accessible_forward_rounded, pretrip.tips.accessibility),
+      ('天气适应', Icons.wb_cloudy_outlined, pretrip.tips.weatherAdaptation),
+    ].where((item) => item.$3.isNotEmpty);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.paperDeep,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('出发前，先认识这段漫游', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text('不必到达现场；故事方向只是参考，可以按任意顺序打开。'),
+          if (pretrip.companionTags.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: pretrip.companionTags
+                  .map((tag) => Chip(label: Text(tag)))
+                  .toList(growable: false),
+            ),
+          ],
+          if (pretrip.themeStory case final story?) ...[
+            const SizedBox(height: 14),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  const CircleAvatar(child: Icon(Icons.headphones_rounded)),
+              title: Text(story.story.title),
+              subtitle: Text(story.story.introduction, maxLines: 2),
+              trailing: const Icon(Icons.arrow_forward_rounded),
+              onTap: () => context.push('/story/${story.story.id}'),
+            ),
+          ],
+          if (pretrip.storyDirections.isNotEmpty) ...[
+            const Divider(height: 28),
+            Text('主要故事方向', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 6),
+            ...pretrip.storyDirections.map(
+              (direction) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(direction.title),
+                subtitle: Text(direction.summary, maxLines: 2),
+                trailing: const Icon(Icons.play_circle_outline_rounded),
+                onTap: () => context.push('/story/${direction.catalogId}'),
+              ),
+            ),
+          ],
+          for (final tip in tips) ...[
+            const SizedBox(height: 12),
+            Row(children: [
+              Icon(tip.$2, size: 18, color: AppColors.moss),
+              const SizedBox(width: 8),
+              Text(tip.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 5),
+            ...tip.$3.map((text) => Text('• $text')),
+          ],
+          if (pretrip.offlineResources.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Row(children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _prepare,
+                  icon: const Icon(Icons.download_rounded),
+                  label: Text(_busy
+                      ? '正在准备 $_complete/${pretrip.offlineResources.length}'
+                      : '提前准备音频和文字'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: '移除已准备内容',
+                onPressed: _busy ? null : _remove,
+                icon: const Icon(Icons.delete_outline_rounded),
+              ),
+            ]),
+            if (_message != null) ...[
+              const SizedBox(height: 8),
+              Text(_message!, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _prepare() async {
+    setState(() {
+      _busy = true;
+      _complete = 0;
+      _message = null;
+    });
+    final result = await ref.read(pretripPreparationServiceProvider).prepare(
+      widget.pretrip.offlineResources,
+      onProgress: (complete, _) {
+        if (mounted) setState(() => _complete = complete);
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _message = result.isComplete
+          ? '音频和文字已校验并准备完成。'
+          : '已准备 ${result.preparedCount} 项，${result.failures.length} 项失败；可再次点击重试。';
+    });
+  }
+
+  Future<void> _remove() async {
+    setState(() => _busy = true);
+    final removed = await ref
+        .read(pretripPreparationServiceProvider)
+        .remove(widget.pretrip.offlineResources);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _message = '已移除 $removed 项离线内容。';
+    });
   }
 }
 

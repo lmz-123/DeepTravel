@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'community_models.dart';
+import 'city_story.dart';
 import 'fragment_models.dart';
 import 'models.dart';
 import 'home_story.dart';
@@ -18,6 +19,16 @@ abstract interface class ExperienceRepository {
     String? citySlug,
     String? excludeId,
   });
+
+  Future<CityStoryHome> cityStoryHome(String citySlug);
+
+  Future<HomeStory> cityStory(String catalogId);
+
+  Future<List<TravelerFavorite>> favorites();
+
+  Future<TravelerFavorite> addFavorite(String kind, String targetId);
+
+  Future<void> removeFavorite(String kind, String targetId);
 
   Future<JourneySession> startOrResume(String routeId);
 

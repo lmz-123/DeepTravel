@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../domain/community_models.dart';
+import '../domain/city_story.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
@@ -115,6 +116,59 @@ class ApiExperienceRepository implements ExperienceRepository {
           },
         ));
     return HomeStory.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<CityStoryHome> cityStoryHome(String citySlug) async {
+    final response =
+        await _request(() => _dio.get('/cities/$citySlug/stories'));
+    return CityStoryHome.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<HomeStory> cityStory(String catalogId) async {
+    final response = await _request(() => _dio.get('/city-stories/$catalogId'));
+    return HomeStory.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<TravelerFavorite>> favorites() async {
+    await _ensureAuth();
+    final response =
+        await _request(() => _dio.get('/favorites', options: _authorized));
+    return (response.data['data'] as List<dynamic>)
+        .whereType<Map>()
+        .map((value) => TravelerFavorite.fromJson(
+              Map<String, dynamic>.from(value),
+            ))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<TravelerFavorite> addFavorite(String kind, String targetId) async {
+    await _ensureAuth();
+    final response = await _request(
+      () => _dio.put(
+        '/favorites/$kind/${Uri.encodeComponent(targetId)}',
+        options: _authorized,
+      ),
+    );
+    return TravelerFavorite.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<void> removeFavorite(String kind, String targetId) async {
+    await _ensureAuth();
+    await _request(
+      () => _dio.delete(
+        '/favorites/$kind/${Uri.encodeComponent(targetId)}',
+        options: _authorized,
+      ),
+    );
   }
 
   Future<List<ResumableJourney>> archivedActiveJourneys() async {

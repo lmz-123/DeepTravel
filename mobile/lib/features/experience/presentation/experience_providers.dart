@@ -8,9 +8,11 @@ import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/api_experience_repository.dart';
 import '../data/demo_experience_repository.dart';
 import '../data/narration_voice_preference_repository.dart';
+import '../data/pretrip_preparation_service.dart';
 import '../data/user_preferences_repository.dart';
 import '../domain/experience_repository.dart';
 import '../domain/community_models.dart';
+import '../domain/city_story.dart';
 import '../domain/fragment_models.dart';
 import '../domain/models.dart';
 import '../../auth/presentation/auth_provider.dart';
@@ -54,8 +56,17 @@ final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {
   return DemoExperienceRepository();
 });
 
+final pretripPreparationServiceProvider = Provider<PretripPreparationService>(
+  (ref) => PretripPreparationService(ref.watch(dioProvider)),
+);
+
 final currentUserIdProvider = Provider<String?>(
     (ref) => ref.watch(authControllerProvider).asData?.value?.user.id);
+
+final travelerFavoritesProvider =
+    FutureProvider.family<List<TravelerFavorite>, String>(
+  (ref, userId) => ref.watch(experienceRepositoryProvider).favorites(),
+);
 
 final archivedActiveJourneysProvider =
     FutureProvider<List<ResumableJourney>>((ref) {
@@ -330,6 +341,7 @@ class CommunityFeedController extends AsyncNotifier<CommunityFeedState> {
         for (final item in current.items) item.id: item,
         for (final item in page.items) item.id: item,
       };
+
       state = AsyncData(current.copyWith(
         items: byId.values.toList(growable: false),
         nextCursor: page.nextCursor,

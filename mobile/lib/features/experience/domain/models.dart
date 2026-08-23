@@ -1,4 +1,5 @@
 import 'fragment_models.dart';
+import 'city_story.dart';
 
 class CityExperience {
   const CityExperience({
@@ -162,6 +163,7 @@ class RouteExperience {
     this.isFeatured = false,
     this.stopCount,
     this.audioTour,
+    this.pretrip,
   });
 
   final String id;
@@ -179,6 +181,7 @@ class RouteExperience {
   final bool isFeatured;
   final int? stopCount;
   final AudioTourManifest? audioTour;
+  final PretripExperience? pretrip;
 
   bool get isPublished => contentStatus == 'published';
   int get numberOfStops =>
@@ -206,6 +209,11 @@ class RouteExperience {
         audioTour: json['audio_tour'] is Map<String, dynamic>
             ? AudioTourManifest.fromJson(
                 json['audio_tour'] as Map<String, dynamic>,
+              )
+            : null,
+        pretrip: json['pretrip'] is Map<String, dynamic>
+            ? PretripExperience.fromJson(
+                json['pretrip'] as Map<String, dynamic>,
               )
             : null,
       );

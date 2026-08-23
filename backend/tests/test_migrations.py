@@ -10,10 +10,7 @@ from sqlalchemy import create_engine, inspect, text
 
 def test_node_community_migration_uses_mysql_compatible_text_columns(monkeypatch):
     migration_path = (
-        Path(__file__).parents[1]
-        / "migrations"
-        / "versions"
-        / "20260823_0009_node_community.py"
+        Path(__file__).parents[1] / "migrations" / "versions" / "20260823_0009_node_community.py"
     )
     spec = importlib.util.spec_from_file_location("node_community_migration", migration_path)
     assert spec is not None and spec.loader is not None
@@ -30,9 +27,7 @@ def test_node_community_migration_uses_mysql_compatible_text_columns(monkeypatch
 
     migration.upgrade()
 
-    post_body = next(
-        column for column in tables["community_posts"] if column.name == "body"
-    )
+    post_body = next(column for column in tables["community_posts"] if column.name == "body")
     assert post_body.server_default is None
 
 
@@ -76,7 +71,38 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0012"
+    assert version == "20260823_0013"
+
+
+def test_city_story_catalog_migration_round_trips(tmp_path):
+    database_path = tmp_path / "city-story-catalog.db"
+    engine = create_engine(f"sqlite:///{database_path}")
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database_path}")
+
+    command.upgrade(config, "20260823_0012")
+    command.upgrade(config, "head")
+    expected = {
+        "story_catalog_items",
+        "story_catalog_variants",
+        "story_placements",
+        "route_pretrip_guidance",
+        "traveler_favorites",
+        "content_import_previews",
+        "content_import_batches",
+    }
+    assert expected <= set(inspect(engine).get_table_names())
+    favorite_unique = {
+        item["name"] for item in inspect(engine).get_unique_constraints("traveler_favorites")
+    }
+    assert "uq_traveler_favorite" in favorite_unique
+    import_unique = {
+        item["name"] for item in inspect(engine).get_unique_constraints("content_import_batches")
+    }
+    assert "uq_content_import_package_version" in import_unique
+
+    command.downgrade(config, "20260823_0012")
+    assert expected.isdisjoint(inspect(engine).get_table_names())
 
 
 def test_narration_voice_migration_backfills_once_and_round_trips(tmp_path):
@@ -337,7 +363,7 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert version == "20260823_0012"
+        assert version == "20260823_0013"
 
 
 def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
@@ -350,9 +376,7 @@ def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
     command.upgrade(config, "head")
 
     inspector = inspect(engine)
-    assert "experience_tags_json" in {
-        column["name"] for column in inspector.get_columns("stops")
-    }
+    assert "experience_tags_json" in {column["name"] for column in inspector.get_columns("stops")}
     assert "experience_tags_json" in {
         column["name"] for column in inspector.get_columns("story_fragments")
     }
@@ -369,7 +393,7 @@ def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0012"
+    assert version == "20260823_0013"
 
 
 def test_node_community_migration_round_trips_without_touching_existing_data(tmp_path):

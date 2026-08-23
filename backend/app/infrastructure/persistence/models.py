@@ -53,6 +53,9 @@ class UserModel(Base):
 
     guest_sessions: Mapped[list[GuestSessionModel]] = relationship(back_populates="user")
     journeys: Mapped[list[JourneyModel]] = relationship(back_populates="user")
+    favorites: Mapped[list[TravelerFavoriteModel]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class CityModel(Base):
@@ -67,6 +70,9 @@ class CityModel(Base):
     longitude: Mapped[float] = mapped_column(Double)
 
     routes: Mapped[list[RouteModel]] = relationship(
+        back_populates="city", cascade="all, delete-orphan"
+    )
+    story_catalog_items: Mapped[list[StoryCatalogItemModel]] = relationship(
         back_populates="city", cascade="all, delete-orphan"
     )
 
@@ -98,6 +104,9 @@ class RouteModel(Base):
         order_by="StopModel.position",
     )
     story_arc: Mapped[StoryArcModel | None] = relationship(
+        back_populates="route", cascade="all, delete-orphan", uselist=False
+    )
+    pretrip_guidance: Mapped[RoutePretripGuidanceModel | None] = relationship(
         back_populates="route", cascade="all, delete-orphan", uselist=False
     )
 
@@ -288,9 +297,7 @@ class StoryNarrationTrackModel(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     arc_id: Mapped[str] = mapped_column(ForeignKey("story_arcs.id"), index=True)
-    profile_id: Mapped[str] = mapped_column(
-        ForeignKey("narration_voice_profiles.id"), index=True
-    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("narration_voice_profiles.id"), index=True)
     transcript_hash: Mapped[str] = mapped_column(String(64), index=True)
     script_version: Mapped[str] = mapped_column(String(40))
     media_path: Mapped[str] = mapped_column(String(500))
@@ -340,6 +347,181 @@ class HomeStoryPublicationModel(Base):
     selected_track: Mapped[StoryNarrationTrackModel | None] = relationship(
         foreign_keys=[selected_track_id]
     )
+
+
+class StoryCatalogItemModel(Base):
+    __tablename__ = "story_catalog_items"
+    __table_args__ = (
+        UniqueConstraint("source_kind", "source_id", name="uq_story_catalog_source"),
+        Index("ix_story_catalog_city_status", "city_id", "status", "published_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    city_id: Mapped[str] = mapped_column(ForeignKey("cities.id"), index=True)
+    source_kind: Mapped[str] = mapped_column(String(30))
+    source_id: Mapped[str] = mapped_column(String(36), index=True)
+    canonical_revision: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(255))
+    summary: Mapped[str] = mapped_column(Text)
+    cover_image: Mapped[str] = mapped_column(String(500), default="")
+    district: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    themes_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    point_ids_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    related_stories_json: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    content_type: Mapped[str] = mapped_column(String(80))
+    place_context: Mapped[str] = mapped_column(Text)
+    observable_detail: Mapped[str] = mapped_column(Text)
+    attention_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sources_json: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    fact_status: Mapped[str] = mapped_column(String(40), default="documented")
+    review_status: Mapped[str] = mapped_column(String(40), default="in_review")
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    reviewed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    city: Mapped[CityModel] = relationship(back_populates="story_catalog_items")
+    variants: Mapped[list[StoryCatalogVariantModel]] = relationship(
+        back_populates="catalog_item", cascade="all, delete-orphan"
+    )
+    placements: Mapped[list[StoryPlacementModel]] = relationship(
+        back_populates="catalog_item", cascade="all, delete-orphan"
+    )
+
+
+class StoryCatalogVariantModel(Base):
+    __tablename__ = "story_catalog_variants"
+    __table_args__ = (
+        UniqueConstraint("catalog_item_id", "role", name="uq_story_catalog_variant_role"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    catalog_item_id: Mapped[str] = mapped_column(
+        ForeignKey("story_catalog_items.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(30))
+    source_kind: Mapped[str] = mapped_column(String(30))
+    source_id: Mapped[str] = mapped_column(String(36), index=True)
+    track_kind: Mapped[str] = mapped_column(String(30))
+    track_id: Mapped[str] = mapped_column(String(36), index=True)
+    transcript_hash: Mapped[str] = mapped_column(String(64))
+    script_version: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    catalog_item: Mapped[StoryCatalogItemModel] = relationship(back_populates="variants")
+
+
+class StoryPlacementModel(Base):
+    __tablename__ = "story_placements"
+    __table_args__ = (
+        UniqueConstraint(
+            "catalog_item_id",
+            "channel",
+            "module_key",
+            "route_id",
+            name="uq_story_catalog_placement",
+        ),
+        Index("ix_story_placement_public", "channel", "module_key", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    catalog_item_id: Mapped[str] = mapped_column(
+        ForeignKey("story_catalog_items.id", ondelete="CASCADE"), index=True
+    )
+    channel: Mapped[str] = mapped_column(String(30), index=True)
+    module_key: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    route_id: Mapped[str | None] = mapped_column(ForeignKey("routes.id"), nullable=True, index=True)
+    variant_role: Mapped[str] = mapped_column(String(30), default="short_preview")
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+    weight: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    catalog_item: Mapped[StoryCatalogItemModel] = relationship(back_populates="placements")
+
+
+class RoutePretripGuidanceModel(Base):
+    __tablename__ = "route_pretrip_guidance"
+
+    route_id: Mapped[str] = mapped_column(ForeignKey("routes.id"), primary_key=True)
+    theme_story_catalog_id: Mapped[str | None] = mapped_column(
+        ForeignKey("story_catalog_items.id"), nullable=True, index=True
+    )
+    story_directions_json: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    companion_tags_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    safety_tips_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    rest_tips_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    accessibility_tips_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    weather_tips_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    offline_roles_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    route: Mapped[RouteModel] = relationship(back_populates="pretrip_guidance")
+
+
+class TravelerFavoriteModel(Base):
+    __tablename__ = "traveler_favorites"
+    __table_args__ = (
+        UniqueConstraint("user_id", "target_kind", "target_id", name="uq_traveler_favorite"),
+        Index("ix_traveler_favorite_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    target_kind: Mapped[str] = mapped_column(String(30))
+    target_id: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[UserModel] = relationship(back_populates="favorites")
+
+
+class ContentImportPreviewModel(Base):
+    __tablename__ = "content_import_previews"
+    __table_args__ = (Index("ix_content_import_preview_expiry", "status", "expires_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    package_id: Mapped[str] = mapped_column(String(120), index=True)
+    package_version: Mapped[str] = mapped_column(String(80))
+    package_checksum: Mapped[str] = mapped_column(String(64))
+    editor_id: Mapped[str] = mapped_column(String(120), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="ready", index=True)
+    plan_json: Mapped[dict] = mapped_column(JSON)
+    target_revisions_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ContentImportBatchModel(Base):
+    __tablename__ = "content_import_batches"
+    __table_args__ = (
+        UniqueConstraint("package_id", "package_version", name="uq_content_import_package_version"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    package_id: Mapped[str] = mapped_column(String(120), index=True)
+    package_version: Mapped[str] = mapped_column(String(80))
+    package_checksum: Mapped[str] = mapped_column(String(64))
+    editor_id: Mapped[str] = mapped_column(String(120), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="completed", index=True)
+    result_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class StoryFragmentModel(Base):

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/platform_discovery_location.dart';
 import '../domain/discovery_location.dart';
+import '../domain/city_story.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import 'experience_providers.dart';
@@ -16,6 +17,7 @@ class DiscoveryState {
     required this.city,
     required this.catalog,
     required this.cards,
+    this.storyHome = CityStoryHome.empty,
     required this.revision,
     this.isLocating = false,
     this.locationFailure,
@@ -25,6 +27,7 @@ class DiscoveryState {
   final CityExperience? city;
   final CityDiscoveryCatalog catalog;
   final List<ScenicSpotCard> cards;
+  final CityStoryHome storyHome;
   final int revision;
   final bool isLocating;
   final DiscoveryLocationFailureReason? locationFailure;
@@ -34,6 +37,7 @@ class DiscoveryState {
     CityExperience? city,
     CityDiscoveryCatalog? catalog,
     List<ScenicSpotCard>? cards,
+    CityStoryHome? storyHome,
     int? revision,
     bool? isLocating,
     DiscoveryLocationFailureReason? locationFailure,
@@ -45,6 +49,7 @@ class DiscoveryState {
         city: clearCity ? null : city ?? this.city,
         catalog: catalog ?? this.catalog,
         cards: cards ?? this.cards,
+        storyHome: storyHome ?? this.storyHome,
         revision: revision ?? this.revision,
         isLocating: isLocating ?? this.isLocating,
         locationFailure: clearLocationFailure
@@ -63,7 +68,6 @@ final discoveryControllerProvider =
 );
 
 class DiscoveryController extends AsyncNotifier<DiscoveryState> {
-  static const maximumAccuracyMeters = 25.0;
   static const maximumSampleAge = Duration(minutes: 2);
 
   ExperienceRepository get _repository =>
@@ -79,11 +83,14 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     final catalog = city == null
         ? const CityDiscoveryCatalog(routes: [], scenicSpots: [])
         : await _repository.discoveryForCity(city.slug);
+    final storyHome =
+        city == null ? CityStoryHome.empty : await _loadStoryHome(city.slug);
     return DiscoveryState(
       cities: cities,
       city: city,
       catalog: catalog,
       cards: scenicSpotCards(catalog),
+      storyHome: storyHome,
       revision: 0,
     );
   }
@@ -128,6 +135,8 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     final catalog = city == null
         ? const CityDiscoveryCatalog(routes: [], scenicSpots: [])
         : await _repository.discoveryForCity(city.slug);
+    final storyHome =
+        city == null ? CityStoryHome.empty : await _loadStoryHome(city.slug);
     if (!_isCurrent(token)) return;
     final base = current.copyWith(
       cities: cities,
@@ -135,6 +144,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
       clearCity: city == null,
       catalog: catalog,
       cards: scenicSpotCards(catalog),
+      storyHome: storyHome,
       revision: current.revision + 1,
       isLocating: true,
       clearLocationFailure: true,
@@ -151,11 +161,13 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
         .firstOrNull;
     if (city == null) return;
     final catalog = await _repository.discoveryForCity(city.slug);
+    final storyHome = await _loadStoryHome(city.slug);
     if (!_isCurrent(token)) return;
     final base = current.copyWith(
       city: city,
       catalog: catalog,
       cards: scenicSpotCards(catalog),
+      storyHome: storyHome,
       revision: current.revision + 1,
       isLocating: true,
       clearLocationFailure: true,
@@ -175,7 +187,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
       clearLocationFailure: true,
     ));
     try {
-      final sample = await _acceptedSample(requestPermission);
+      final sample = await _currentSample(requestPermission);
       if (!_isCurrent(token)) return;
       final matched = matchDiscoveryCity(sample.locality, current.cities);
       if (matched == null) {
@@ -185,6 +197,9 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
       final catalog = matched.slug == current.city?.slug
           ? current.catalog
           : await _repository.discoveryForCity(matched.slug);
+      final storyHome = matched.slug == current.city?.slug
+          ? current.storyHome
+          : await _loadStoryHome(matched.slug);
       if (!_isCurrent(token)) return;
       if (catalog.scenicSpots.isEmpty) {
         await _restoreFallback(token, current);
@@ -194,6 +209,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
         city: matched,
         catalog: catalog,
         cards: scenicSpotCards(catalog, sample: sample),
+        storyHome: storyHome,
         revision: current.revision + 1,
         isLocating: false,
         clearLocationFailure: true,
@@ -210,11 +226,17 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
         : fallback.slug == current.city?.slug
             ? current.catalog
             : await _repository.discoveryForCity(fallback.slug);
+    final storyHome = fallback == null
+        ? CityStoryHome.empty
+        : fallback.slug == current.city?.slug
+            ? current.storyHome
+            : await _loadStoryHome(fallback.slug);
     if (!_isCurrent(token)) return;
     state = AsyncData(current.copyWith(
       city: fallback,
       catalog: catalog,
       cards: scenicSpotCards(catalog),
+      storyHome: storyHome,
       revision: current.revision + 1,
       isLocating: false,
       locationFailure: DiscoveryLocationFailureReason.unavailable,
@@ -227,7 +249,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     required bool requestPermission,
   }) async {
     try {
-      final sample = await _acceptedSample(requestPermission);
+      final sample = await _currentSample(requestPermission);
       if (!_isCurrent(token)) return;
       state = AsyncData(base.copyWith(
         cards: scenicSpotCards(base.catalog, sample: sample),
@@ -244,7 +266,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     }
   }
 
-  Future<DiscoveryLocationSample> _acceptedSample(
+  Future<DiscoveryLocationSample> _currentSample(
     bool requestPermission,
   ) async {
     final sample = await _location.currentPosition(
@@ -253,14 +275,20 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     final age = DateTime.now().toUtc().difference(
           sample.recordedAt.toUtc(),
         );
-    if (sample.accuracyMeters > maximumAccuracyMeters ||
-        age > maximumSampleAge ||
-        age < -const Duration(seconds: 5)) {
+    if (age > maximumSampleAge || age < -const Duration(seconds: 5)) {
       throw const DiscoveryLocationFailure(
-        DiscoveryLocationFailureReason.inaccurate,
+        DiscoveryLocationFailureReason.unavailable,
       );
     }
     return sample;
+  }
+
+  Future<CityStoryHome> _loadStoryHome(String citySlug) async {
+    try {
+      return await _repository.cityStoryHome(citySlug);
+    } catch (_) {
+      return CityStoryHome.empty;
+    }
   }
 
   void _setFailure(DiscoveryLocationFailureReason reason) {

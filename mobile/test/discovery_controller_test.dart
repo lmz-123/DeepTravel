@@ -80,7 +80,6 @@ void main() {
       sample: DiscoveryLocationSample(
         latitude: 22.5,
         longitude: 114,
-        accuracyMeters: 25,
         recordedAt: DateTime.now(),
       ),
     );
@@ -88,10 +87,9 @@ void main() {
     expect(ranked.first.spot.experienceTags, ['安静', '未来标签']);
   });
 
-  test('cold entry matches backend city and accepts exactly 25m accuracy',
-      () async {
+  test('cold entry matches backend city without an accuracy gate', () async {
     final location = _LocationSource(
-      samples: [_sample(locality: '上海市', accuracy: 25)],
+      samples: [_sample(locality: '上海市')],
     );
     final container = _container(location);
     addTearDown(container.dispose);
@@ -181,26 +179,22 @@ void main() {
     expect(location.requests, [false, false]);
   });
 
-  test('inaccurate or stale samples restore server order and no fake distance',
-      () async {
-    for (final sample in [
-      _sample(locality: '深圳', accuracy: 25.1),
+  test('stale samples restore server order and no fake distance', () async {
+    final location = _LocationSource(samples: [
       _sample(
         locality: '深圳',
         recordedAt: DateTime.now().subtract(const Duration(minutes: 3)),
       ),
-    ]) {
-      final location = _LocationSource(samples: [sample]);
-      final container = _container(location);
-      await container.read(discoveryControllerProvider.future);
-      await container
-          .read(discoveryControllerProvider.notifier)
-          .prepareColdStart();
-      final state = await container.read(discoveryControllerProvider.future);
-      expect(state.locationFailure, DiscoveryLocationFailureReason.inaccurate);
-      expect(state.cards.every((item) => item.distanceMeters == null), isTrue);
-      container.dispose();
-    }
+    ]);
+    final container = _container(location);
+    await container.read(discoveryControllerProvider.future);
+    await container
+        .read(discoveryControllerProvider.notifier)
+        .prepareColdStart();
+    final state = await container.read(discoveryControllerProvider.future);
+    expect(state.locationFailure, DiscoveryLocationFailureReason.unavailable);
+    expect(state.cards.every((item) => item.distanceMeters == null), isTrue);
+    container.dispose();
   });
 
   test('permission and acquisition failures keep discovery usable', () async {
@@ -287,13 +281,11 @@ class _ShanghaiWithoutPointsRepository extends DemoExperienceRepository {
 
 DiscoveryLocationSample _sample({
   String? locality,
-  double accuracy = 10,
   DateTime? recordedAt,
 }) =>
     DiscoveryLocationSample(
       latitude: demoRoute.stops.first.latitude,
       longitude: demoRoute.stops.first.longitude,
-      accuracyMeters: accuracy,
       recordedAt: recordedAt ?? DateTime.now(),
       locality: locality,
     );

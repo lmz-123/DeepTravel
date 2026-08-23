@@ -7,12 +7,14 @@ import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/fade_slide_in.dart';
 import '../domain/discovery_location.dart';
+import '../domain/city_story.dart';
 import '../domain/models.dart';
 import 'active_tour_controller.dart';
 import 'discovery_controller.dart';
 import 'experience_providers.dart';
 import 'traveler_shell.dart';
 import 'widgets/rotating_tour_orb.dart';
+import 'widgets/favorite_button.dart';
 
 class DiscoveryPage extends ConsumerStatefulWidget {
   const DiscoveryPage({super.key});
@@ -120,6 +122,17 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                       ),
                     ),
                   ),
+                  SliverToBoxAdapter(
+                    child: discovery.maybeWhen(
+                      data: (state) => _CityStoryModules(
+                        home: state.storyHome,
+                        onSwitchCity: (slug) => ref
+                            .read(discoveryControllerProvider.notifier)
+                            .switchCity(slug),
+                      ),
+                      orElse: () => const SizedBox.shrink(),
+                    ),
+                  ),
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 0),
                     sliver: SliverToBoxAdapter(
@@ -188,6 +201,178 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
       ),
     );
   }
+}
+
+class _CityStoryModules extends StatelessWidget {
+  const _CityStoryModules({
+    required this.home,
+    required this.onSwitchCity,
+  });
+
+  final CityStoryHome home;
+  final ValueChanged<String> onSwitchCity;
+
+  @override
+  Widget build(BuildContext context) {
+    if (home.isEmpty &&
+        home.emptyReason == null &&
+        home.fallbackCities.isEmpty &&
+        home.modules.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (home.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.paperDeep,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('城市故事', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(home.emptyReason ?? '这座城市的故事还在准备中。'),
+              if (home.fallbackCities.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  children: home.fallbackCities
+                      .map((city) => ActionChip(
+                            label: Text('看看${city.name}'),
+                            onPressed: () => onSwitchCity(city.slug),
+                          ))
+                      .toList(growable: false),
+                ),
+              ] else ...[
+                const SizedBox(height: 10),
+                const Text('可以使用右上角的城市选择器看看其他城市。'),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    final modules = home.modules
+        .where((module) => module.items.isNotEmpty)
+        .toList(growable: false);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: modules.map((module) {
+        final primary = module.primary;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  module.title,
+                  style: primary
+                      ? Theme.of(context).textTheme.headlineMedium
+                      : Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: primary ? 220 : 190,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: module.items.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  itemBuilder: (context, index) => _CityStoryCardView(
+                    card: module.items[index],
+                    primary: primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(growable: false),
+    );
+  }
+}
+
+class _CityStoryCardView extends StatelessWidget {
+  const _CityStoryCardView({required this.card, required this.primary});
+
+  final CityStoryCard card;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: '${card.contentType}：${card.story.title}',
+        child: SizedBox(
+          width: primary ? 300 : 240,
+          child: Material(
+            clipBehavior: Clip.antiAlias,
+            color: AppColors.ink,
+            borderRadius: BorderRadius.circular(26),
+            child: InkWell(
+              key: primary ? const ValueKey('home-random-story-action') : null,
+              onTap: () => context.push('/story/${card.story.id}'),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  EditorialImage(source: card.story.coverImage),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xdd17201c)],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          card.contentType,
+                          style: const TextStyle(
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          card.story.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(color: AppColors.white),
+                        ),
+                        if (card.themes.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            card.themes.join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.white.withValues(alpha: .75),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _ArchivedJourneyCard extends ConsumerWidget {
@@ -265,6 +450,8 @@ class _Header extends ConsumerWidget {
       children: [
         BrandMark(onPressed: () => TravelerShellScope.showDrawer(context)),
         const Spacer(),
+        if (selectedCity != null)
+          FavoriteButton(kind: 'city', targetId: selectedCity.slug),
         Semantics(
           button: true,
           label: '选择城市，当前${selectedCity?.name ?? '未选择'}',
@@ -564,8 +751,6 @@ class _LocationStatus extends StatelessWidget {
           '未获得定位权限，当前按后台推荐顺序展示。',
         DiscoveryLocationFailureReason.serviceDisabled =>
           '系统定位已关闭，当前按后台推荐顺序展示。',
-        DiscoveryLocationFailureReason.inaccurate =>
-          '当前位置精度不足 25 米，当前按后台推荐顺序展示。',
         DiscoveryLocationFailureReason.timeout ||
         DiscoveryLocationFailureReason.unavailable =>
           '暂时无法获得当前位置，当前按后台推荐顺序展示。',
@@ -719,14 +904,14 @@ class _ScenicCarouselState extends ConsumerState<_ScenicCarousel> {
   }
 }
 
-class _ScenicCard extends StatelessWidget {
+class _ScenicCard extends ConsumerWidget {
   const _ScenicCard({required this.card, required this.onTap});
 
   final ScenicSpotCard card;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final spot = card.spot;
     final route = card.route;
     return Semantics(
@@ -755,6 +940,12 @@ class _ScenicCard extends StatelessWidget {
                             label: card.distanceMeters == null
                                 ? '城市景点'
                                 : _formatDistance(card.distanceMeters!),
+                          ),
+                          const Spacer(),
+                          FavoriteButton(
+                            kind: 'point',
+                            targetId: spot.id,
+                            color: AppColors.white,
                           ),
                         ],
                       ),
@@ -880,9 +1071,8 @@ class _ExperiencePromise extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = [
-      (Icons.headphones_rounded, '听一个短故事', true),
-      (Icons.visibility_outlined, '观察真实细节', false),
-      (Icons.auto_awesome_outlined, '带走一条见识', false),
+      (Icons.visibility_outlined, '观察真实细节'),
+      (Icons.auto_awesome_outlined, '带走一条见识'),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -895,10 +1085,8 @@ class _ExperiencePromise extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                key:
-                    item.$3 ? const ValueKey('home-random-story-action') : null,
                 borderRadius: BorderRadius.circular(18),
-                onTap: item.$3 ? () => context.push('/story') : null,
+                onTap: null,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
@@ -915,9 +1103,6 @@ class _ExperiencePromise extends StatelessWidget {
                         child: Text(item.$2,
                             style: Theme.of(context).textTheme.bodyLarge),
                       ),
-                      if (item.$3)
-                        const Icon(Icons.arrow_forward_rounded,
-                            color: AppColors.moss),
                     ],
                   ),
                 ),

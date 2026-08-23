@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../domain/community_models.dart';
+import '../domain/city_story.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/home_story.dart';
@@ -15,6 +16,7 @@ class DemoExperienceRepository implements ExperienceRepository {
   final Map<String, AnswerFeedback> _answers = {};
   final List<CommunityPost> _communityPosts = [];
   final Map<String, List<CommunityComment>> _communityComments = {};
+  final Set<String> _favorites = {};
 
   @override
   Future<HomeStory> randomHomeStory({
@@ -37,6 +39,91 @@ class DemoExperienceRepository implements ExperienceRepository {
       routeSlug: 'nantou-ancient-city',
       narratorName: '见地讲述者',
     );
+  }
+
+  @override
+  Future<CityStoryHome> cityStoryHome(String citySlug) async {
+    final story = await randomHomeStory(citySlug: citySlug);
+    final card = CityStoryCard(
+      story: story,
+      contentType: '街角故事',
+      themes: const ['城市历史', '老建筑'],
+      placeContext: '深圳南头古城的一处街角',
+      observableDetail: '留意墙脚新旧砖块交接的位置。',
+      factStatus: 'documented',
+      attentionHint: '可以看看转角处不同时期留下的砖缝。',
+    );
+    return CityStoryHome(
+      isEmpty: false,
+      fallbackCities: const [],
+      modules: [
+        CityStoryModule(
+          key: 'today_city_story',
+          title: '今天听一段城市故事',
+          primary: true,
+          items: [card],
+        ),
+        CityStoryModule(
+          key: 'street_corner_3min',
+          title: '3 分钟了解一个街角',
+          primary: false,
+          items: const [],
+        ),
+        const CityStoryModule(
+          key: 'city_small_thing',
+          title: '一座城市的一件小事',
+          primary: false,
+          items: [],
+        ),
+        const CityStoryModule(
+          key: 'overlooked_detail',
+          title: '你路过但没注意的细节',
+          primary: false,
+          items: [],
+        ),
+        const CityStoryModule(
+          key: 'today_destination',
+          title: '今天适合去哪儿',
+          primary: false,
+          items: [],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<HomeStory> cityStory(String catalogId) => randomHomeStory();
+
+  @override
+  Future<List<TravelerFavorite>> favorites() async {
+    await _pause();
+    return _favorites.map((value) {
+      final parts = value.split(':');
+      return TravelerFavorite(
+        kind: parts.first,
+        targetId: parts.sublist(1).join(':'),
+        available: true,
+        label: '已收藏内容',
+      );
+    }).toList(growable: false);
+  }
+
+  @override
+  Future<TravelerFavorite> addFavorite(String kind, String targetId) async {
+    await _pause();
+    _favorites.add('$kind:$targetId');
+    return TravelerFavorite(
+      kind: kind,
+      targetId: targetId,
+      available: true,
+      label: '已收藏内容',
+    );
+  }
+
+  @override
+  Future<void> removeFavorite(String kind, String targetId) async {
+    await _pause();
+    _favorites.remove('$kind:$targetId');
   }
 
   Future<void> _pause() => Future<void>.delayed(latency);

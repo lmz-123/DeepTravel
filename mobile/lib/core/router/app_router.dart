@@ -45,6 +45,12 @@ final appRouter = GoRouter(
           builder: (context, state) => const HomeStoryPage(),
         ),
         GoRoute(
+          path: '/story/:catalogId',
+          builder: (context, state) => HomeStoryPage(
+            catalogId: state.pathParameters['catalogId'],
+          ),
+        ),
+        GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsPage(),
         ),

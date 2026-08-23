@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "package_id": "shenzhen-city-stories",
+  "package_version": "2026.08.23-1",
+  "entities": {
+    "cities": [],
+    "routes": [],
+    "stops": [],
+    "story_arcs": [],
+    "story_fragments": [],
+    "catalog_items": [],
+    "variants": [],
+    "placements": [],
+    "pretrip_guidance": [],
+    "media": [
+      {
+        "key": "existing-managed-cover",
+        "checksum_sha256": "replace-with-managed-media-checksum"
+      }
+    ]
+  }
+}

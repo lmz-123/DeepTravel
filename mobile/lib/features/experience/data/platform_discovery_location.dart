@@ -66,7 +66,6 @@ class PlatformCurrentLocationSource implements CurrentLocationSource {
       return DiscoveryLocationSample(
         latitude: position.latitude,
         longitude: position.longitude,
-        accuracyMeters: position.accuracy,
         recordedAt: position.timestamp,
         locality: locality,
       );

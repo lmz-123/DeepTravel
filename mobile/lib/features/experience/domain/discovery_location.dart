@@ -11,7 +11,6 @@ enum DiscoveryLocationFailureReason {
   serviceDisabled,
   timeout,
   unavailable,
-  inaccurate,
 }
 
 class DiscoveryLocationFailure implements Exception {
@@ -24,14 +23,12 @@ class DiscoveryLocationSample {
   const DiscoveryLocationSample({
     required this.latitude,
     required this.longitude,
-    required this.accuracyMeters,
     required this.recordedAt,
     this.locality,
   });
 
   final double latitude;
   final double longitude;
-  final double accuracyMeters;
   final DateTime recordedAt;
   final String? locality;
 }

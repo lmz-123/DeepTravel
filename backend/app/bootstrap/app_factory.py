@@ -7,6 +7,7 @@ import click
 from flask import Flask
 from flask_cors import CORS
 
+from app.application.city_story_service import CityStoryService
 from app.application.community_service import CommunityService
 from app.application.fragment_services import FragmentTourService
 from app.application.historical_content_service import HistoricalContentService
@@ -132,6 +133,7 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
         ),
         "historical_content": HistoricalContentService(database.session_factory),
         "story_listening": StoryListeningService(database.session_factory, asset_url),
+        "city_stories": CityStoryService(database.session_factory, asset_url),
         "community": CommunityService(
             database.session_factory,
             community_media_storage,

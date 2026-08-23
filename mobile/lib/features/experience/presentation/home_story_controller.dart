@@ -117,6 +117,35 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
     }
   }
 
+  Future<void> loadCatalog(String catalogId) async {
+    final generation = ++_generation;
+    await _player.stop();
+    await _cancelBindings();
+    final ownership = _ownershipGeneration;
+    if (ownership != null) {
+      ref.read(audioOwnershipProvider.notifier).clear(ownership);
+      _ownershipGeneration = null;
+    }
+    state = const HomeStoryPlaybackState(phase: HomeStoryPhase.loading);
+    try {
+      final story =
+          await ref.read(experienceRepositoryProvider).cityStory(catalogId);
+      if (generation != _generation) return;
+      state = HomeStoryPlaybackState(
+        phase: HomeStoryPhase.ready,
+        story: story,
+        duration: story.duration,
+        citySlug: story.citySlug,
+      );
+    } catch (_) {
+      if (generation != _generation) return;
+      state = const HomeStoryPlaybackState(
+        phase: HomeStoryPhase.error,
+        message: '故事暂时没有加载出来，请稍后重试。',
+      );
+    }
+  }
+
   Future<void> play() async {
     final story = state.story;
     if (story == null) return;

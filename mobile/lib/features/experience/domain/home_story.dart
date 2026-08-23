@@ -13,6 +13,12 @@ class HomeStory {
     required this.routeTitle,
     required this.routeSlug,
     required this.narratorName,
+    this.contentType = '城市故事',
+    this.themes = const [],
+    this.placeContext = '',
+    this.observableDetail = '',
+    this.attentionHint,
+    this.factStatus = '',
   });
 
   final String id;
@@ -28,6 +34,12 @@ class HomeStory {
   final String routeTitle;
   final String routeSlug;
   final String narratorName;
+  final String contentType;
+  final List<String> themes;
+  final String placeContext;
+  final String observableDetail;
+  final String? attentionHint;
+  final String factStatus;
 
   factory HomeStory.fromJson(Map<String, dynamic> json) {
     final city = _storyMap(json['city']);
@@ -47,6 +59,14 @@ class HomeStory {
       routeTitle: _storyText(route['title']),
       routeSlug: _storyText(route['slug']),
       narratorName: _storyText(profile['display_name'], '见地讲述者'),
+      contentType: _storyText(json['content_type'], '城市故事'),
+      themes: (json['themes'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
+      placeContext: _storyText(json['place_context']),
+      observableDetail: _storyText(json['observable_detail']),
+      attentionHint: json['attention_hint'] as String?,
+      factStatus: _storyText(json['fact_status']),
     );
   }
 }

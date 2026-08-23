@@ -211,6 +211,11 @@ def list_city_routes(city_slug: str):
     )
 
 
+@api.get("/cities/<city_slug>/stories")
+def list_city_stories(city_slug: str):
+    return jsonify({"data": _services()["city_stories"].home(city_slug)})
+
+
 @api.get("/routes/<route_slug>")
 def get_route(route_slug: str):
     route = _services()["catalog"].get_route(route_slug)
@@ -232,6 +237,52 @@ def random_story():
 @api.get("/stories/<publication_id>")
 def get_listening_story(publication_id: str):
     return jsonify({"data": _services()["story_listening"].get(publication_id)})
+
+
+@api.get("/city-stories/<catalog_id>")
+def get_city_story(catalog_id: str):
+    return jsonify(
+        {
+            "data": _services()["city_stories"].get_story(
+                catalog_id, request.args.get("variant_role")
+            )
+        }
+    )
+
+
+@api.get("/routes/<route_slug>/pretrip")
+def get_route_pretrip(route_slug: str):
+    return jsonify({"data": _services()["city_stories"].pretrip(route_slug)})
+
+
+@api.get("/favorites")
+@require_user
+def list_favorites():
+    return jsonify({"data": _services()["city_stories"].list_favorites(g.current_user.id)})
+
+
+@api.put("/favorites/<target_kind>/<path:target_id>")
+@require_user
+def add_favorite(target_kind: str, target_id: str):
+    return jsonify(
+        {
+            "data": _services()["city_stories"].add_favorite(
+                g.current_user.id, target_kind, target_id
+            )
+        }
+    )
+
+
+@api.delete("/favorites/<target_kind>/<path:target_id>")
+@require_user
+def remove_favorite(target_kind: str, target_id: str):
+    return jsonify(
+        {
+            "data": _services()["city_stories"].remove_favorite(
+                g.current_user.id, target_kind, target_id
+            )
+        }
+    )
 
 
 @api.post("/journeys")
@@ -738,6 +789,9 @@ def _route_payload(route, *, include_stops: bool = True) -> dict:
         payload["fragment_count"] = tour["fragment_count"]
         payload["photo_mission_count"] = tour["photo_mission_count"]
         payload["download_size_bytes"] = tour["download_size_bytes"]
+    if route.content_status.value == "published":
+        payload["pretrip"] = _services()["city_stories"].pretrip(route.slug)
+        payload["companion_tags"] = payload["pretrip"]["companion_tags"]
     return payload
 
 

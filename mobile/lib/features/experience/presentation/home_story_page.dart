@@ -5,9 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import 'home_story_controller.dart';
 import 'discovery_controller.dart';
+import 'widgets/favorite_button.dart';
 
 class HomeStoryPage extends ConsumerStatefulWidget {
-  const HomeStoryPage({super.key});
+  const HomeStoryPage({this.catalogId, super.key});
+
+  final String? catalogId;
 
   @override
   ConsumerState<HomeStoryPage> createState() => _HomeStoryPageState();
@@ -20,6 +23,12 @@ class _HomeStoryPageState extends ConsumerState<HomeStoryPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final city = ref.read(discoveryControllerProvider).asData?.value.city;
+      if (widget.catalogId case final catalogId?) {
+        ref
+            .read(homeStoryPlaybackControllerProvider.notifier)
+            .loadCatalog(catalogId);
+        return;
+      }
       final current = ref.read(homeStoryPlaybackControllerProvider);
       if (current.story == null || current.citySlug != city?.slug) {
         ref
@@ -50,15 +59,22 @@ class _HomeStoryPageState extends ConsumerState<HomeStoryPage> {
           ),
         HomeStoryPhase.empty || HomeStoryPhase.error => _StoryFailure(
             message: state.message ?? '故事暂时没有加载出来。',
-            onRetry: () =>
-                ref.read(homeStoryPlaybackControllerProvider.notifier).load(
-                      citySlug: ref
-                          .read(discoveryControllerProvider)
-                          .asData
-                          ?.value
-                          .city
-                          ?.slug,
-                    ),
+            onRetry: () {
+              final controller =
+                  ref.read(homeStoryPlaybackControllerProvider.notifier);
+              if (widget.catalogId case final catalogId?) {
+                controller.loadCatalog(catalogId);
+              } else {
+                controller.load(
+                  citySlug: ref
+                      .read(discoveryControllerProvider)
+                      .asData
+                      ?.value
+                      .city
+                      ?.slug,
+                );
+              }
+            },
           ),
         _ when state.story != null => _StoryBody(state: state),
         _ => const SizedBox.shrink(),
@@ -111,6 +127,50 @@ class _StoryBody extends ConsumerWidget {
           story.introduction,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.65),
         ),
+        if (story.themes.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: story.themes
+                .map((theme) => InputChip(
+                      label: Text(theme),
+                      avatar: const Icon(Icons.tag_rounded, size: 16),
+                      onPressed: null,
+                      deleteIcon: FavoriteButton(
+                        kind: 'theme',
+                        targetId: theme,
+                      ),
+                      onDeleted: () {},
+                    ))
+                .toList(growable: false),
+          ),
+        ],
+        if (story.placeContext.isNotEmpty ||
+            story.observableDetail.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.paperDeep,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (story.placeContext.isNotEmpty) Text(story.placeContext),
+                if (story.observableDetail.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('可以观察：${story.observableDetail}'),
+                ],
+                if (story.attentionHint?.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 8),
+                  Text('到现场时可以留意：${story.attentionHint}'),
+                ],
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.fromLTRB(16, 17, 16, 14),
