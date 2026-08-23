@@ -78,4 +78,4 @@
 - [x] 10.3 Run Flutter formatting, analyze, focused/full tests, architecture/import audit, semantics/text-scale/reduced-motion checks and verify the footprint screens instantiate no audio player or community request.
 - [x] 10.4 Run strict OpenSpec validation and inspect both repository diffs for hard-coded cities/themes/summaries, public photo URLs, audio coupling, map/route-recommendation work, secrets and unrelated generated files.
 - [x] 10.5 Update only footprint API/privacy/content/backfill/deployment documentation, increment the full mobile version, and build/inspect the production Android APK only when required runtime credentials are available.
-- [ ] 10.6 Commit and push scoped main and admin changes independently, then report hashes, validation evidence, backfill dry-run/execute commands and exact API/admin deployment/rollback sequences.
+- [x] 10.6 Commit and push scoped main and admin changes independently, then report hashes, validation evidence, backfill dry-run/execute commands and exact API/admin deployment/rollback sequences.
