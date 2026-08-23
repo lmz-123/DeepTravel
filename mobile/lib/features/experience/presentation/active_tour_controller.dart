@@ -310,8 +310,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         narrationProfileMessage:
             profileFallback ? '之前选择的讲述音色已不可用，已切换为路线默认音色。' : null,
         playbackMode: TourPlaybackMode.live,
+        selectedFragmentId: manifest.fragments.firstOrNull?.id,
         generation: _playbackGeneration,
         isBusy: true);
+    _refreshNearbyStoryPoints();
     var prepared = <String, String>{};
     try {
       prepared = await ref
@@ -461,6 +463,24 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   Future<bool> selectCollectedFragment(String fragmentId) =>
       selectRevealedFragment(fragmentId);
 
+  Future<bool> selectNode(String fragmentId) async {
+    final manifestEntry = state.route?.audioTour?.fragments
+        .where((item) => item.id == fragmentId)
+        .firstOrNull;
+    if (manifestEntry == null) return false;
+    final ledgerEntry = state.ledger?.entries
+        .where((item) => item.id == fragmentId)
+        .firstOrNull;
+    if (ledgerEntry?.isRevealed == true) {
+      return selectRevealedFragment(fragmentId);
+    }
+    state = state.copyWith(
+      selectedFragmentId: manifestEntry.id,
+      clearError: true,
+    );
+    return true;
+  }
+
   Future<bool> selectRevealedFragment(String fragmentId) async {
     final entry = state.ledger?.entries
         .where((item) => item.id == fragmentId)
@@ -484,7 +504,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       queue: activeJourney ? state.queue : const [],
       status: activeJourney ? state.status : 'revisit',
       locationMessage: activeJourney
-          ? '正在回听已触发故事点；附近故事点仍会继续识别。'
+          ? '正在回听已触发节点；其他节点仍会继续识别。'
           : '正在回听第 ${entry.position} 条已解锁线索；旅程进度不会改变。',
       clearError: true,
     );
@@ -1167,14 +1187,14 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   void _refreshNearbyStoryPoints([LocationSample? sample]) {
     final manifest = state.route?.audioTour;
     final ledger = state.ledger;
-    if (manifest == null || ledger == null) {
+    if (manifest == null) {
       state = state.copyWith(nearbyStoryPoints: const []);
       return;
     }
     state = state.copyWith(
       nearbyStoryPoints: projectNearbyStoryPoints(
         manifestFragments: manifest.fragments,
-        ledgerEntries: ledger.entries,
+        ledgerEntries: ledger?.entries ?? const [],
         presenceOf: _triggerEngine.stateOf,
         sample: sample ?? _latestLocationSample,
       ),

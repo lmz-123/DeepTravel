@@ -1,6 +1,6 @@
 ## Context
 
-参见 [proposal.md](./proposal.md)。现有真实定位链路已经在 Flutter `StableTriggerEngine` 中同时评估全部未揭示 fragment，并在多个候选中选择最近点；逐点 `trigger_region`、旅程 ledger、outbox、足迹、可选照片和因果重构均已存在。因此本次重点是锁定真实定位乱序触发契约、补足发布资格验证，并把旅程页从“下一条/锁定轨道”改造成附近点状态面。
+参见 [proposal.md](./proposal.md)。现有真实定位链路已经在 Flutter `StableTriggerEngine` 中同时评估全部未揭示 fragment，并在多个候选中选择最近点；逐点 `trigger_region`、旅程 ledger、outbox、足迹、可选照片和因果重构均已存在。因此本次重点是锁定真实定位乱序触发契约、补足发布资格验证，并在保留原节点轨道和节点页的前提下补充自由选择与接近状态。
 
 当前公开 fragment 已包含坐标、独立半径、后台体验标签和音频引用，但没有稳定的展示时长字段。独立后台已经编辑、校验并导入逐点 trigger region；除非实现核查发现字段缺失，否则不新增后台仓库变更或数据库迁移。
 
@@ -39,7 +39,7 @@ API URL 不变。拒绝新增触发时返回现有结构化状态冲突/不可�
 
 新增纯领域投影 `NearbyStoryPoint`（命名可在实现中调整），输入 manifest fragment、ledger entry 和最新 real sample，输出：stable ID、title/safe preview、display theme、expected duration、heard/revealed state、region presence、可选 distance。排序规则为：有 real sample 时距离升序、position、ID；无 sample 时 position、ID，且 distance 必须为 null。
 
-“附近故事点”展示 route manifest 的全部已发布点，避免用户离开某个半径后列表突然消失：进入 entry radius 且采样合格显示“可触发/正在确认”，已揭示显示“已触发/已听过”，其他点显示“尚未接近”。用户无需打开地图；距离仅作当前状态说明，不成为路线推荐或完成条件。
+该派生投影只为原节点轨道的状态和所选节点详情提供数据，不形成独立的“附近故事点”列表，也不按距离重排节点轨道。进入 entry radius 且采样合格时，所选节点可显示“可触发/正在确认”；已揭示显示“已触发/已听过”，其他点显示“尚未接近”。用户无需打开地图；距离仅作当前选中节点的临时状态说明，不成为路线推荐或完成条件。
 
 ActiveTourState 只保存派生后的距离/region presence 或一次 UI 更新所需的短生命周期 sample；不写 shared preferences、SQLite、API payload（除实际 trigger）或 runtime log。停止旅程、切换账号/路线和 controller dispose 时清除。
 
@@ -51,9 +51,13 @@ ActiveTourState 只保存派生后的距离/region presence 或一次 UI 更新�
 
 不新增主题枚举、客户端映射或数据库列。若实现时确认当前 narration track 无法提供真实时长，预计值只作为近似并以“约 X 分钟”展示，不伪装成播放器精确 duration。
 
-### 5. 节点选择与现场进度分离
+### 5. 保留原节点入口，并将节点选择与现场触发分离
 
-旅程页用可滚动 nearby list/compact cards 替换当前只读锁定 rail 的主要信息层。`selectedFragmentId` 继续表示当前查看/播放节点，location engine 的 candidate 集合不读取它。任何 `triggered|playing|mission_pending|collected|reconstructed` 节点可选择；未触发节点只展示位置状态，不能通过点击伪造 arrival。
+旅程页继续使用原有节点轨道作为主要节点入口，不以可滚动 nearby list 或另一套故事点列表替换。点击任意节点后，在轨道下方插入一个所选节点详情区，复用 nearby 派生状态与后台 fragment 文案，依次展示预览/已揭示文案、主题、预计时长、已听状态和接近/定位状态；现有音频卡片保持在该详情区下方。选择未触发节点时只高亮该节点并展示安全预览与“到达范围后自动触发”的提示；它不能通过点击伪造 arrival、解锁、播放或收集。选择已触发节点时继续打开原节点内容并允许回听。
+
+节点数量由 `manifest.fragments` 唯一决定，不使用“五个节点”常量。轨道先按可用宽度和节点数量收缩视觉圆点与间距，同时保留至少 44dp 的语义点击区域；当单行仍无法安全容纳时使用横向滚动而不是溢出、裁剪、丢弃或换成故事点列表。
+
+`selectedFragmentId` 表示当前选中的节点，不参与 location engine 的 candidate 集合。未触发节点也可以写入这个纯 UI 选择值，但不得写入 ledger、本地进度或触发 API。选择任意节点都不能改变其他节点的独立触发资格，也不能把选择顺序写成旅程进度或故事因果顺序。
 
 选择历史节点时先安全交接单一播放器，再读取现有已揭示内容。回听 completion callback 使用 playback generation 和 replay mode 隔离，不写新的 trigger/collection；返回当前现场节点不影响其他 region presence。
 
@@ -71,7 +75,7 @@ ActiveTourState 只保存派生后的距离/region presence 或一次 UI 更新�
 
 ## Risks / Trade-offs
 
-- [多个重叠围栏可能让列表频繁换序] → 使用现有稳定样本/迟滞；只在距离顺序实际变化时更新，并用 position/ID 稳定打破平局。
+- [多个重叠围栏可能让临时接近状态频繁变化] → 使用现有稳定样本/迟滞；节点轨道始终保持后台顺序，距离只更新所选节点详情。
 - [内容撤回会让进行中用户无法触发剩余点] → 已有进度继续可读，UI 明确标注该点暂不可用并提供刷新/退出；不绕过发布审核。
 - [旧 API 没有主题或预计时长] → Flutter 提供无虚假值的兼容 fallback，服务端先部署，客户端后部署。
 - [自由触发后多个音频争抢播放] → 每次 sample 最多触发一个，沿用全局单播放器 ownership 和 generation，其他合格点留待后续 sample。

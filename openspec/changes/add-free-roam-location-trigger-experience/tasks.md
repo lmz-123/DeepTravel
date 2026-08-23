@@ -21,11 +21,11 @@
 
 ## 4. Flutter free-roam presentation and replay
 
-- [x] 4.1 Replace the real-location journey page's primary locked-number rail/next-stop framing with an accessible “附近故事点” list or compact card surface showing backend theme, approximate duration, heard state and proximity/trigger state without requiring a map.
-- [x] 4.2 Keep untriggered points non-activating while allowing every triggered, playing, interrupted, mission-pending, collected or reconstructed point to reopen its node page, transcript and narration through the existing single-player ownership flow.
+- [x] 4.1 Restore and preserve the original node rail and node-page structure as the primary journey navigation; remove the replacement nearby-point list and place selected-node backend story copy, theme, duration, heard and proximity/trigger status directly below the rail and before the existing audio card.
+- [x] 4.2 Enable every published node button for selection regardless of authored order. Untriggered selection is informational only and must not trigger, reveal, play or collect; triggered and collected nodes continue through the existing single-player replay flow. Render exactly the backend node count, adapting visual size/spacing and using safe horizontal scrolling when density requires it rather than assuming five nodes.
 - [x] 4.3 Ensure historical selection/replay never emits a trigger or duplicate collection, never changes the live location candidate set, and safely returns to the current formal journey state after interruption.
 - [x] 4.4 Add explicit loading, unavailable-location, empty-content, offline and retry presentation; display no calculated distance without a current sample and preserve readable backend order.
-- [x] 4.5 Add widget/semantics tests for nearby metadata, unknown themes, heard/unheard announcements, triggered-node replay, interrupted-node recovery, no map dependency, reduced motion and absence of a mandatory real-mode next-stop action.
+- [x] 4.5 Add widget/semantics tests proving the original node rail remains visible, every node is selectable, untriggered selection changes no progress, selected-node copy appears between rail and audio card, non-five node counts remain usable without overflow, triggered-node replay still works, and no mandatory real-mode next-stop action returns.
 
 ## 5. Partial footprints and causal reconstruction
 
@@ -36,7 +36,7 @@
 
 ## 6. Verification and delivery
 
-- [x] 6.1 Run focused and full backend tests, formatter/lint, Flutter formatting/analyze/tests and privacy/log audits; preserve existing legacy ordered-route compatibility and unrelated user files.
-- [x] 6.2 Run strict OpenSpec validation and inspect the diff for route recommendation, map/navigation, city/range recognition, location persistence, hard-coded tags or unrelated admin/schema work.
-- [x] 6.3 Update only the field/free-roam/API/privacy documentation required by this change and record the server-first rolling-deployment and rollback sequence.
+- [x] 6.1 Run focused and full backend tests, formatter/lint, Flutter formatting/analyze/tests and privacy/log audits; preserve the original node UI, existing legacy ordered-route compatibility and unrelated user files.
+- [x] 6.2 Run strict OpenSpec validation and inspect the diff for replacement node surfaces, route recommendation, map/navigation, city/range recognition, location persistence, hard-coded tags or unrelated admin/schema work.
+- [x] 6.3 Update only the field/free-roam documentation needed to state that the original node rail remains the primary selector and untriggered selection is informational.
 - [x] 6.4 Increment the full mobile version, build and inspect the production Android APK when required credentials are available, then commit and push scoped main-repository changes.

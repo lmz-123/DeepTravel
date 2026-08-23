@@ -56,7 +56,7 @@ void main() {
   });
 
   testWidgets(
-      'real journey shows backend nearby metadata without a mandatory next action',
+      'real journey shows selected node copy before audio without a mandatory next action',
       (tester) async {
     final store = _MemoryTourStore();
     final container = ProviderContainer(overrides: [
@@ -78,12 +78,56 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('附近故事点'), findsOneWidget);
-    expect(find.textContaining('潮汐里的旧城'), findsOneWidget);
-    expect(find.textContaining('约 3 分钟'), findsOneWidget);
-    expect(find.textContaining('不显示估算距离'), findsOneWidget);
+    expect(find.text('附近故事点'), findsNothing);
+    expect(find.byKey(const ValueKey('selected-node-detail-fragment-1')),
+        findsOneWidget);
+    expect(find.text('第一条线索'), findsOneWidget);
+    expect(find.text('潮汐里的旧城'), findsOneWidget);
+    expect(find.text('约 3 分钟'), findsOneWidget);
+    expect(find.text('等待定位'), findsOneWidget);
+    expect(
+        find.byWidgetPredicate((widget) =>
+            widget is Text &&
+            widget.data != null &&
+            RegExp(r'^\d+ 米$').hasMatch(widget.data!)),
+        findsNothing);
     expect(find.text('下一条线索（测试）'), findsNothing);
     expect(find.byType(Switch), findsNothing);
+  });
+
+  test('selecting an untriggered node changes selection only', () async {
+    final store = _MemoryTourStore();
+    final repository = _ProgressingFragmentRepository();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_DeniedLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(_SilentNarrationPlayer()),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider
+          .overrideWithValue(_MemoryLocationModeStore(TourLocationMode.real)),
+    ]);
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    final controller = container.read(activeTourControllerProvider.notifier);
+    await controller.start(_twoFragmentRoute, _session);
+    final before = container.read(activeTourControllerProvider);
+
+    expect(await controller.selectNode('fragment-2'), isTrue);
+    final after = container.read(activeTourControllerProvider);
+    expect(after.selectedFragmentId, 'fragment-2');
+    expect(after.ledger?.collectedCount, before.ledger?.collectedCount);
+    expect(after.current, before.current);
+    expect(repository.stateOf('fragment-2'), 'undiscovered');
+    expect(repository.selectionTriggerCalls, 0);
+    expect(repository.selectionAcknowledgeCalls, 0);
   });
 
   test('denied location keeps nearby points ordered without fake distances',
@@ -367,21 +411,24 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('第二条线索'), findsOneWidget);
+    expect(find.text('第二条线索'), findsWidgets);
     expect(find.text('设置模式：模拟定位'), findsOneWidget);
     expect(find.byType(Switch), findsNothing);
-    expect(find.text('阅读等价文字稿'), findsOneWidget);
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);
-    expect(find.text('00:00'), findsOneWidget);
-    expect(find.text('--:--'), findsOneWidget);
     await tester.tap(find.byTooltip('暂停自动导览'));
     await tester.pump();
     expect(find.byTooltip('继续自动导览'), findsOneWidget);
     await tester.tap(find.byTooltip('继续自动导览'));
     await tester.pump();
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);
-    await tester.drag(find.byType(ListView), const Offset(0, -240));
+    await tester.dragUntilVisible(
+      find.text('阅读等价文字稿'),
+      find.byType(ListView),
+      const Offset(0, -220),
+    );
     await tester.pumpAndSettle();
+    expect(find.text('00:00'), findsOneWidget);
+    expect(find.text('--:--'), findsOneWidget);
     await tester.tap(find.text('阅读等价文字稿'));
     await tester.pumpAndSettle();
     expect(find.text('第二条线索的正文'), findsOneWidget);
@@ -415,7 +462,7 @@ void main() {
 
     expect(repository.isCollected('fragment-2'), isTrue);
     expect(player.playedFragmentIds, ['fragment-2', 'fragment-3']);
-    expect(find.text('第三条线索'), findsOneWidget);
+    expect(find.text('第三条线索'), findsWidgets);
   });
 
   testWidgets(
@@ -1193,8 +1240,11 @@ class _ProgressingFragmentRepository extends _FragmentRepository {
             });
 
   final Map<String, String> _states;
+  int selectionTriggerCalls = 0;
+  int selectionAcknowledgeCalls = 0;
 
   bool isCollected(String fragmentId) => _states[fragmentId] == 'collected';
+  String? stateOf(String fragmentId) => _states[fragmentId];
 
   @override
   Future<StoryFragment> triggerFragment(String journeyId, String fragmentId,
@@ -1203,6 +1253,7 @@ class _ProgressingFragmentRepository extends _FragmentRepository {
       double? latitude,
       double? longitude,
       double? accuracyM}) async {
+    selectionTriggerCalls += 1;
     _states[fragmentId] = 'triggered';
     return _fragmentWithState(fragmentId, 'triggered', revealed: true);
   }
@@ -1210,6 +1261,7 @@ class _ProgressingFragmentRepository extends _FragmentRepository {
   @override
   Future<StoryFragment> acknowledgePlayback(String journeyId, String fragmentId,
       double progress, String idempotencyKey) async {
+    selectionAcknowledgeCalls += 1;
     _states[fragmentId] = 'collected';
     return _fragmentWithState(fragmentId, 'collected', revealed: true);
   }

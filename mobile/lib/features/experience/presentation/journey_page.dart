@@ -136,10 +136,15 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
               Text(manifest.centralQuestion,
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 18),
-              if (state.locationMode == TourLocationMode.real)
-                _NearbyStoryPointsPanel(points: state.nearbyStoryPoints)
-              else
-                _FragmentRail(manifest: manifest, ledger: ledger),
+              _FragmentRail(manifest: manifest, ledger: ledger),
+              const SizedBox(height: 14),
+              _SelectedNodeDetail(
+                manifest: manifest,
+                ledger: ledger,
+                selectedFragmentId: selectedFragmentId,
+                points: state.nearbyStoryPoints,
+                isLoading: state.isBusy || ledger == null,
+              ),
               const SizedBox(height: 22),
               AnimatedSwitcher(
                   duration: const Duration(milliseconds: 380),
@@ -597,48 +602,90 @@ class _FragmentRail extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(activeTourControllerProvider);
-    return Row(
-      children: manifest.fragments.map((fragment) {
+    final fragments = manifest.fragments;
+    if (fragments.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(18),
+          child: Text('当前漫游暂无可展示的节点。'),
+        ),
+      );
+    }
+    return LayoutBuilder(builder: (context, constraints) {
+      const minNodeExtent = 44.0;
+      const maxNodeExtent = 56.0;
+      const minSpacing = 4.0;
+      const maxSpacing = 18.0;
+      final count = fragments.length;
+      final availableWidth = constraints.maxWidth;
+      final minimumWidth = count * minNodeExtent + (count - 1) * minSpacing;
+      final scrollable =
+          availableWidth.isFinite && minimumWidth > availableWidth;
+      final rawExtent = count == 0 || !availableWidth.isFinite
+          ? maxNodeExtent
+          : (availableWidth - (count - 1) * minSpacing) / count;
+      final nodeExtent = scrollable
+          ? minNodeExtent
+          : rawExtent.clamp(minNodeExtent, maxNodeExtent).toDouble();
+      final remaining = availableWidth.isFinite
+          ? availableWidth - nodeExtent * count
+          : minSpacing * (count - 1);
+      final spacing = count <= 1
+          ? 0.0
+          : scrollable
+              ? 8.0
+              : (remaining / (count - 1))
+                  .clamp(minSpacing, maxSpacing)
+                  .toDouble();
+      final nodes = <Widget>[];
+      for (var index = 0; index < fragments.length; index += 1) {
+        final fragment = fragments[index];
         StoryFragment? entry;
         for (final value in ledger?.entries ?? const <StoryFragment>[]) {
           if (value.id == fragment.id) entry = value;
         }
         final collected = entry?.isCollected ?? false;
         final pending = entry?.isMissionPending ?? false;
+        final revealed = entry?.isRevealed ?? false;
         final selected = state.selectedFragmentId == fragment.id;
         final live = state.liveFragmentId == fragment.id;
-        return Expanded(
+        final action = collected
+            ? '回听'
+            : revealed
+                ? '打开'
+                : '查看信息';
+        final stateLabel = collected
+            ? '已听过'
+            : revealed
+                ? '已触发'
+                : '尚未触发';
+        if (index > 0) nodes.add(SizedBox(width: spacing));
+        nodes.add(SizedBox(
+          width: nodeExtent,
           child: Column(
             children: [
               Semantics(
                 button: true,
                 selected: selected,
-                label: collected
-                    ? '第 ${fragment.position} 条线索，已解锁${live ? '，当前行走进度' : ''}'
-                    : '第 ${fragment.position} 条线索，尚未解锁',
+                label:
+                    '第 ${fragment.position} 个节点，${fragment.title ?? fragment.safePreview}，$stateLabel${live ? '，当前行走进度' : ''}，$action',
                 child: SizedBox.square(
-                  dimension: 48,
+                  dimension: nodeExtent,
                   child: IconButton(
-                    tooltip:
-                        collected ? '回听第 ${fragment.position} 条线索' : '线索尚未解锁',
-                    onPressed: () {
-                      if (collected) {
-                        ref
-                            .read(activeTourControllerProvider.notifier)
-                            .selectCollectedFragment(fragment.id);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('这条线索尚未解锁')),
-                        );
-                      }
-                    },
+                    tooltip: '$action第 ${fragment.position} 个节点',
+                    onPressed: () => ref
+                        .read(activeTourControllerProvider.notifier)
+                        .selectNode(fragment.id),
                     style: IconButton.styleFrom(
-                      backgroundColor: collected
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.square(nodeExtent),
+                      maximumSize: Size.square(nodeExtent),
+                      backgroundColor: collected || revealed
                           ? AppColors.moss
                           : pending
                               ? AppColors.terracotta
                               : AppColors.paperDeep,
-                      foregroundColor: collected || pending
+                      foregroundColor: collected || revealed || pending
                           ? AppColors.white
                           : AppColors.ink,
                       side: BorderSide(
@@ -655,9 +702,11 @@ class _FragmentRail extends ConsumerWidget {
                           ? selected
                               ? Icons.graphic_eq_rounded
                               : Icons.check_rounded
-                          : pending
-                              ? Icons.photo_camera_outlined
-                              : Icons.lock_outline_rounded,
+                          : revealed
+                              ? Icons.volume_up_outlined
+                              : pending
+                                  ? Icons.photo_camera_outlined
+                                  : Icons.radio_button_unchecked_rounded,
                     ),
                   ),
                 ),
@@ -667,43 +716,115 @@ class _FragmentRail extends ConsumerWidget {
                   style: Theme.of(context).textTheme.labelMedium),
             ],
           ),
+        ));
+      }
+      final rail = Row(mainAxisSize: MainAxisSize.min, children: nodes);
+      if (scrollable) {
+        return SingleChildScrollView(
+          key: const ValueKey('fragment-node-rail-scroll'),
+          scrollDirection: Axis.horizontal,
+          child: rail,
         );
-      }).toList(),
-    );
+      }
+      return Align(alignment: Alignment.center, child: rail);
+    });
   }
 }
 
-class _NearbyStoryPointsPanel extends ConsumerWidget {
-  const _NearbyStoryPointsPanel({required this.points});
+class _SelectedNodeDetail extends StatelessWidget {
+  const _SelectedNodeDetail({
+    required this.manifest,
+    required this.ledger,
+    required this.selectedFragmentId,
+    required this.points,
+    required this.isLoading,
+  });
 
+  final AudioTourManifest manifest;
+  final StoryLedger? ledger;
+  final String? selectedFragmentId;
   final List<NearbyStoryPoint> points;
+  final bool isLoading;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (points.isEmpty) {
+  Widget build(BuildContext context) {
+    if (manifest.fragments.isEmpty) {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(18),
-          child: Text('当前漫游暂无可展示的已发布故事点。'),
+          child: Text('当前漫游暂无可展示的节点内容。'),
         ),
       );
     }
-    final hasDistance = points.any((point) => point.distanceMeters != null);
+    final effectiveId = manifest.fragments
+            .where((fragment) => fragment.id == selectedFragmentId)
+            .firstOrNull
+            ?.id ??
+        manifest.fragments.first.id;
+    final manifestFragment =
+        manifest.fragments.firstWhere((fragment) => fragment.id == effectiveId);
+    final ledgerFragment = ledger?.entries
+        .where((fragment) => fragment.id == effectiveId)
+        .firstOrNull;
+    final point = points
+        .where((candidate) => candidate.fragment.id == effectiveId)
+        .firstOrNull;
+    final fragment = ledgerFragment?.isRevealed == true
+        ? ledgerFragment!
+        : point?.fragment ?? manifestFragment;
+    final status = point?.status ?? NearbyStoryPointStatus.locationUnavailable;
+    final durationSeconds = fragment.expectedDurationSeconds;
+    final durationMinutes = durationSeconds == null
+        ? null
+        : (durationSeconds / 60).ceil().clamp(1, 99);
+    final revealed = ledgerFragment?.isRevealed ?? false;
+    final metadata = <String>[
+      if (fragment.displayTheme != null) fragment.displayTheme!,
+      if (durationMinutes != null) '约 $durationMinutes 分钟',
+      isLoading && point == null ? '正在准备节点状态' : _statusLabel(status),
+      if (point?.distanceMeters != null) _distanceLabel(point!.distanceMeters!),
+    ];
     return Card(
+      key: ValueKey('selected-node-detail-${fragment.id}'),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('附近故事点', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(
-              hasDistance
-                  ? '自由选择行走方向；靠近任意故事点都会自动触发。'
-                  : '定位暂不可用，以下按后台推荐顺序展示，不显示估算距离。',
+            Row(
+              children: [
+                Icon(_statusIcon(status), color: _statusColor(status)),
+                const SizedBox(width: 10),
+                Text('节点 ${fragment.position}',
+                    style: Theme.of(context).textTheme.labelLarge),
+              ],
             ),
             const SizedBox(height: 10),
-            for (final point in points) _NearbyStoryPointTile(point: point),
+            Text(
+              fragment.title ?? fragment.safePreview,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (fragment.title != null && fragment.safePreview.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(fragment.safePreview),
+            ],
+            if (metadata.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: metadata
+                    .map((value) => Chip(label: Text(value)))
+                    .toList(growable: false),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              revealed
+                  ? '这个节点已经触发，可以在下方播放卡片继续收听或回听。'
+                  : '先按自己的方向行走；靠近这个节点后，讲解会自动触发。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
       ),
@@ -711,76 +832,35 @@ class _NearbyStoryPointsPanel extends ConsumerWidget {
   }
 }
 
-class _NearbyStoryPointTile extends ConsumerWidget {
-  const _NearbyStoryPointTile({required this.point});
+String _statusLabel(NearbyStoryPointStatus status) => switch (status) {
+      NearbyStoryPointStatus.locationUnavailable => '等待定位',
+      NearbyStoryPointStatus.outside => '尚未进入范围',
+      NearbyStoryPointStatus.approaching => '正在确认位置',
+      NearbyStoryPointStatus.inRange => '已进入触发范围',
+      NearbyStoryPointStatus.triggered => '已触发，可回听',
+      NearbyStoryPointStatus.heard => '已听过，可回听',
+    };
 
-  final NearbyStoryPoint point;
+IconData _statusIcon(NearbyStoryPointStatus status) => switch (status) {
+      NearbyStoryPointStatus.locationUnavailable => Icons.location_off_outlined,
+      NearbyStoryPointStatus.outside => Icons.radio_button_unchecked_rounded,
+      NearbyStoryPointStatus.approaching => Icons.radar_rounded,
+      NearbyStoryPointStatus.inRange => Icons.location_on_outlined,
+      NearbyStoryPointStatus.triggered => Icons.volume_up_outlined,
+      NearbyStoryPointStatus.heard => Icons.check_circle_outline_rounded,
+    };
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final fragment = point.fragment;
-    final durationSeconds = fragment.expectedDurationSeconds;
-    final durationMinutes = durationSeconds == null
-        ? null
-        : (durationSeconds / 60).ceil().clamp(1, 99);
-    final metadata = <String>[
-      if (fragment.displayTheme != null) fragment.displayTheme!,
-      if (durationMinutes != null) '约 $durationMinutes 分钟',
-      _statusLabel(point.status),
-      if (point.distanceMeters != null) _distanceLabel(point.distanceMeters!),
-    ];
-    final replayable = point.canReplay;
-    return Semantics(
-      button: replayable,
-      label: '${fragment.title ?? fragment.safePreview}，${metadata.join('，')}',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading:
-            Icon(_statusIcon(point.status), color: _statusColor(point.status)),
-        title: Text(fragment.title ?? fragment.safePreview),
-        subtitle: Text(metadata.join(' · ')),
-        trailing:
-            replayable ? const Icon(Icons.play_circle_outline_rounded) : null,
-        onTap: replayable
-            ? () => ref
-                .read(activeTourControllerProvider.notifier)
-                .selectRevealedFragment(fragment.id)
-            : null,
-      ),
-    );
-  }
+Color _statusColor(NearbyStoryPointStatus status) => switch (status) {
+      NearbyStoryPointStatus.triggered ||
+      NearbyStoryPointStatus.inRange =>
+        AppColors.terracotta,
+      NearbyStoryPointStatus.heard => AppColors.moss,
+      _ => AppColors.ink,
+    };
 
-  String _statusLabel(NearbyStoryPointStatus status) => switch (status) {
-        NearbyStoryPointStatus.locationUnavailable => '等待定位',
-        NearbyStoryPointStatus.outside => '尚未进入范围',
-        NearbyStoryPointStatus.approaching => '正在确认位置',
-        NearbyStoryPointStatus.inRange => '已进入触发范围',
-        NearbyStoryPointStatus.triggered => '已触发，可回听',
-        NearbyStoryPointStatus.heard => '已听过，可回听',
-      };
-
-  IconData _statusIcon(NearbyStoryPointStatus status) => switch (status) {
-        NearbyStoryPointStatus.locationUnavailable =>
-          Icons.location_off_outlined,
-        NearbyStoryPointStatus.outside => Icons.radio_button_unchecked_rounded,
-        NearbyStoryPointStatus.approaching => Icons.radar_rounded,
-        NearbyStoryPointStatus.inRange => Icons.location_on_outlined,
-        NearbyStoryPointStatus.triggered => Icons.volume_up_outlined,
-        NearbyStoryPointStatus.heard => Icons.check_circle_outline_rounded,
-      };
-
-  Color _statusColor(NearbyStoryPointStatus status) => switch (status) {
-        NearbyStoryPointStatus.triggered ||
-        NearbyStoryPointStatus.inRange =>
-          AppColors.terracotta,
-        NearbyStoryPointStatus.heard => AppColors.moss,
-        _ => AppColors.ink,
-      };
-
-  String _distanceLabel(double meters) {
-    if (meters < 1000) return '${meters.round()} 米';
-    return '${(meters / 1000).toStringAsFixed(1)} 公里';
-  }
+String _distanceLabel(double meters) {
+  if (meters < 1000) return '${meters.round()} 米';
+  return '${(meters / 1000).toStringAsFixed(1)} 公里';
 }
 
 class _ListeningCard extends StatelessWidget {

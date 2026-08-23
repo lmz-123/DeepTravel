@@ -38,23 +38,33 @@ Each field story point SHALL carry its own server-configured coordinates and tri
 - **WHEN** the traveler enters a point's valid region without capturing optional evidence
 - **THEN** photo absence does not affect triggering, narration collection, or later reconstruction eligibility
 
-### Requirement: Nearby story-point awareness without map dependence
-During a formal journey, the client SHALL present the tour's story points as a nearby-point surface rather than only a next-stop instruction. Every row SHALL expose a backend-derived theme, expected listening duration, and heard or unheard state. With a current real position, the surface SHALL order points by transient calculated distance and distinguish points currently satisfying their region from points not yet reached; without a current position it SHALL preserve backend reference order and MUST NOT display a calculated distance.
+### Requirement: Story-point awareness without replacing the existing node rail
+During a formal journey, the client SHALL preserve the existing node rail and node pages rather than replacing them with a new nearby-point list or reducing the experience to a next-stop instruction. Every published node SHALL remain visible and selectable regardless of authored position. Selecting a node SHALL expose its backend story-point preview copy, backend-derived theme, expected listening duration, heard or unheard state, and transient proximity/trigger state in a detail region placed immediately below the node rail and before the audio playback card, without requiring a map. The rail SHALL use the actual backend node count, SHALL NOT assume five nodes, and SHALL adapt node visual size and spacing to density while keeping controls safely usable and scrollable when needed. Selection of an untriggered node MUST NOT create a trigger, reveal narration, start playback, or mark progress. Without a current position the client SHALL preserve backend reference order and MUST NOT display a calculated distance.
 
 #### Scenario: Current position is available
 - **WHEN** the client receives a usable real-location sample during an active tour
-- **THEN** the nearby surface updates point ordering and proximity state without requiring a map or changing the authored story order
+- **THEN** the selected-node status updates its transient distance and proximity without reordering or replacing the original node rail and without changing the authored story order
 
 #### Scenario: Position is unavailable
 - **WHEN** permission, service, timeout, or acquisition failure leaves no current position
-- **THEN** the client keeps all known story points visible in backend reference order, keeps previously triggered points usable, explains that automatic triggering is paused, and shows no false distance
+- **THEN** the client keeps all known story points visible and selectable in the original backend reference order, keeps previously triggered points usable, explains that automatic triggering is paused, and shows no false distance
 
 #### Scenario: Backend adds a new theme
 - **WHEN** a published story point carries a previously unknown safe theme or experience label
 - **THEN** the client displays the backend value without requiring a client release
 
+#### Scenario: Backend changes node density
+- **WHEN** a route publishes an arbitrary number of story nodes rather than exactly five
+- **THEN** the client renders the exact count and adapts the rail's spacing or visual node size without dropping, clipping, or inventing nodes
+
 ### Requirement: Triggered points remain reviewable in the formal journey
 Every triggered or collected story point SHALL remain selectable from the active journey so the traveler can reopen its node page, read its transcript, and listen again. Reviewing or replaying a point MUST NOT create another trigger, change the spatial progress order, reduce collected progress, or satisfy an unvisited point.
+
+Untriggered published points SHALL also remain selectable from the node rail for informational status only. Their narration, transcript and collection state SHALL remain unavailable until the independent location policy triggers that point.
+
+#### Scenario: Select an untriggered point
+- **WHEN** the traveler selects an untriggered published point from the original node rail
+- **THEN** the client highlights that point and shows its safe backend preview copy, theme, duration and location status below the rail and above the audio card without triggering, revealing, playing or collecting it
 
 #### Scenario: Reopen a heard point
 - **WHEN** the traveler selects a previously collected point while the formal journey remains active
