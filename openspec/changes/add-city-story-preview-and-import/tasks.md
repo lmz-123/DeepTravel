@@ -61,4 +61,4 @@
 - [x] 9.1 Run affected backend test suites, migration checks, API contract tests, Flutter analyze/tests, and formatters; resolve regressions without deleting unrelated user changes.
 - [ ] 9.2 Verify the companion `Travel-Admin` change against the same migrated schema and complete a manual upload → dry-run → confirm → edit → review smoke test.
 - [x] 9.3 Update API/import schema and operator documentation, record compatibility/deprecation notes, and run `openspec validate add-city-story-preview-and-import --strict` in both repositories.
-- [ ] 9.4 Update mobile build metadata, produce and inspect the Android APK when required credentials are available, then commit and push scoped main-repository changes.
+- [x] 9.4 Update mobile build metadata, produce and inspect the Android APK when required credentials are available, then commit and push scoped main-repository changes.
