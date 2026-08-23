@@ -45,7 +45,7 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<List<RouteExperience>> routesForCity(String citySlug) async {
+  Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async {
     final response = await _request(() => _dio.get('/cities/$citySlug/routes'));
     final data = response.data['data'] as Map<String, dynamic>;
     final summaries = data['routes'] as List<dynamic>;
@@ -61,12 +61,20 @@ class ApiExperienceRepository implements ExperienceRepository {
         name: 'jiandi.catalog',
       );
     }
-    return published;
+    final routeIds = published.map((route) => route.id).toSet();
+    final scenicSpots = (data['scenic_spots'] as List<dynamic>? ?? const [])
+        .map((item) => ScenicSpot.fromJson(item as Map<String, dynamic>))
+        .where((spot) => routeIds.contains(spot.routeId))
+        .toList(growable: false);
+    return CityDiscoveryCatalog(
+      routes: published,
+      scenicSpots: scenicSpots,
+    );
   }
 
   @override
   Future<RouteExperience> featuredRoute(String citySlug) async {
-    final routes = await routesForCity(citySlug);
+    final routes = (await discoveryForCity(citySlug)).routes;
     if (routes.isEmpty) {
       throw const ExperienceFailure('这座城市还没有可用路线');
     }

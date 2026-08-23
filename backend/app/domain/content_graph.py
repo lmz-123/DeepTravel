@@ -6,6 +6,29 @@ from math import asin, cos, radians, sin, sqrt
 from random import Random
 from typing import Any
 
+MAX_EXPERIENCE_TAGS = 8
+MAX_EXPERIENCE_TAG_LENGTH = 24
+
+
+def normalize_experience_tags(values: Any) -> list[str]:
+    if values is None:
+        return []
+    if not isinstance(values, list | tuple):
+        raise ValueError("体验标签必须是字符串数组")
+    result: list[str] = []
+    for raw in values:
+        if not isinstance(raw, str):
+            raise ValueError("体验标签必须是字符串数组")
+        value = raw.strip()
+        if not value or value in result:
+            continue
+        if len(value) > MAX_EXPERIENCE_TAG_LENGTH:
+            raise ValueError(f"每个体验标签最多 {MAX_EXPERIENCE_TAG_LENGTH} 个字符")
+        result.append(value)
+    if len(result) > MAX_EXPERIENCE_TAGS:
+        raise ValueError(f"体验标签最多 {MAX_EXPERIENCE_TAGS} 个")
+    return result
+
 
 def normalize_reconstruction_items(values: Iterable[dict[str, Any] | str]) -> list[dict[str, str]]:
     """Normalize legacy text entries and managed entries to stable id/text pairs."""
@@ -99,6 +122,24 @@ def validate_content_graph(
     previous_index = -1
     for index, fragment in enumerate(fragments):
         path = f"fragments[{index}]"
+        try:
+            fragment["experience_tags"] = normalize_experience_tags(
+                fragment.get("experience_tags")
+            )
+        except ValueError as exc:
+            error(f"{path}.experience_tags", "experience_tags_invalid", str(exc))
+        stop = fragment.get("stop")
+        if isinstance(stop, dict):
+            try:
+                stop["experience_tags"] = normalize_experience_tags(
+                    stop.get("experience_tags")
+                )
+            except ValueError as exc:
+                error(
+                    f"{path}.stop.experience_tags",
+                    "experience_tags_invalid",
+                    str(exc),
+                )
         for key in ("title", "narration_script", "transcript", "audio_path", "script_version"):
             if not str(fragment.get(key) or "").strip():
                 error(f"{path}.{key}", "required", "线索缺少必填内容")

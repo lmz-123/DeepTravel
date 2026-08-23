@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>在你明确开始路线后，见地使用位置自动唤醒附近的历史故事。</string>
+	<string>见地使用单次位置识别首次展示的城市、排列附近景点；开始路线后也用于唤醒附近故事，不会保存连续位置轨迹。</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>行走路线进行中，即使锁屏也需要位置来触发故事；停止路线后立即结束监测。</string>
 	<key>NSCameraUsageDescription</key>

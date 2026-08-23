@@ -48,6 +48,7 @@ class Stop:
     image: str
     insight: str
     challenge: Challenge | None
+    experience_tags: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True, slots=True)

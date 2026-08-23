@@ -57,38 +57,6 @@ final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {
 final currentUserIdProvider = Provider<String?>(
     (ref) => ref.watch(authControllerProvider).asData?.value?.user.id);
 
-final citiesProvider = FutureProvider<List<CityExperience>>((ref) {
-  return ref.watch(experienceRepositoryProvider).cities();
-});
-
-class SelectedCityController extends Notifier<String?> {
-  @override
-  String? build() =>
-      AppConfig.defaultCitySlug.isEmpty ? null : AppConfig.defaultCitySlug;
-
-  void select(String citySlug) => state = citySlug;
-}
-
-final selectedCityProvider = NotifierProvider<SelectedCityController, String?>(
-    SelectedCityController.new);
-
-final activeCityProvider = Provider<CityExperience?>((ref) {
-  final available = ref.watch(citiesProvider).asData?.value;
-  if (available == null || available.isEmpty) return null;
-  final selectedSlug = ref.watch(selectedCityProvider);
-  if (selectedSlug == null) return available.first;
-  for (final city in available) {
-    if (city.slug == selectedSlug) return city;
-  }
-  return available.first;
-});
-
-final cityRoutesProvider = FutureProvider<List<RouteExperience>>((ref) {
-  final city = ref.watch(activeCityProvider);
-  if (city == null) return const <RouteExperience>[];
-  return ref.watch(experienceRepositoryProvider).routesForCity(city.slug);
-});
-
 final archivedActiveJourneysProvider =
     FutureProvider<List<ResumableJourney>>((ref) {
   final repository = ref.watch(experienceRepositoryProvider);

@@ -195,11 +195,17 @@ def list_cities():
 @api.get("/cities/<city_slug>/routes")
 def list_city_routes(city_slug: str):
     city, routes = _services()["catalog"].list_city_routes(city_slug)
+    route_payloads = [_route_payload(route, include_stops=False) for route in routes]
     return jsonify(
         {
             "data": {
                 "city": city_to_dict(city),
-                "routes": [_route_payload(route, include_stops=False) for route in routes],
+                "routes": route_payloads,
+                "scenic_spots": [
+                    spot
+                    for route, payload in zip(routes, route_payloads, strict=True)
+                    for spot in _scenic_spots(route, payload)
+                ],
             }
         }
     )
@@ -733,3 +739,37 @@ def _route_payload(route, *, include_stops: bool = True) -> dict:
         payload["photo_mission_count"] = tour["photo_mission_count"]
         payload["download_size_bytes"] = tour["download_size_bytes"]
     return payload
+
+
+def _scenic_spots(route, route_payload: dict) -> list[dict]:
+    tour = route_payload.get("audio_tour")
+    if isinstance(tour, dict) and tour.get("fragments"):
+        result = []
+        for fragment in tour["fragments"]:
+            region = fragment.get("trigger_region") or {}
+            latitude = region.get("latitude")
+            longitude = region.get("longitude")
+            if latitude is None or longitude is None:
+                continue
+            result.append(
+                {
+                    "id": fragment["id"],
+                    "title": fragment.get("safe_preview") or route.title,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "experience_tags": list(fragment.get("experience_tags") or []),
+                    "route_id": route.id,
+                }
+            )
+        return result
+    return [
+        {
+            "id": stop.id,
+            "title": stop.title,
+            "latitude": stop.latitude,
+            "longitude": stop.longitude,
+            "experience_tags": list(stop.experience_tags),
+            "route_id": route.id,
+        }
+        for stop in route.stops
+    ]

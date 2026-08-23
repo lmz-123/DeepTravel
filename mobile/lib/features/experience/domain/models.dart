@@ -24,6 +24,57 @@ class CityExperience {
       );
 }
 
+class ScenicSpot {
+  const ScenicSpot({
+    required this.id,
+    required this.title,
+    required this.latitude,
+    required this.longitude,
+    required this.experienceTags,
+    required this.routeId,
+  });
+
+  final String id;
+  final String title;
+  final double latitude;
+  final double longitude;
+  final List<String> experienceTags;
+  final String routeId;
+
+  factory ScenicSpot.fromJson(Map<String, dynamic> json) => ScenicSpot(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        experienceTags: (json['experience_tags'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .toList(growable: false),
+        routeId: json['route_id'] as String,
+      );
+}
+
+class CityDiscoveryCatalog {
+  const CityDiscoveryCatalog({
+    required this.routes,
+    required this.scenicSpots,
+  });
+
+  final List<RouteExperience> routes;
+  final List<ScenicSpot> scenicSpots;
+}
+
+class ScenicSpotCard {
+  const ScenicSpotCard({
+    required this.spot,
+    required this.route,
+    this.distanceMeters,
+  });
+
+  final ScenicSpot spot;
+  final RouteExperience route;
+  final double? distanceMeters;
+}
+
 class Challenge {
   const Challenge({
     required this.id,

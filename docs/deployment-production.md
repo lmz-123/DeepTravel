@@ -16,6 +16,8 @@ docker compose ps
 curl -fsS http://127.0.0.1:5001/api/v1/health
 ```
 
+景点体验标签上线时必须先让主 API 执行 Alembic `20260823_0012`，确认 `stops` 与 `story_fragments` 已有 `experience_tags_json`，再部署独立后台和客户端。独立后台只映射这两个主库字段，不拥有迁移。紧急回退应用代码时保留新增列和现有标签数据；不要为代码回退执行 downgrade 或删除列。
+
 生产 `.env` 必须设为：
 
 ```dotenv

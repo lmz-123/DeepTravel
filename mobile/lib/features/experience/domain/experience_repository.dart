@@ -8,7 +8,7 @@ import 'home_story.dart';
 abstract interface class ExperienceRepository {
   Future<List<CityExperience>> cities();
 
-  Future<List<RouteExperience>> routesForCity(String citySlug);
+  Future<CityDiscoveryCatalog> discoveryForCity(String citySlug);
 
   Future<RouteExperience> featuredRoute(String citySlug);
 

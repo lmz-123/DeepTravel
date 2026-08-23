@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.domain.content_graph import (
+    normalize_experience_tags,
     normalize_reconstruction_items,
     reconstruction_ids,
     shuffled_reconstruction_items,
@@ -764,6 +765,9 @@ class FragmentTourService:
             "safe_preview": fragment.safe_preview,
             "interaction_type": fragment.interaction_type,
             "review_state": fragment.review_state,
+            "experience_tags": normalize_experience_tags(
+                fragment.experience_tags_json or []
+            ),
             "trigger_region": {
                 "latitude": region.latitude,
                 "longitude": region.longitude,

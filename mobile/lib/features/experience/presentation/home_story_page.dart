@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import 'experience_providers.dart';
 import 'home_story_controller.dart';
+import 'discovery_controller.dart';
 
 class HomeStoryPage extends ConsumerStatefulWidget {
   const HomeStoryPage({super.key});
@@ -19,7 +19,7 @@ class _HomeStoryPageState extends ConsumerState<HomeStoryPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final city = ref.read(activeCityProvider);
+      final city = ref.read(discoveryControllerProvider).asData?.value.city;
       final current = ref.read(homeStoryPlaybackControllerProvider);
       if (current.story == null || current.citySlug != city?.slug) {
         ref
@@ -50,9 +50,15 @@ class _HomeStoryPageState extends ConsumerState<HomeStoryPage> {
           ),
         HomeStoryPhase.empty || HomeStoryPhase.error => _StoryFailure(
             message: state.message ?? '故事暂时没有加载出来。',
-            onRetry: () => ref
-                .read(homeStoryPlaybackControllerProvider.notifier)
-                .load(citySlug: ref.read(activeCityProvider)?.slug),
+            onRetry: () =>
+                ref.read(homeStoryPlaybackControllerProvider.notifier).load(
+                      citySlug: ref
+                          .read(discoveryControllerProvider)
+                          .asData
+                          ?.value
+                          .city
+                          ?.slug,
+                    ),
           ),
         _ when state.story != null => _StoryBody(state: state),
         _ => const SizedBox.shrink(),

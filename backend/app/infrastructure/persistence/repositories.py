@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.domain.content_graph import normalize_experience_tags
 from app.domain.models import (
     Challenge,
     City,
@@ -65,6 +66,9 @@ def _stop_to_domain(model: StopModel, resolve_media=lambda value: value) -> Stop
         image=resolve_media(model.image),
         insight=model.insight,
         challenge=_challenge_to_domain(model.challenge),
+        experience_tags=tuple(
+            normalize_experience_tags(model.experience_tags_json or ())
+        ),
     )
 
 

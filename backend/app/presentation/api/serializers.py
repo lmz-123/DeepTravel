@@ -61,6 +61,7 @@ def stop_to_dict(stop: Stop) -> dict:
         "audio_url": asset_url(stop.audio_url),
         "image": asset_url(stop.image),
         "insight": stop.insight,
+        "experience_tags": list(stop.experience_tags),
         "challenge": {
             "id": stop.challenge.id,
             "prompt": stop.challenge.prompt,

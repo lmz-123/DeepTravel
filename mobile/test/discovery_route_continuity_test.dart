@@ -5,14 +5,53 @@ import 'package:go_router/go_router.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
+import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 
 void main() {
+  testWidgets(
+      'scenic card keeps the first point, backend tag, and no fake distance',
+      (tester) async {
+    await _pumpDiscovery(tester, journeyItem: null, context: null);
+
+    expect(
+        find.byKey(const ValueKey('scenic-card-fragment-a')), findsOneWidget);
+    expect(find.text('第一条线索'), findsOneWidget);
+    expect(find.text('安静'), findsOneWidget);
+    expect(find.textContaining('距你'), findsNothing);
+    final indicator = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('scenic-indicator-0')),
+    );
+    expect(indicator.constraints?.maxWidth, 24);
+  });
+
+  testWidgets(
+      'purpose explanation appears before permission request and decline is usable',
+      (tester) async {
+    final controller = _PurposeDiscoveryController();
+    await _pumpDiscovery(
+      tester,
+      journeyItem: null,
+      context: null,
+      discoveryController: controller,
+    );
+
+    expect(find.text('看看离你最近的见地'), findsOneWidget);
+    expect(find.textContaining('不会持续追踪'), findsOneWidget);
+    await tester.tap(find.text('手动选择城市'));
+    await tester.pumpAndSettle();
+
+    expect(controller.declined, isTrue);
+    expect(find.byTooltip('选择城市'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('scenic-card-fragment-a')), findsOneWidget);
+  });
+
   testWidgets('first visit still enters the headphone invitation',
       (tester) async {
     await _pumpDiscovery(tester, journeyItem: null, context: null);
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
     await tester.pumpAndSettle();
     expect(find.text('headphone-gate'), findsOneWidget);
   });
@@ -25,7 +64,7 @@ void main() {
       journeyItem: _item(ownerContext),
       context: ownerContext,
     );
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
     await tester.pumpAndSettle();
     expect(find.text('journey-target'), findsOneWidget);
   });
@@ -40,7 +79,7 @@ void main() {
       context: ownerContext,
       activeController: controller,
     );
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
     await tester.pumpAndSettle();
     expect(find.text('journey-target'), findsOneWidget);
     expect(controller.revisitedJourneyId, 'journey-a');
@@ -54,7 +93,7 @@ void main() {
       journeyItem: _item(ownerContext),
       context: ownerContext,
     );
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
     await tester.pumpAndSettle();
     expect(find.text('legacy-footprint'), findsOneWidget);
   });
@@ -96,6 +135,7 @@ Future<void> _pumpDiscovery(
   required JourneyLibraryItem? journeyItem,
   required JourneyContext? context,
   _RecordingRevisitController? activeController,
+  DiscoveryController? discoveryController,
 }) async {
   final router = GoRouter(routes: [
     GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
@@ -116,8 +156,9 @@ Future<void> _pumpDiscovery(
   await tester.pumpWidget(ProviderScope(
     overrides: [
       currentUserIdProvider.overrideWithValue('user-a'),
-      citiesProvider.overrideWith((ref) async => const [_city]),
-      cityRoutesProvider.overrideWith((ref) async => const [_route]),
+      discoveryControllerProvider.overrideWith(
+        () => discoveryController ?? _FixedDiscoveryController(),
+      ),
       archivedActiveJourneysProvider.overrideWith((ref) async => const []),
       routeJourneyIndexProvider.overrideWith(
         (ref) async => journeyItem == null
@@ -147,6 +188,35 @@ class _RecordingRevisitController extends ActiveTourController {
   Future<void> startRevisit(JourneyContext context) async {
     revisitedJourneyId = context.journey.id;
   }
+}
+
+class _FixedDiscoveryController extends DiscoveryController {
+  @override
+  Future<DiscoveryState> build() async => const DiscoveryState(
+        cities: [_city],
+        city: _city,
+        catalog: CityDiscoveryCatalog(
+          routes: [_route],
+          scenicSpots: [_spot],
+        ),
+        cards: [ScenicSpotCard(spot: _spot, route: _route)],
+        revision: 0,
+      );
+
+  @override
+  Future<DiscoveryStartupAction> prepareColdStart() async =>
+      DiscoveryStartupAction.completed;
+}
+
+class _PurposeDiscoveryController extends _FixedDiscoveryController {
+  bool declined = false;
+
+  @override
+  Future<DiscoveryStartupAction> prepareColdStart() async =>
+      DiscoveryStartupAction.needsPurposeExplanation;
+
+  @override
+  void declineColdStart() => declined = true;
 }
 
 const _city = CityExperience(
@@ -182,6 +252,15 @@ const _fragment = StoryFragment(
   ),
   title: '第一条线索',
   state: 'collected',
+);
+
+const _spot = ScenicSpot(
+  id: 'fragment-a',
+  title: '第一条线索',
+  latitude: 22.5,
+  longitude: 114,
+  experienceTags: ['安静'],
+  routeId: 'route-a',
 );
 
 const _route = RouteExperience(

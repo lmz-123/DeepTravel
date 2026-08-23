@@ -19,9 +19,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('梧桐树下的城市切片'), findsOneWidget);
-    await tester.ensureVisible(find.text('梧桐树下的城市切片'));
-    await tester.tap(find.text('梧桐树下的城市切片'));
+    final firstSpot = find.byKey(
+      const ValueKey('scenic-card-8fa6c9b1-5e3a-40df-b5c8-100000000001'),
+    );
+    expect(firstSpot, findsOneWidget);
+    await tester.ensureVisible(firstSpot);
+    await tester.tap(firstSpot);
     await tester.pumpAndSettle();
 
     expect(find.text('开始这段探索'), findsOneWidget);
@@ -77,8 +80,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('梧桐树下的城市切片'));
-    await tester.tap(find.text('梧桐树下的城市切片'));
+    final firstSpot = find.byKey(
+      const ValueKey('scenic-card-8fa6c9b1-5e3a-40df-b5c8-100000000001'),
+    );
+    await tester.ensureVisible(firstSpot);
+    await tester.tap(firstSpot);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开始这段探索'));
     await tester.pumpAndSettle();
@@ -102,8 +108,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('梧桐树下的城市切片'));
-    await tester.tap(find.text('梧桐树下的城市切片'));
+    final firstSpot = find.byKey(
+      const ValueKey('scenic-card-8fa6c9b1-5e3a-40df-b5c8-100000000001'),
+    );
+    await tester.ensureVisible(firstSpot);
+    await tester.tap(firstSpot);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开始这段探索'));
     await tester.pumpAndSettle();
@@ -113,7 +122,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('深圳'), findsOneWidget);
-    expect(find.byKey(const ValueKey('route-carousel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scenic-carousel')), findsOneWidget);
   });
 
   testWidgets('defaults to configured Shenzhen and reloads after city change',
@@ -165,7 +174,7 @@ void main() {
     expect(repository.requestedCity, 'city-19');
   });
 
-  testWidgets('swipes between every route returned by the backend',
+  testWidgets('swipes between every scenic spot returned by the backend',
       (tester) async {
     appRouter.go('/');
     final repository = _TwoRouteRepository();
@@ -177,27 +186,30 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('route-card-old-harbor')), findsOneWidget);
-    expect(find.byKey(const ValueKey('route-card-mountain-coast')),
+    expect(find.byKey(const ValueKey('scenic-card-old-harbor-spot')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('scenic-card-mountain-coast-spot')),
         findsOneWidget);
 
     await tester.fling(
-      find.byKey(const ValueKey('route-carousel')),
+      find.byKey(const ValueKey('scenic-carousel')),
       const Offset(-700, 0),
       1200,
     );
     await tester.pumpAndSettle();
 
     final firstIndicator = tester.widget<AnimatedContainer>(
-      find.byKey(const ValueKey('route-indicator-0')),
+      find.byKey(const ValueKey('scenic-indicator-0')),
     );
     final secondIndicator = tester.widget<AnimatedContainer>(
-      find.byKey(const ValueKey('route-indicator-1')),
+      find.byKey(const ValueKey('scenic-indicator-1')),
     );
     expect(firstIndicator.constraints?.maxWidth, 7);
     expect(secondIndicator.constraints?.maxWidth, 24);
 
-    await tester.tap(find.text('山海之间的故事'));
+    await tester.tap(
+      find.byKey(const ValueKey('scenic-card-mountain-coast-spot')),
+    );
     await tester.pumpAndSettle();
 
     expect(repository.requestedRouteSlug, 'mountain-coast');
@@ -218,7 +230,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('这座城市还没有开放路线'), findsOneWidget);
+    expect(find.text('这座城市还没有开放景点'), findsOneWidget);
     expect(find.text('南头古城的时间叠层'), findsNothing);
     expect(find.text('被打开的海湾'), findsNothing);
   });
@@ -273,9 +285,9 @@ class _RecordingRepository extends DemoExperienceRepository {
   String? requestedCity;
 
   @override
-  Future<List<RouteExperience>> routesForCity(String citySlug) {
+  Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) {
     requestedCity = citySlug;
-    return super.routesForCity(citySlug);
+    return super.discoveryForCity(citySlug);
   }
 }
 
@@ -296,8 +308,11 @@ class _TwoRouteRepository extends DemoExperienceRepository {
       ];
 
   @override
-  Future<List<RouteExperience>> routesForCity(String citySlug) async =>
-      const [_oldHarborRoute, _mountainCoastRoute];
+  Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async =>
+      const CityDiscoveryCatalog(
+        routes: [_oldHarborRoute, _mountainCoastRoute],
+        scenicSpots: [_oldHarborSpot, _mountainCoastSpot],
+      );
 
   @override
   Future<RouteExperience> routeBySlug(String slug) async {
@@ -326,16 +341,16 @@ class _ManyCityRepository extends DemoExperienceRepository {
       );
 
   @override
-  Future<List<RouteExperience>> routesForCity(String citySlug) async {
+  Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async {
     requestedCity = citySlug;
-    return const [];
+    return const CityDiscoveryCatalog(routes: [], scenicSpots: []);
   }
 }
 
 class _EmptyCatalogRepository extends _TwoRouteRepository {
   @override
-  Future<List<RouteExperience>> routesForCity(String citySlug) async =>
-      const [];
+  Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async =>
+      const CityDiscoveryCatalog(routes: [], scenicSpots: []);
 }
 
 class _ArchivedResumeRepository extends DemoExperienceRepository {
@@ -370,6 +385,15 @@ const _oldHarborRoute = RouteExperience(
   stops: [],
 );
 
+const _oldHarborSpot = ScenicSpot(
+  id: 'old-harbor-spot',
+  title: '旧港码头',
+  latitude: 22.5,
+  longitude: 114,
+  experienceTags: ['城市历史'],
+  routeId: 'route-old-harbor',
+);
+
 const _mountainCoastRoute = RouteExperience(
   id: 'route-mountain-coast',
   slug: 'mountain-coast',
@@ -381,9 +405,18 @@ const _mountainCoastRoute = RouteExperience(
   difficulty: '轻松',
   theme: '海岸变迁',
   heroImage: '',
-  contentStatus: 'in_review',
+  contentStatus: 'published',
   stopCount: 5,
   stops: [],
+);
+
+const _mountainCoastSpot = ScenicSpot(
+  id: 'mountain-coast-spot',
+  title: '山海栈道',
+  latitude: 22.6,
+  longitude: 114.1,
+  experienceTags: ['海边或自然景观'],
+  routeId: 'route-mountain-coast',
 );
 
 const _archivedQuizRoute = RouteExperience(

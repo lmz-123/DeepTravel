@@ -1,6 +1,13 @@
 import json
 
-from app.infrastructure.persistence.models import JourneyModel, RouteModel, UserModel
+from app.infrastructure.persistence.models import (
+    JourneyModel,
+    RouteModel,
+    StopModel,
+    StoryArcModel,
+    StoryFragmentModel,
+    UserModel,
+)
 from app.infrastructure.persistence.seed import seed_database
 
 
@@ -48,6 +55,96 @@ def test_shenzhen_featured_route_and_media(client):
     media = client.get("/api/v1/assets/images/route_shenzhen.png")
     assert media.status_code == 200
     assert media.content_type == "image/png"
+
+
+def test_city_discovery_projects_scenic_points_without_route_ranking_fields(app, client):
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        route = session.query(RouteModel).filter_by(slug="nantou-time-layers").one()
+        arc = session.query(StoryArcModel).filter_by(route_id=route.id).one()
+        fragment = (
+            session.query(StoryFragmentModel)
+            .filter_by(arc_id=arc.id)
+            .order_by(StoryFragmentModel.position)
+            .first()
+        )
+        fragment.experience_tags_json = [" 安静 ", "未来新标签", "安静"]
+        session.commit()
+
+    response = client.get("/api/v1/cities/shenzhen/routes")
+    assert response.status_code == 200
+    payload = response.get_json()["data"]
+    spots = payload["scenic_spots"]
+    assert spots
+    assert len({spot["id"] for spot in spots}) == len(spots)
+    first = next(spot for spot in spots if spot["id"] == fragment.id)
+    assert first["route_id"] == route.id
+    assert first["experience_tags"] == ["安静", "未来新标签"]
+    assert {"latitude", "longitude", "title"} <= first.keys()
+    assert all(
+        "discovery_order" not in route_payload
+        and "experience_tags" not in route_payload
+        and "recognition_radius_m" not in route_payload
+        for route_payload in payload["routes"]
+    )
+
+
+def test_legacy_city_discovery_uses_stops_and_excludes_unpublished_routes(app, client):
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        city_id = session.query(RouteModel).filter_by(slug="wukang-urban-slices").one().city_id
+        session.add(
+            RouteModel(
+                id="draft-discovery-route",
+                city_id=city_id,
+                slug="draft-discovery-route",
+                title="草稿路线",
+                subtitle="不可公开",
+                description="不可公开",
+                duration_minutes=10,
+                distance_km=1,
+                difficulty="轻松",
+                theme="测试",
+                hero_image="images/route_wukang.png",
+                is_featured=False,
+                content_status="draft",
+                published_at=None,
+            )
+        )
+        session.add(
+            StopModel(
+                id="draft-discovery-stop",
+                route_id="draft-discovery-route",
+                position=1,
+                title="草稿景点",
+                kicker="不可公开",
+                address="测试",
+                latitude=31.2,
+                longitude=121.4,
+                arrival_radius_m=80,
+                story_title="草稿",
+                story_body="草稿",
+                audio_url=None,
+                image="images/stop_lane.png",
+                insight="草稿",
+                experience_tags_json=["不应出现"],
+            )
+        )
+        session.commit()
+
+    response = client.get("/api/v1/cities/shanghai/routes")
+    assert response.status_code == 200
+    payload = response.get_json()["data"]
+    published_route_ids = {route["id"] for route in payload["routes"]}
+    assert payload["scenic_spots"]
+    assert {spot["route_id"] for spot in payload["scenic_spots"]} <= published_route_ids
+    assert len({spot["id"] for spot in payload["scenic_spots"]}) == len(
+        payload["scenic_spots"]
+    )
+    assert "draft-discovery-route" not in published_route_ids
+    assert "draft-discovery-stop" not in {
+        spot["id"] for spot in payload["scenic_spots"]
+    }
 
 
 def test_unknown_city_has_structured_error(client):

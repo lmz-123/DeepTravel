@@ -120,6 +120,7 @@ class StopModel(Base):
     audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     image: Mapped[str] = mapped_column(String(255))
     insight: Mapped[str] = mapped_column(Text)
+    experience_tags_json: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     route: Mapped[RouteModel] = relationship(back_populates="stops")
     challenge: Mapped[ChallengeModel] = relationship(
@@ -364,6 +365,9 @@ class StoryFragmentModel(Base):
     raises_question: Mapped[str] = mapped_column(Text)
     authenticity_label: Mapped[str] = mapped_column(String(80), default="interpretive")
     review_state: Mapped[str] = mapped_column(String(40), default="in_review")
+    experience_tags_json: Mapped[list[str] | None] = mapped_column(
+        JSON, default=list, nullable=True
+    )
 
     arc: Mapped[StoryArcModel] = relationship(back_populates="fragments")
     trigger_region: Mapped[TriggerRegionModel] = relationship(

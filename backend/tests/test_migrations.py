@@ -76,7 +76,7 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0011"
+    assert version == "20260823_0012"
 
 
 def test_narration_voice_migration_backfills_once_and_round_trips(tmp_path):
@@ -337,7 +337,39 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert version == "20260823_0011"
+        assert version == "20260823_0012"
+
+
+def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
+    database_path = tmp_path / "scenic-point-tags.db"
+    engine = create_engine(f"sqlite:///{database_path}")
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database_path}")
+
+    command.upgrade(config, "20260823_0011")
+    command.upgrade(config, "head")
+
+    inspector = inspect(engine)
+    assert "experience_tags_json" in {
+        column["name"] for column in inspector.get_columns("stops")
+    }
+    assert "experience_tags_json" in {
+        column["name"] for column in inspector.get_columns("story_fragments")
+    }
+
+    command.downgrade(config, "20260823_0011")
+    inspector = inspect(engine)
+    assert "experience_tags_json" not in {
+        column["name"] for column in inspector.get_columns("stops")
+    }
+    assert "experience_tags_json" not in {
+        column["name"] for column in inspector.get_columns("story_fragments")
+    }
+
+    command.upgrade(config, "head")
+    with engine.begin() as connection:
+        version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+    assert version == "20260823_0012"
 
 
 def test_node_community_migration_round_trips_without_touching_existing_data(tmp_path):

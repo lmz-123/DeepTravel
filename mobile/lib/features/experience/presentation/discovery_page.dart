@@ -6,19 +6,73 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/fade_slide_in.dart';
+import '../domain/discovery_location.dart';
 import '../domain/models.dart';
 import 'active_tour_controller.dart';
+import 'discovery_controller.dart';
 import 'experience_providers.dart';
 import 'traveler_shell.dart';
 import 'widgets/rotating_tour_orb.dart';
 
-class DiscoveryPage extends ConsumerWidget {
+class DiscoveryPage extends ConsumerStatefulWidget {
   const DiscoveryPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cities = ref.watch(citiesProvider);
-    final routes = ref.watch(cityRoutesProvider);
+  ConsumerState<DiscoveryPage> createState() => _DiscoveryPageState();
+}
+
+class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
+  var _coldStartPrepared = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_coldStartPrepared) return;
+    _coldStartPrepared = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prepareColdStart());
+  }
+
+  Future<void> _prepareColdStart() async {
+    final controller = ref.read(discoveryControllerProvider.notifier);
+    DiscoveryStartupAction action;
+    try {
+      action = await controller.prepareColdStart();
+    } catch (_) {
+      return;
+    }
+    if (!mounted || action != DiscoveryStartupAction.needsPurposeExplanation) {
+      return;
+    }
+    final locate = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('看看离你最近的见地'),
+        content: const Text(
+          '见地会使用一次当前位置来识别首次展示的城市，并按距离排列附近景点。刷新或切换城市时会再次获取一次位置，不会持续追踪或保存你的行程轨迹。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('手动选择城市'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('允许定位'),
+          ),
+        ],
+      ),
+    );
+    if (locate == true) {
+      await controller.continueColdStart();
+    } else {
+      controller.declineColdStart();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final discovery = ref.watch(discoveryControllerProvider);
     final archivedJourneys = ref.watch(archivedActiveJourneysProvider);
     return Scaffold(
       body: Stack(
@@ -27,18 +81,22 @@ class DiscoveryPage extends ConsumerWidget {
             bottom: false,
             child: RefreshIndicator(
               onRefresh: () async {
-                ref.invalidate(citiesProvider);
-                ref.invalidate(cityRoutesProvider);
                 ref.invalidate(archivedActiveJourneysProvider);
-                await ref.read(citiesProvider.future);
-                await ref.read(cityRoutesProvider.future);
+                await ref
+                    .read(discoveryControllerProvider.notifier)
+                    .refreshDiscovery();
               },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                    sliver: SliverToBoxAdapter(child: _Header()),
+                    sliver: SliverToBoxAdapter(
+                      child: discovery.maybeWhen(
+                        data: (state) => _Header(state: state),
+                        orElse: () => const _HeaderPlaceholder(),
+                      ),
+                    ),
                   ),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 34, 20, 24),
@@ -65,7 +123,7 @@ class DiscoveryPage extends ConsumerWidget {
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 0),
                     sliver: SliverToBoxAdapter(
-                      child: cities.when(
+                      child: discovery.when(
                         loading: () => const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 20),
                           child: _RouteSkeleton(),
@@ -73,11 +131,13 @@ class DiscoveryPage extends ConsumerWidget {
                         error: (error, _) => Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _ErrorCard(
-                            onRetry: () => ref.invalidate(citiesProvider),
+                            onRetry: () => ref.invalidate(
+                              discoveryControllerProvider,
+                            ),
                           ),
                         ),
-                        data: (availableCities) {
-                          if (availableCities.isEmpty) {
+                        data: (state) {
+                          if (state.cities.isEmpty) {
                             return const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 20),
                               child: _EmptyCatalog(
@@ -86,29 +146,30 @@ class DiscoveryPage extends ConsumerWidget {
                               ),
                             );
                           }
-                          return routes.when(
-                            loading: () => const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 20),
-                              child: _RouteSkeleton(),
-                            ),
-                            error: (error, _) => Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 20),
-                              child: _ErrorCard(
-                                onRetry: () =>
-                                    ref.invalidate(cityRoutesProvider),
+                          if (state.cards.isEmpty) {
+                            return Column(
+                              children: [
+                                _LocationStatus(state: state),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 20),
+                                  child: _EmptyCatalog(
+                                    title: '这座城市还没有开放景点',
+                                    message: '可以先切换城市，或稍后再来看看。',
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          return Column(
+                            children: [
+                              _LocationStatus(state: state),
+                              _ScenicCarousel(
+                                key: ValueKey(
+                                  '${state.city?.slug}-${state.revision}',
+                                ),
+                                cards: state.cards,
                               ),
-                            ),
-                            data: (items) => items.isEmpty
-                                ? const Padding(
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 20),
-                                    child: _EmptyCatalog(
-                                      title: '这座城市还没有开放路线',
-                                      message: '可以先切换城市，或稍后再来看看。',
-                                    ),
-                                  )
-                                : _RouteCarousel(routes: items),
+                            ],
                           );
                         },
                       ),
@@ -176,13 +237,29 @@ class _ArchivedJourneyCard extends ConsumerWidget {
   }
 }
 
+class _HeaderPlaceholder extends StatelessWidget {
+  const _HeaderPlaceholder();
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          BrandMark(onPressed: () => TravelerShellScope.showDrawer(context)),
+          const Spacer(),
+          const SizedBox(width: 96, height: 36),
+        ],
+      );
+}
+
 class _Header extends ConsumerWidget {
+  const _Header({required this.state});
+
+  final DiscoveryState state;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cities = ref.watch(citiesProvider);
-    final selectedCity = ref.watch(activeCityProvider);
+    final selectedCity = state.city;
     final selectedSlug = selectedCity?.slug;
-    final availableCities = cities.value ?? const <CityExperience>[];
+    final availableCities = state.cities;
 
     return Row(
       children: [
@@ -210,9 +287,8 @@ class _Header extends ConsumerWidget {
                             selectedSlug: selectedSlug,
                             onSelected: (slug) {
                               ref
-                                  .read(selectedCityProvider.notifier)
-                                  .select(slug);
-                              ref.invalidate(cityRoutesProvider);
+                                  .read(discoveryControllerProvider.notifier)
+                                  .switchCity(slug);
                             },
                           ),
                         ),
@@ -449,16 +525,63 @@ class _CitySelectionSheetState extends State<_CitySelectionSheet> {
 String _normalizeCitySearch(String value) =>
     value.toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
-class _RouteCarousel extends ConsumerStatefulWidget {
-  const _RouteCarousel({required this.routes});
+class _LocationStatus extends StatelessWidget {
+  const _LocationStatus({required this.state});
 
-  final List<RouteExperience> routes;
+  final DiscoveryState state;
 
   @override
-  ConsumerState<_RouteCarousel> createState() => _RouteCarouselState();
+  Widget build(BuildContext context) {
+    final message = state.isLocating
+        ? '正在获取当前位置，景点顺序稍后更新…'
+        : _failureMessage(state.locationFailure);
+    if (message == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Row(
+        children: [
+          Icon(
+            state.isLocating
+                ? Icons.my_location_rounded
+                : Icons.location_off_outlined,
+            size: 16,
+            color: AppColors.moss,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _failureMessage(DiscoveryLocationFailureReason? reason) =>
+      switch (reason) {
+        null => null,
+        DiscoveryLocationFailureReason.denied ||
+        DiscoveryLocationFailureReason.deniedForever =>
+          '未获得定位权限，当前按后台推荐顺序展示。',
+        DiscoveryLocationFailureReason.serviceDisabled =>
+          '系统定位已关闭，当前按后台推荐顺序展示。',
+        DiscoveryLocationFailureReason.inaccurate =>
+          '当前位置精度不足 25 米，当前按后台推荐顺序展示。',
+        DiscoveryLocationFailureReason.timeout ||
+        DiscoveryLocationFailureReason.unavailable =>
+          '暂时无法获得当前位置，当前按后台推荐顺序展示。',
+      };
 }
 
-class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
+class _ScenicCarousel extends ConsumerStatefulWidget {
+  const _ScenicCarousel({super.key, required this.cards});
+
+  final List<ScenicSpotCard> cards;
+
+  @override
+  ConsumerState<_ScenicCarousel> createState() => _ScenicCarouselState();
+}
+
+class _ScenicCarouselState extends ConsumerState<_ScenicCarousel> {
   late final PageController _controller;
   var _selectedIndex = 0;
 
@@ -484,10 +607,10 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
           SizedBox(
             height: 505,
             child: PageView.builder(
-              key: const ValueKey('route-carousel'),
+              key: const ValueKey('scenic-carousel'),
               controller: _controller,
               physics: const BouncingScrollPhysics(),
-              itemCount: widget.routes.length,
+              itemCount: widget.cards.length,
               onPageChanged: (index) => setState(() => _selectedIndex = index),
               itemBuilder: (context, index) => AnimatedBuilder(
                 animation: _controller,
@@ -512,8 +635,8 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: _RouteCard(
-                    route: widget.routes[index],
+                  child: _ScenicCard(
+                    card: widget.cards[index],
                     onTap: () {
                       if (_selectedIndex != index) {
                         _controller.animateToPage(
@@ -524,8 +647,8 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
                         return;
                       }
                       _openRoute(
-                        widget.routes[index],
-                        journeyIndex[widget.routes[index].id],
+                        widget.cards[index].route,
+                        journeyIndex[widget.cards[index].route.id],
                       );
                     },
                   ),
@@ -535,13 +658,13 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
           ),
           const SizedBox(height: 14),
           Semantics(
-            label: '第 ${_selectedIndex + 1} 条，共 ${widget.routes.length} 条路线',
+            label: '第 ${_selectedIndex + 1} 个，共 ${widget.cards.length} 个景点',
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(widget.routes.length, (index) {
+              children: List.generate(widget.cards.length, (index) {
                 final selected = index == _selectedIndex;
                 return AnimatedContainer(
-                  key: ValueKey('route-indicator-$index'),
+                  key: ValueKey('scenic-indicator-$index'),
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
                   width: selected ? 24 : 7,
@@ -596,18 +719,21 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   }
 }
 
-class _RouteCard extends StatelessWidget {
-  const _RouteCard({required this.route, required this.onTap});
-  final RouteExperience route;
+class _ScenicCard extends StatelessWidget {
+  const _ScenicCard({required this.card, required this.onTap});
+
+  final ScenicSpotCard card;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final spot = card.spot;
+    final route = card.route;
     return Semantics(
       button: true,
-      label: '查看路线 ${route.title}',
+      label: '查看景点 ${spot.title}',
       child: Card(
-        key: ValueKey('route-card-${route.slug}'),
+        key: ValueKey('scenic-card-${spot.id}'),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -617,7 +743,7 @@ class _RouteCard extends StatelessWidget {
               EditorialImage(
                 source: route.heroImage,
                 height: 276,
-                heroTag: 'route-${route.slug}',
+                heroTag: 'scenic-${spot.id}',
                 child: Padding(
                   padding: const EdgeInsets.all(22),
                   child: Column(
@@ -626,13 +752,15 @@ class _RouteCard extends StatelessWidget {
                       Row(
                         children: [
                           _GlassPill(
-                            label: route.isFeatured ? '本周精选' : '城市路线',
+                            label: card.distanceMeters == null
+                                ? '城市景点'
+                                : _formatDistance(card.distanceMeters!),
                           ),
                         ],
                       ),
                       const Spacer(),
                       Text(
-                        route.theme,
+                        route.title,
                         style:
                             Theme.of(context).textTheme.labelMedium?.copyWith(
                                   color: AppColors.gold,
@@ -640,7 +768,7 @@ class _RouteCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        route.title,
+                        spot.title,
                         style: Theme.of(context)
                             .textTheme
                             .headlineMedium
@@ -657,22 +785,40 @@ class _RouteCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(route.subtitle,
-                        style: Theme.of(context).textTheme.bodyLarge),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        _Metric(
-                            icon: Icons.schedule_rounded,
-                            text: '${route.durationMinutes} 分钟'),
-                        _Metric(
-                            icon: Icons.route_rounded,
-                            text: '${route.distanceKm} km'),
-                        _Metric(
-                            icon: Icons.flag_outlined,
-                            text: '${route.numberOfStops} 站'),
-                      ],
+                    Text(
+                      route.subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge,
                     ),
+                    if (spot.experienceTags.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: spot.experienceTags
+                              .map(
+                                (tag) => Container(
+                                  margin: const EdgeInsets.only(right: 7),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.paperDeep,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style:
+                                        Theme.of(context).textTheme.labelMedium,
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     Row(
                       children: [
@@ -698,6 +844,12 @@ class _RouteCard extends StatelessWidget {
   }
 }
 
+String _formatDistance(double meters) {
+  if (meters < 1000) return '距你 ${meters.round()} 米';
+  final kilometers = meters / 1000;
+  return '距你 ${kilometers < 10 ? kilometers.toStringAsFixed(1) : kilometers.round()} 公里';
+}
+
 class _GlassPill extends StatelessWidget {
   const _GlassPill({required this.label});
   final String label;
@@ -717,27 +869,6 @@ class _GlassPill extends StatelessWidget {
             .textTheme
             .labelMedium
             ?.copyWith(color: AppColors.white),
-      ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  const _Metric({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Row(
-        children: [
-          Icon(icon, size: 17, color: AppColors.moss),
-          const SizedBox(width: 6),
-          Flexible(
-              child:
-                  Text(text, style: Theme.of(context).textTheme.labelMedium)),
-        ],
       ),
     );
   }

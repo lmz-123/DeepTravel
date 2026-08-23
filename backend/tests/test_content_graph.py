@@ -4,6 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from app.domain.content_graph import (
+    normalize_experience_tags,
     normalize_reconstruction_items,
     shuffled_reconstruction_items,
     validate_content_graph,
@@ -92,6 +93,28 @@ def _graph() -> dict:
         "fragments": fragments,
         "required_photo_mission_count": 0,
     }
+
+
+def test_experience_tags_are_normalized_without_a_semantic_allowlist():
+    assert normalize_experience_tags(
+        [" 安静 ", "", "安静", "海边或自然景观", "未来标签"]
+    ) == ["安静", "海边或自然景观", "未来标签"]
+
+
+def test_content_graph_normalizes_point_tags_and_reports_precise_errors():
+    graph = _graph()
+    graph["fragments"][0]["experience_tags"] = [" 安静 ", "安静", "未来标签"]
+    graph["fragments"][0]["stop"] = {"experience_tags": [" 老建筑 "]}
+    result = validate_content_graph(graph, media_assets=_media())
+    assert result["valid"] is True
+    assert graph["fragments"][0]["experience_tags"] == ["安静", "未来标签"]
+    assert graph["fragments"][0]["stop"]["experience_tags"] == ["老建筑"]
+
+    invalid = _graph()
+    invalid["fragments"][0]["experience_tags"] = ["过长" * 13]
+    result = validate_content_graph(invalid, media_assets=_media())
+    assert result["valid"] is False
+    assert result["errors"][0]["path"] == "fragments[0].experience_tags"
 
 
 def _media() -> dict[str, str]:

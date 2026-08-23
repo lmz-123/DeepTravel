@@ -17,6 +17,7 @@
 - `city`、`route`、`story_arc`：稳定 ID，不复用其他路线的标识。
 - `story_arc.causal_model`：每项是唯一 `{id, text}`，数量与碎片相同，顺序就是最终正确因果链。
 - `fragments`：位置从 1 连续递增，依赖只能指向前序碎片；旁白与 transcript 必须完全一致。
+- `experience_tags`：只配置在 legacy stop 或 managed fragment 上；会按填写顺序去空白、去重，最多 8 个且每个最多 24 个字。示例标签不是枚举，新增标签不需要修改客户端；不要给路线增加标签或发现页排序字段。
 - `trigger_region`：运行坐标只存 WGS-84，`exit_radius_m` 大于进入半径，并保留原坐标系、来源和现场备注。
 - `claims` 与 `sources`：每条碎片至少关联一个有来源支持的史实主张。
 - `photo_mission`：照片只作为可稍后补拍的私密留念，不得作为线索收集或下一节点的 gate。必须填写 `field_subject`、`vantage_point`（安全站位/经典机位）、`shooting_direction`（拍摄朝向）、`composition_tip`（构图建议）、安全提醒和无障碍/延期替代方案，并设置 `required: false`。

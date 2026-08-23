@@ -15,12 +15,13 @@ cd mobile
 flutter pub get
 flutter run --dart-define=APP_MODE=api \
   --dart-define=API_BASE_URL=http://127.0.0.1:5001/api/v1 \
-  --dart-define=DEFAULT_CITY_SLUG=shenzhen \
   --dart-define=RUNTIME_LOG_ENDPOINT=http://127.0.0.1:5100/api/runtime/client-logs \
   --dart-define=RUNTIME_LOG_TOKEN=DeepTravelClientLogs2026
 ```
 
-发现页从后端获取城市和该城市的全部已发布路线，路线卡片可左右滑动选择。开始碎片导览后，客户端仅在用户设置为真实定位时请求定位权限，且需在 15 秒内出现两次合格采样才触发音频；真实/模拟定位只在“设置”中修改，路线与旅程页仅如实展示当前模式。服务器需要设置 `ALLOW_DEMO_ARRIVAL=true` 才能接受模拟到达请求。
+发现页从后端获取可选城市、已发布景点/故事点及其体验标签。首次进入可在用途说明后授权一次定位：客户端用系统返回的城市名匹配后台城市，并只在定位精度不大于 25 米时按景点距离排序；无匹配内容、拒绝授权或定位失败时继续使用深圳与后台推荐顺序，且不显示虚假距离。刷新或手动切城会各获取一次新位置并重排当前城市，手动选择不会被定位覆盖；发现页不保存位置、选择模式或连续轨迹。景点卡片点击后仍进入所属路线，路线内部顺序不变。
+
+开始碎片导览后，定位触发仍沿用独立的旅程运行时：需在 15 秒内出现两次合格采样才触发音频；真实/模拟定位只在“设置”中修改，路线与旅程页仅如实展示当前模式。服务器需要设置 `ALLOW_DEMO_ARRIVAL=true` 才能接受模拟到达请求。
 
 点击首页左上角“见地”可打开旅行者菜单，进入足迹、设置或退出账号。完成过的路线会保留全部已解锁线索与私密照片，再次点击路线直接进入回听；进行中的路线也会绕过首次耳机邀请。音频离开旅程页后继续播放时，发现页右侧显示可自由拖动的旋转唱片圆球，点击即可回到当前进度；开始另一景点的音频会原子停止上一景点。已解锁的绿色节点可随时回听且不改写行走进度。
 
@@ -63,7 +64,6 @@ cd mobile
 flutter run \
   --dart-define=APP_MODE=api \
   --dart-define=API_BASE_URL=http://127.0.0.1:5001/api/v1 \
-  --dart-define=DEFAULT_CITY_SLUG=shenzhen \
   --dart-define=RUNTIME_LOG_ENDPOINT=http://127.0.0.1:5100/api/runtime/client-logs \
   --dart-define=RUNTIME_LOG_TOKEN=DeepTravelClientLogs2026
 ```

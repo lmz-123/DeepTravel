@@ -9,10 +9,6 @@ abstract final class AppConfig {
     'API_BASE_URL',
     defaultValue: 'http://127.0.0.1:5001/api/v1',
   );
-  static const defaultCitySlug = String.fromEnvironment(
-    'DEFAULT_CITY_SLUG',
-    defaultValue: 'shenzhen',
-  );
   static const runtimeLogEndpoint = String.fromEnvironment(
     'RUNTIME_LOG_ENDPOINT',
     defaultValue: 'http://115.29.221.190:5100/api/runtime/client-logs',
