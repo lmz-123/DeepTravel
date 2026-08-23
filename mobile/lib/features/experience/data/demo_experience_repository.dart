@@ -156,21 +156,7 @@ class DemoExperienceRepository implements ExperienceRepository {
   @override
   Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async {
     await _pause();
-    return CityDiscoveryCatalog(
-      routes: const [demoRoute],
-      scenicSpots: demoRoute.stops
-          .map(
-            (stop) => ScenicSpot(
-              id: stop.id,
-              title: stop.title,
-              latitude: stop.latitude,
-              longitude: stop.longitude,
-              experienceTags: const [],
-              routeId: demoRoute.id,
-            ),
-          )
-          .toList(growable: false),
-    );
+    return const CityDiscoveryCatalog(routes: [demoRoute]);
   }
 
   @override

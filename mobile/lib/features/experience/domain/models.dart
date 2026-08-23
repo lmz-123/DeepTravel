@@ -25,53 +25,18 @@ class CityExperience {
       );
 }
 
-class ScenicSpot {
-  const ScenicSpot({
-    required this.id,
-    required this.title,
-    required this.latitude,
-    required this.longitude,
-    required this.experienceTags,
-    required this.routeId,
-  });
-
-  final String id;
-  final String title;
-  final double latitude;
-  final double longitude;
-  final List<String> experienceTags;
-  final String routeId;
-
-  factory ScenicSpot.fromJson(Map<String, dynamic> json) => ScenicSpot(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
-        experienceTags: (json['experience_tags'] as List<dynamic>? ?? const [])
-            .whereType<String>()
-            .toList(growable: false),
-        routeId: json['route_id'] as String,
-      );
-}
-
 class CityDiscoveryCatalog {
-  const CityDiscoveryCatalog({
-    required this.routes,
-    required this.scenicSpots,
-  });
+  const CityDiscoveryCatalog({required this.routes});
 
   final List<RouteExperience> routes;
-  final List<ScenicSpot> scenicSpots;
 }
 
-class ScenicSpotCard {
-  const ScenicSpotCard({
-    required this.spot,
+class ScenicAreaCard {
+  const ScenicAreaCard({
     required this.route,
     this.distanceMeters,
   });
 
-  final ScenicSpot spot;
   final RouteExperience route;
   final double? distanceMeters;
 }
@@ -164,6 +129,8 @@ class RouteExperience {
     this.stopCount,
     this.audioTour,
     this.pretrip,
+    this.centerLatitude,
+    this.centerLongitude,
   });
 
   final String id;
@@ -182,6 +149,8 @@ class RouteExperience {
   final int? stopCount;
   final AudioTourManifest? audioTour;
   final PretripExperience? pretrip;
+  final double? centerLatitude;
+  final double? centerLongitude;
 
   bool get isPublished => contentStatus == 'published';
   int get numberOfStops =>
@@ -202,6 +171,16 @@ class RouteExperience {
         contentStatus: json['content_status'] as String,
         isFeatured: json['is_featured'] as bool? ?? false,
         stopCount: json['stop_count'] as int?,
+        centerLatitude: json['center'] is Map<String, dynamic> &&
+                (json['center'] as Map<String, dynamic>)['latitude'] is num
+            ? ((json['center'] as Map<String, dynamic>)['latitude'] as num)
+                .toDouble()
+            : null,
+        centerLongitude: json['center'] is Map<String, dynamic> &&
+                (json['center'] as Map<String, dynamic>)['longitude'] is num
+            ? ((json['center'] as Map<String, dynamic>)['longitude'] as num)
+                .toDouble()
+            : null,
         stops: (json['stops'] as List<dynamic>? ?? const [])
             .map(
                 (item) => ExperienceStop.fromJson(item as Map<String, dynamic>))

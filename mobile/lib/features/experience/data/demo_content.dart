@@ -13,6 +13,8 @@ const demoRoute = RouteExperience(
   heroImage: '',
   contentStatus: 'demo_unverified',
   isFeatured: true,
+  centerLatitude: 31.205615,
+  centerLongitude: 121.43784,
   stops: [
     ExperienceStop(
       id: '8fa6c9b1-5e3a-40df-b5c8-100000000001',

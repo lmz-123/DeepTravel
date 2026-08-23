@@ -25,7 +25,7 @@ void main() {
       () {
     final plist = File('ios/Runner/Info.plist').readAsStringSync();
     expect(plist, contains('识别首次展示的城市'));
-    expect(plist, contains('排列附近景点'));
+    expect(plist, contains('排列附近景区'));
     expect(plist, contains('不会保存连续位置轨迹'));
   });
 }

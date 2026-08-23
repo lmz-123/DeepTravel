@@ -52,7 +52,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
       builder: (context) => AlertDialog(
         title: const Text('看看离你最近的见地'),
         content: const Text(
-          '见地会使用一次当前位置来识别首次展示的城市，并按距离排列附近景点。刷新或切换城市时会再次获取一次位置，不会持续追踪或保存你的行程轨迹。',
+          '见地会使用一次当前位置来识别首次展示的城市，并按距离排列附近景区。刷新或切换城市时会再次获取一次位置，不会持续追踪或保存你的行程轨迹。',
         ),
         actions: [
           TextButton(
@@ -180,7 +180,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                                 const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 20),
                                   child: _EmptyCatalog(
-                                    title: '这座城市还没有开放景点',
+                                    title: '这座城市还没有开放景区',
                                     message: '可以先切换城市，或稍后再来看看。',
                                   ),
                                 ),
@@ -190,7 +190,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                           return Column(
                             children: [
                               _LocationStatus(state: state),
-                              _ScenicCarousel(
+                              _RouteCarousel(
                                 key: ValueKey(
                                   '${state.city?.slug}-${state.revision}',
                                 ),
@@ -779,7 +779,7 @@ class _LocationStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = state.isLocating
-        ? '正在获取当前位置，景点顺序稍后更新…'
+        ? '正在获取当前位置，景区顺序稍后更新…'
         : _failureMessage(state.locationFailure);
     if (message == null) return const SizedBox.shrink();
     return Padding(
@@ -816,16 +816,16 @@ class _LocationStatus extends StatelessWidget {
       };
 }
 
-class _ScenicCarousel extends ConsumerStatefulWidget {
-  const _ScenicCarousel({super.key, required this.cards});
+class _RouteCarousel extends ConsumerStatefulWidget {
+  const _RouteCarousel({super.key, required this.cards});
 
-  final List<ScenicSpotCard> cards;
+  final List<ScenicAreaCard> cards;
 
   @override
-  ConsumerState<_ScenicCarousel> createState() => _ScenicCarouselState();
+  ConsumerState<_RouteCarousel> createState() => _RouteCarouselState();
 }
 
-class _ScenicCarouselState extends ConsumerState<_ScenicCarousel> {
+class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   late final PageController _controller;
   var _selectedIndex = 0;
 
@@ -851,7 +851,7 @@ class _ScenicCarouselState extends ConsumerState<_ScenicCarousel> {
           SizedBox(
             height: 505,
             child: PageView.builder(
-              key: const ValueKey('scenic-carousel'),
+              key: const ValueKey('route-carousel'),
               controller: _controller,
               physics: const BouncingScrollPhysics(),
               itemCount: widget.cards.length,
@@ -879,7 +879,7 @@ class _ScenicCarouselState extends ConsumerState<_ScenicCarousel> {
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: _ScenicCard(
+                  child: _RouteCard(
                     card: widget.cards[index],
                     onTap: () {
                       if (_selectedIndex != index) {
@@ -902,13 +902,13 @@ class _ScenicCarouselState extends ConsumerState<_ScenicCarousel> {
           ),
           const SizedBox(height: 14),
           Semantics(
-            label: '第 ${_selectedIndex + 1} 个，共 ${widget.cards.length} 个景点',
+            label: '第 ${_selectedIndex + 1} 个，共 ${widget.cards.length} 个景区',
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(widget.cards.length, (index) {
                 final selected = index == _selectedIndex;
                 return AnimatedContainer(
-                  key: ValueKey('scenic-indicator-$index'),
+                  key: ValueKey('route-indicator-$index'),
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
                   width: selected ? 24 : 7,
@@ -963,21 +963,20 @@ class _ScenicCarouselState extends ConsumerState<_ScenicCarousel> {
   }
 }
 
-class _ScenicCard extends ConsumerWidget {
-  const _ScenicCard({required this.card, required this.onTap});
+class _RouteCard extends StatelessWidget {
+  const _RouteCard({required this.card, required this.onTap});
 
-  final ScenicSpotCard card;
+  final ScenicAreaCard card;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final spot = card.spot;
+  Widget build(BuildContext context) {
     final route = card.route;
     return Semantics(
       button: true,
-      label: '查看景点 ${spot.title}',
+      label: '查看景区 ${route.title}',
       child: Card(
-        key: ValueKey('scenic-card-${spot.id}'),
+        key: ValueKey('route-card-${route.slug}'),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -987,7 +986,7 @@ class _ScenicCard extends ConsumerWidget {
               EditorialImage(
                 source: route.heroImage,
                 height: 276,
-                heroTag: 'scenic-${spot.id}',
+                heroTag: 'route-${route.slug}',
                 child: Padding(
                   padding: const EdgeInsets.all(22),
                   child: Column(
@@ -997,20 +996,16 @@ class _ScenicCard extends ConsumerWidget {
                         children: [
                           _GlassPill(
                             label: card.distanceMeters == null
-                                ? '城市景点'
+                                ? route.isFeatured
+                                    ? '本周精选'
+                                    : '城市景区'
                                 : _formatDistance(card.distanceMeters!),
-                          ),
-                          const Spacer(),
-                          FavoriteButton(
-                            kind: 'point',
-                            targetId: spot.id,
-                            color: AppColors.white,
                           ),
                         ],
                       ),
                       const Spacer(),
                       Text(
-                        route.title,
+                        route.theme,
                         style:
                             Theme.of(context).textTheme.labelMedium?.copyWith(
                                   color: AppColors.gold,
@@ -1018,13 +1013,11 @@ class _ScenicCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        spot.title,
+                        route.title,
                         style: Theme.of(context)
                             .textTheme
                             .headlineMedium
-                            ?.copyWith(
-                              color: AppColors.white,
-                            ),
+                            ?.copyWith(color: AppColors.white),
                       ),
                     ],
                   ),
@@ -1041,34 +1034,23 @@ class _ScenicCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
-                    if (spot.experienceTags.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: spot.experienceTags
-                              .map(
-                                (tag) => Container(
-                                  margin: const EdgeInsets.only(right: 7),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.paperDeep,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style:
-                                        Theme.of(context).textTheme.labelMedium,
-                                  ),
-                                ),
-                              )
-                              .toList(growable: false),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        _Metric(
+                          icon: Icons.schedule_rounded,
+                          text: '${route.durationMinutes} 分钟',
                         ),
-                      ),
-                    ],
+                        _Metric(
+                          icon: Icons.route_rounded,
+                          text: '${route.distanceKm} km',
+                        ),
+                        _Metric(
+                          icon: Icons.flag_outlined,
+                          text: '${route.numberOfStops} 站',
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
@@ -1119,6 +1101,28 @@ class _GlassPill extends StatelessWidget {
             .textTheme
             .labelMedium
             ?.copyWith(color: AppColors.white),
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Row(
+        children: [
+          Icon(icon, size: 17, color: AppColors.moss),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(text, style: Theme.of(context).textTheme.labelMedium),
+          ),
+        ],
       ),
     );
   }

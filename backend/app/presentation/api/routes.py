@@ -215,17 +215,14 @@ def list_cities():
 @api.get("/cities/<city_slug>/routes")
 def list_city_routes(city_slug: str):
     city, routes = _services()["catalog"].list_city_routes(city_slug)
-    route_payloads = [_route_payload(route, include_stops=False) for route in routes]
+    route_payloads = [
+        _route_payload(route, include_stops=False, include_center=True) for route in routes
+    ]
     return jsonify(
         {
             "data": {
                 "city": city_to_dict(city),
                 "routes": route_payloads,
-                "scenic_spots": [
-                    spot
-                    for route, payload in zip(routes, route_payloads, strict=True)
-                    for spot in _scenic_spots(route, payload)
-                ],
             }
         }
     )
@@ -893,7 +890,9 @@ def reconstruct_story(journey_id: str):
     )
 
 
-def _route_payload(route, *, include_stops: bool = True) -> dict:
+def _route_payload(
+    route, *, include_stops: bool = True, include_center: bool = False
+) -> dict:
     payload = route_to_dict(route, include_stops=include_stops)
     tour = _services()["fragment_tours"].public_manifest(route.id)
     if tour is not None:
@@ -901,41 +900,30 @@ def _route_payload(route, *, include_stops: bool = True) -> dict:
         payload["fragment_count"] = tour["fragment_count"]
         payload["photo_mission_count"] = tour["photo_mission_count"]
         payload["download_size_bytes"] = tour["download_size_bytes"]
+    if include_center:
+        payload["center"] = _route_center(route, tour)
     if route.content_status.value == "published":
         payload["pretrip"] = _services()["city_stories"].pretrip(route.slug)
         payload["companion_tags"] = payload["pretrip"]["companion_tags"]
     return payload
 
 
-def _scenic_spots(route, route_payload: dict) -> list[dict]:
-    tour = route_payload.get("audio_tour")
+def _route_center(route, tour: dict | None) -> dict | None:
+    coordinates: list[tuple[float, float]] = []
     if isinstance(tour, dict) and tour.get("fragments"):
-        result = []
         for fragment in tour["fragments"]:
             region = fragment.get("trigger_region") or {}
             latitude = region.get("latitude")
             longitude = region.get("longitude")
-            if latitude is None or longitude is None:
-                continue
-            result.append(
-                {
-                    "id": fragment["id"],
-                    "title": fragment.get("safe_preview") or route.title,
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "experience_tags": list(fragment.get("experience_tags") or []),
-                    "route_id": route.id,
-                }
-            )
-        return result
-    return [
-        {
-            "id": stop.id,
-            "title": stop.title,
-            "latitude": stop.latitude,
-            "longitude": stop.longitude,
-            "experience_tags": list(stop.experience_tags),
-            "route_id": route.id,
-        }
-        for stop in route.stops
-    ]
+            if isinstance(latitude, int | float) and isinstance(longitude, int | float):
+                coordinates.append((float(latitude), float(longitude)))
+    else:
+        coordinates.extend((stop.latitude, stop.longitude) for stop in route.stops)
+    if not coordinates:
+        return None
+    latitudes = [item[0] for item in coordinates]
+    longitudes = [item[1] for item in coordinates]
+    return {
+        "latitude": (min(latitudes) + max(latitudes)) / 2,
+        "longitude": (min(longitudes) + max(longitudes)) / 2,
+    }

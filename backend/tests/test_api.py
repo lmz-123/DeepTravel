@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 
 from app.infrastructure.persistence.models import (
     JourneyModel,
@@ -57,7 +58,7 @@ def test_shenzhen_featured_route_and_media(client):
     assert media.content_type == "image/png"
 
 
-def test_city_discovery_projects_scenic_points_without_route_ranking_fields(app, client):
+def test_city_discovery_returns_one_managed_scenic_area_with_derived_center(app, client):
     database = app.extensions["database"]
     with database.session_factory() as session:
         route = session.query(RouteModel).filter_by(slug="nantou-time-layers").one()
@@ -74,13 +75,18 @@ def test_city_discovery_projects_scenic_points_without_route_ranking_fields(app,
     response = client.get("/api/v1/cities/shenzhen/routes")
     assert response.status_code == 200
     payload = response.get_json()["data"]
-    spots = payload["scenic_spots"]
-    assert spots
-    assert len({spot["id"] for spot in spots}) == len(spots)
-    first = next(spot for spot in spots if spot["id"] == fragment.id)
-    assert first["route_id"] == route.id
-    assert first["experience_tags"] == ["安静", "未来新标签"]
-    assert {"latitude", "longitude", "title"} <= first.keys()
+    assert "scenic_spots" not in payload
+    route_payload = next(item for item in payload["routes"] if item["id"] == route.id)
+    fragments = route_payload["audio_tour"]["fragments"]
+    assert next(item for item in fragments if item["id"] == fragment.id)[
+        "experience_tags"
+    ] == ["安静", "未来新标签"]
+    latitudes = [item["trigger_region"]["latitude"] for item in fragments]
+    longitudes = [item["trigger_region"]["longitude"] for item in fragments]
+    assert route_payload["center"] == {
+        "latitude": (min(latitudes) + max(latitudes)) / 2,
+        "longitude": (min(longitudes) + max(longitudes)) / 2,
+    }
     assert all(
         "discovery_order" not in route_payload
         and "experience_tags" not in route_payload
@@ -89,10 +95,64 @@ def test_city_discovery_projects_scenic_points_without_route_ranking_fields(app,
     )
 
 
-def test_legacy_city_discovery_uses_stops_and_excludes_unpublished_routes(app, client):
+def test_legacy_city_discovery_derives_route_center_and_excludes_drafts(app, client):
     database = app.extensions["database"]
     with database.session_factory() as session:
         city_id = session.query(RouteModel).filter_by(slug="wukang-urban-slices").one().city_id
+        session.add_all(
+            [
+                RouteModel(
+                    id="published-legacy-route",
+                    city_id=city_id,
+                    slug="published-legacy-route",
+                    title="已发布景区",
+                    subtitle="保留景区卡片",
+                    description="用于验证景区中心",
+                    duration_minutes=20,
+                    distance_km=1,
+                    difficulty="轻松",
+                    theme="测试",
+                    hero_image="images/route_wukang.png",
+                    is_featured=False,
+                    content_status="published",
+                    published_at=datetime.now(UTC),
+                ),
+                StopModel(
+                    id="published-legacy-stop-a",
+                    route_id="published-legacy-route",
+                    position=1,
+                    title="景区内部节点 A",
+                    kicker="内部节点",
+                    address="测试",
+                    latitude=31.0,
+                    longitude=121.0,
+                    arrival_radius_m=80,
+                    story_title="节点 A",
+                    story_body="节点 A",
+                    audio_url=None,
+                    image="images/stop_lane.png",
+                    insight="节点 A",
+                    experience_tags_json=["安静"],
+                ),
+                StopModel(
+                    id="published-legacy-stop-b",
+                    route_id="published-legacy-route",
+                    position=2,
+                    title="景区内部节点 B",
+                    kicker="内部节点",
+                    address="测试",
+                    latitude=31.2,
+                    longitude=121.4,
+                    arrival_radius_m=80,
+                    story_title="节点 B",
+                    story_body="节点 B",
+                    audio_url=None,
+                    image="images/stop_lane.png",
+                    insight="节点 B",
+                    experience_tags_json=["老建筑"],
+                ),
+            ]
+        )
         session.add(
             RouteModel(
                 id="draft-discovery-route",
@@ -136,15 +196,13 @@ def test_legacy_city_discovery_uses_stops_and_excludes_unpublished_routes(app, c
     assert response.status_code == 200
     payload = response.get_json()["data"]
     published_route_ids = {route["id"] for route in payload["routes"]}
-    assert payload["scenic_spots"]
-    assert {spot["route_id"] for spot in payload["scenic_spots"]} <= published_route_ids
-    assert len({spot["id"] for spot in payload["scenic_spots"]}) == len(
-        payload["scenic_spots"]
+    assert "scenic_spots" not in payload
+    legacy = next(
+        route for route in payload["routes"] if route["id"] == "published-legacy-route"
     )
+    assert legacy["center"] == {"latitude": 31.1, "longitude": 121.2}
+    assert legacy["stop_count"] == 2
     assert "draft-discovery-route" not in published_route_ids
-    assert "draft-discovery-stop" not in {
-        spot["id"] for spot in payload["scenic_spots"]
-    }
 
 
 def test_unknown_city_has_structured_error(client):

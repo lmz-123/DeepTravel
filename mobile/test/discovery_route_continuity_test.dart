@@ -11,17 +11,16 @@ import 'package:jiandi/features/experience/presentation/experience_providers.dar
 
 void main() {
   testWidgets(
-      'scenic card keeps the first point, backend tag, and no fake distance',
+      'scenic-area card keeps route metadata, contains nodes, and has no fake distance',
       (tester) async {
     await _pumpDiscovery(tester, journeyItem: null, context: null);
 
-    expect(
-        find.byKey(const ValueKey('scenic-card-fragment-a')), findsOneWidget);
-    expect(find.text('第一条线索'), findsOneWidget);
-    expect(find.text('安静'), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-card-route-a')), findsOneWidget);
+    expect(find.text('测试路线'), findsOneWidget);
+    expect(find.text('第一条线索'), findsNothing);
     expect(find.textContaining('距你'), findsNothing);
     final indicator = tester.widget<AnimatedContainer>(
-      find.byKey(const ValueKey('scenic-indicator-0')),
+      find.byKey(const ValueKey('route-indicator-0')),
     );
     expect(indicator.constraints?.maxWidth, 24);
   });
@@ -44,14 +43,13 @@ void main() {
 
     expect(controller.declined, isTrue);
     expect(find.byTooltip('选择城市'), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('scenic-card-fragment-a')), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-card-route-a')), findsOneWidget);
   });
 
   testWidgets('first visit still enters the headphone invitation',
       (tester) async {
     await _pumpDiscovery(tester, journeyItem: null, context: null);
-    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
+    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
     await tester.pumpAndSettle();
     expect(find.text('headphone-gate'), findsOneWidget);
   });
@@ -64,7 +62,7 @@ void main() {
       journeyItem: _item(ownerContext),
       context: ownerContext,
     );
-    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
+    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
     await tester.pumpAndSettle();
     expect(find.text('journey-target'), findsOneWidget);
   });
@@ -79,7 +77,7 @@ void main() {
       context: ownerContext,
       activeController: controller,
     );
-    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
+    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
     await tester.pumpAndSettle();
     expect(find.text('journey-target'), findsOneWidget);
     expect(controller.revisitedJourneyId, 'journey-a');
@@ -93,7 +91,7 @@ void main() {
       journeyItem: _item(ownerContext),
       context: ownerContext,
     );
-    await tester.tap(find.byKey(const ValueKey('scenic-card-fragment-a')));
+    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
     await tester.pumpAndSettle();
     expect(find.text('legacy-footprint'), findsOneWidget);
   });
@@ -197,9 +195,8 @@ class _FixedDiscoveryController extends DiscoveryController {
         city: _city,
         catalog: CityDiscoveryCatalog(
           routes: [_route],
-          scenicSpots: [_spot],
         ),
-        cards: [ScenicSpotCard(spot: _spot, route: _route)],
+        cards: [ScenicAreaCard(route: _route)],
         revision: 0,
       );
 
@@ -254,15 +251,6 @@ const _fragment = StoryFragment(
   state: 'collected',
 );
 
-const _spot = ScenicSpot(
-  id: 'fragment-a',
-  title: '第一条线索',
-  latitude: 22.5,
-  longitude: 114,
-  experienceTags: ['安静'],
-  routeId: 'route-a',
-);
-
 const _route = RouteExperience(
   id: 'route-a',
   slug: 'route-a',
@@ -276,6 +264,8 @@ const _route = RouteExperience(
   heroImage: '',
   contentStatus: 'published',
   stops: [],
+  centerLatitude: 22.5,
+  centerLongitude: 114,
   audioTour: AudioTourManifest(
     title: '测试路线',
     centralQuestion: '为什么？',

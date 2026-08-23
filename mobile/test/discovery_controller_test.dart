@@ -34,11 +34,43 @@ void main() {
     expect(normalizeDiscoveryLocality('香港特别行政区'), '香港');
   });
 
-  test('Haversine ranking is stable and omits distance without a sample', () {
-    const route = RouteExperience(
-      id: 'route',
-      slug: 'route',
-      title: '路线',
+  test('Haversine ranks scenic areas by center and keeps nodes contained', () {
+    const farRoute = RouteExperience(
+      id: 'far-route',
+      slug: 'far-route',
+      title: '较远景区',
+      subtitle: '',
+      description: '',
+      durationMinutes: 1,
+      distanceKm: 1,
+      difficulty: '',
+      theme: '',
+      heroImage: '',
+      contentStatus: 'published',
+      stops: [],
+      centerLatitude: 22.501,
+      centerLongitude: 114,
+    );
+    const nearRoute = RouteExperience(
+      id: 'near-route',
+      slug: 'near-route',
+      title: '最近景区',
+      subtitle: '',
+      description: '',
+      durationMinutes: 1,
+      distanceKm: 1,
+      difficulty: '',
+      theme: '',
+      heroImage: '',
+      contentStatus: 'published',
+      stops: [],
+      centerLatitude: 22.5,
+      centerLongitude: 114,
+    );
+    const uncenteredRoute = RouteExperience(
+      id: 'uncentered-route',
+      slug: 'uncentered-route',
+      title: '暂缺中心景区',
       subtitle: '',
       description: '',
       durationMinutes: 1,
@@ -50,32 +82,18 @@ void main() {
       stops: [],
     );
     const catalog = CityDiscoveryCatalog(
-      routes: [route],
-      scenicSpots: [
-        ScenicSpot(
-          id: 'far',
-          title: '较远',
-          latitude: 22.501,
-          longitude: 114,
-          experienceTags: [],
-          routeId: 'route',
-        ),
-        ScenicSpot(
-          id: 'near',
-          title: '最近',
-          latitude: 22.5,
-          longitude: 114,
-          experienceTags: ['安静', '未来标签'],
-          routeId: 'route',
-        ),
-      ],
+      routes: [farRoute, uncenteredRoute, nearRoute],
     );
 
-    final serverOrder = scenicSpotCards(catalog);
-    expect(serverOrder.map((item) => item.spot.id), ['far', 'near']);
+    final serverOrder = scenicAreaCards(catalog);
+    expect(serverOrder.map((item) => item.route.id), [
+      'far-route',
+      'uncentered-route',
+      'near-route',
+    ]);
     expect(serverOrder.every((item) => item.distanceMeters == null), isTrue);
 
-    final ranked = scenicSpotCards(
+    final ranked = scenicAreaCards(
       catalog,
       sample: DiscoveryLocationSample(
         latitude: 22.5,
@@ -83,8 +101,12 @@ void main() {
         recordedAt: DateTime.now(),
       ),
     );
-    expect(ranked.map((item) => item.spot.id), ['near', 'far']);
-    expect(ranked.first.spot.experienceTags, ['安静', '未来标签']);
+    expect(ranked.map((item) => item.route.id), [
+      'near-route',
+      'far-route',
+      'uncentered-route',
+    ]);
+    expect(ranked.last.distanceMeters, isNull);
   });
 
   test('cold entry matches backend city without an accuracy gate', () async {
@@ -275,7 +297,7 @@ class _ShanghaiWithoutPointsRepository extends DemoExperienceRepository {
   @override
   Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async =>
       citySlug == 'shanghai'
-          ? const CityDiscoveryCatalog(routes: [], scenicSpots: [])
+          ? const CityDiscoveryCatalog(routes: [])
           : super.discoveryForCity(citySlug);
 }
 

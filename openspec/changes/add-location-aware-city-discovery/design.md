@@ -9,14 +9,14 @@ The requested behavior is intentionally small: location affects the initial defa
 **Goals:**
 
 - Use one platform position on cold discovery entry, refresh, and city switch without accuracy gating.
-- Select the initial city only when the platform locality matches a backend-selectable city with published points; otherwise use Shenzhen.
-- Sort published scenic/story point cards for the active city by geodesic distance.
+- Select the initial city only when the platform locality matches a backend-selectable city with published scenic areas; otherwise use Shenzhen.
+- Sort the existing scenic-area/route cards for the active city by geodesic distance to each area's single center point.
 - Keep point tags fully backend-driven and location samples transient.
 
 **Non-Goals:**
 
 - No city center/radius/polygon configuration or distance-based city recognition.
-- No route recommendations, route order field, card redesign, or route-internal point sorting.
+- No node recommendations, persistent route order field, card redesign, or route-internal point sorting.
 - No persistence of discovery mode, manual city, prompt suppression, first-run completion, coordinates, or distances.
 - No change to simulated/real journey settings, arrival checks, free-roam triggers, or later requirements.
 
@@ -26,7 +26,7 @@ The requested behavior is intentionally small: location affects the initial defa
 
 On cold entry, discovery asks for one real current position and resolves its administrative locality through the platform location stack. A pure normalizer compares that locality with the names of cities already returned by the backend's selectable city catalog. Generic normalization may remove administrative suffixes such as `市`; Flutter does not contain a city list.
 
-The locality is accepted only when the matched backend city has at least one published scenic/story point in the discovery payload. If locality is unavailable, unmatched, or has no published point, discovery uses the project's existing Shenzhen default. This design never reads a city center, recognition radius, or boundary and never calculates distance from the user to a city.
+The locality is accepted only when the matched backend city has at least one published scenic area in the discovery payload. If locality is unavailable, unmatched, or has no published scenic area, discovery uses the project's existing Shenzhen default. This design never reads a city center, recognition radius, or boundary and never calculates distance from the user to a city.
 
 The same automatic city choice is not rerun after a manual switch. Location acquired for refresh or switching is used only to sort the already active city.
 
@@ -42,31 +42,31 @@ Every successful one-shot real position can produce distance ordering and distan
 
 No first-entry-processed value is persisted. “Cold entry” is an in-memory page/application lifecycle event, not an installation-history flag.
 
-### 3. The home response exposes scenic points, not route recommendations
+### 3. The home response keeps one summary per scenic area
 
-Extend the existing city discovery response with a flat compact `scenic_spots` projection built only from formally published content. Each item contains the point's stable ID, title, WGS-84 coordinate, ordered free-form `experience_tags`, and the minimal parent-route identity needed by the existing tap flow.
+Keep the existing published `routes` collection as the home collection, where each route represents one scenic area and one home card. Add a nullable `center` coordinate to each route summary. The center is calculated server-side from that route's eligible published story-node coordinates: managed story-fragment trigger regions for managed routes, or legacy stop coordinates for legacy routes. It is one representative scenic-area coordinate, not a separately selectable city coordinate and not a new persisted route-ranking field.
 
-Managed routes project eligible story fragments; legacy routes project eligible stops. The projection does not add route order, route tags, point recommendation order, transcripts, journey state, or editorial fields.
+The public city response MUST NOT expose a flat home-card collection of the route's internal story nodes. Point tags remain part of the existing point/fragment content model and downstream node workflows, but they do not change the homepage recommendation unit.
 
-Flutter renders one home card per projected point using the current route-card visual structure. A tap continues into the point's parent route through the existing route navigation. Thus the recommended object is the scenic/story point even though the familiar card shell and route entry remain.
+Flutter renders one original route/scenic-area card per route summary. A tap continues through the existing route navigation. Internal story nodes are available only after opening their parent scenic area or entering its journey experience.
 
 ### 4. Ranking is local, scoped to the selected city, and does not leak inward
 
-For a successfully acquired position, a pure Flutter service calculates Haversine distance to every projected point in the active city and sorts ascending by unrounded metres. Exact ties use the server response order followed by stable point ID. The first home card is therefore the closest published point.
+For a successfully acquired position, a pure Flutter service calculates Haversine distance to every route summary's valid center in the active city and sorts ascending by unrounded metres. Exact ties use the server response order followed by stable route ID. Routes without a usable center remain after centered routes in their existing server order and display no distance. The first home card is therefore the closest published scenic area with a center.
 
 On refresh, the active city is unchanged. On manual switch, the user's chosen backend city is applied before acquisition and cannot be replaced by locality. Ranking affects only the home carousel. Route details, fragment/stop position, and journey progression remain untouched.
 
 When acquisition fails, the client preserves server response order and omits all distance copy. A prior event's position is not reused after a refresh or switch failure.
 
-### 5. Tags live only on point records
+### 5. Point tags do not define homepage cards
 
 Add `experience_tags_json` to `stops` and `story_fragments`, defaulting to an empty JSON array. Do not add tags or a discovery-order field to routes. Admin and existing package/graph paths expose the editorial name `experience_tags` and normalize by trimming, removing empty values, and de-duplicating in first-occurrence order. Tags remain arbitrary display strings subject only to modest shape/length limits.
 
-The ten product examples are fixtures/help text, not a client enum or server allowlist. Only published point values reach the public projection.
+The ten product examples are fixtures/help text, not a client enum or server allowlist. They remain available through published point/fragment content where those nodes are used, but no flat homepage projection is created for them.
 
 ### 6. Failure remains the current simple discovery behavior
 
-Before an undetermined OS permission request, show concise Chinese purpose copy explaining city choice and nearby-point ordering. Declining or denial leaves the city selector and normal browsing available.
+Before an undetermined OS permission request, show concise Chinese purpose copy explaining city choice and nearby-scenic-area ordering. Declining or denial leaves the city selector and normal browsing available.
 
 On cold-entry failure, retain Shenzhen and server order. On refresh or switch failure, retain the selected city and server order. No state asks the user to enable an automatic mode, and no repeated-prompt suppression preference is added beyond the operating system's permission state.
 
@@ -76,7 +76,7 @@ Coordinates, locality, sample timestamps, and calculated distances exist only in
 
 ## API and Module Boundaries
 
-- Backend catalog: filters published cities/points and serializes compact point metadata; it never receives traveler coordinates.
+- Backend catalog: filters published cities/routes and serializes one derived center per scenic-area summary; it never receives traveler coordinates and never flattens route nodes for home.
 - Main Alembic: owns the two additive point-tag columns.
 - Flutter discovery domain: owns locality matching, Haversine ranking, and stable fallback without an accuracy threshold.
 - Flutter presentation: owns purpose/failure copy, the existing city selector, and the retained card visual.
@@ -85,8 +85,8 @@ Coordinates, locality, sample timestamps, and calculated distances exist only in
 
 ## Failure Behavior
 
-- Missing point tags from an older API parse as `[]`.
-- Missing/invalid point coordinates exclude only that point from distance ordering; the point remains available in server order without a distance.
+- Missing point tags from an older API continue to parse as `[]` in node-specific content.
+- A missing/invalid route center keeps that scenic-area card in server order after centered cards and omits its distance.
 - A failed catalog refresh retains known city/content state and exposes the existing retry path.
 - A city switch succeeds even when the subsequent location attempt fails.
 - If Shenzhen is temporarily absent from the selectable catalog, retain the current valid catalog selection rather than inventing another city identifier.
@@ -95,13 +95,13 @@ Coordinates, locality, sample timestamps, and calculated distances exist only in
 
 - [Platform locality names can differ from backend display names] → Apply generic administrative-suffix normalization; unmatched results deliberately fall back to Shenzhen rather than adding a city-coordinate system.
 - [Platform coordinates may be less precise in some environments] → Use the successful one-shot position consistently; discovery ordering does not claim or expose a precision guarantee.
-- [A point card still opens a parent route] → Keep the existing navigation contract while ensuring the home title/tags/distance describe the point, not a newly ranked route.
-- [Two point storage models exist] → Add the same tag field to stops and fragments, project managed fragments first and legacy stops only for legacy routes.
+- [A route has no separately stored center] → Derive one representative center from its eligible published node coordinates and return it only in the route summary; do not add an editor, migration, or client-side node flattening.
+- [Two point storage models exist] → Add the same tag field to stops and fragments for existing node workflows, and use managed fragment regions or legacy stop coordinates only to derive their parent scenic area's center.
 
 ## Migration Plan
 
-1. Add the main Alembic revision for stop/fragment point tags and update compatible API mappings/projection.
+1. Keep the main Alembic revision for stop/fragment point tags and update compatible API mappings; derive route centers without another schema migration.
 2. Deploy the API migration and response before the independent admin and Flutter client.
 3. Deploy admin point-tag support; existing import/export paths preserve the new field without adding a new import feature.
-4. Ship the Flutter client, then verify cold-entry match/fallback, refresh, city switch, ordering across different reported accuracy values, nearest-first point cards, tag passthrough, and denial fallback.
+4. Ship the Flutter client, then verify cold-entry match/fallback, refresh, city switch, ordering across different reported accuracy values, nearest-first scenic-area cards, node containment, and denial fallback.
 5. Roll back application versions without dropping the additive tag columns.

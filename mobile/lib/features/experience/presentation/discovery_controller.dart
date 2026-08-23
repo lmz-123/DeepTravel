@@ -26,7 +26,7 @@ class DiscoveryState {
   final List<CityExperience> cities;
   final CityExperience? city;
   final CityDiscoveryCatalog catalog;
-  final List<ScenicSpotCard> cards;
+  final List<ScenicAreaCard> cards;
   final CityStoryHome storyHome;
   final int revision;
   final bool isLocating;
@@ -36,7 +36,7 @@ class DiscoveryState {
     List<CityExperience>? cities,
     CityExperience? city,
     CityDiscoveryCatalog? catalog,
-    List<ScenicSpotCard>? cards,
+    List<ScenicAreaCard>? cards,
     CityStoryHome? storyHome,
     int? revision,
     bool? isLocating,
@@ -81,7 +81,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     final cities = await _repository.cities();
     final city = fallbackDiscoveryCity(cities);
     final catalog = city == null
-        ? const CityDiscoveryCatalog(routes: [], scenicSpots: [])
+        ? const CityDiscoveryCatalog(routes: [])
         : await _repository.discoveryForCity(city.slug);
     final storyHome =
         city == null ? CityStoryHome.empty : await _loadStoryHome(city.slug);
@@ -89,7 +89,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
       cities: cities,
       city: city,
       catalog: catalog,
-      cards: scenicSpotCards(catalog),
+      cards: scenicAreaCards(catalog),
       storyHome: storyHome,
       revision: 0,
     );
@@ -133,7 +133,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     final city =
         active.isNotEmpty ? active.first : fallbackDiscoveryCity(cities);
     final catalog = city == null
-        ? const CityDiscoveryCatalog(routes: [], scenicSpots: [])
+        ? const CityDiscoveryCatalog(routes: [])
         : await _repository.discoveryForCity(city.slug);
     final storyHome =
         city == null ? CityStoryHome.empty : await _loadStoryHome(city.slug);
@@ -143,7 +143,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
       city: city,
       clearCity: city == null,
       catalog: catalog,
-      cards: scenicSpotCards(catalog),
+      cards: scenicAreaCards(catalog),
       storyHome: storyHome,
       revision: current.revision + 1,
       isLocating: true,
@@ -166,7 +166,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     final base = current.copyWith(
       city: city,
       catalog: catalog,
-      cards: scenicSpotCards(catalog),
+      cards: scenicAreaCards(catalog),
       storyHome: storyHome,
       revision: current.revision + 1,
       isLocating: true,
@@ -201,14 +201,14 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
           ? current.storyHome
           : await _loadStoryHome(matched.slug);
       if (!_isCurrent(token)) return;
-      if (catalog.scenicSpots.isEmpty) {
+      if (catalog.routes.isEmpty) {
         await _restoreFallback(token, current);
         return;
       }
       state = AsyncData(current.copyWith(
         city: matched,
         catalog: catalog,
-        cards: scenicSpotCards(catalog, sample: sample),
+        cards: scenicAreaCards(catalog, sample: sample),
         storyHome: storyHome,
         revision: current.revision + 1,
         isLocating: false,
@@ -222,7 +222,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
   Future<void> _restoreFallback(int token, DiscoveryState current) async {
     final fallback = fallbackDiscoveryCity(current.cities);
     final catalog = fallback == null
-        ? const CityDiscoveryCatalog(routes: [], scenicSpots: [])
+        ? const CityDiscoveryCatalog(routes: [])
         : fallback.slug == current.city?.slug
             ? current.catalog
             : await _repository.discoveryForCity(fallback.slug);
@@ -235,7 +235,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     state = AsyncData(current.copyWith(
       city: fallback,
       catalog: catalog,
-      cards: scenicSpotCards(catalog),
+      cards: scenicAreaCards(catalog),
       storyHome: storyHome,
       revision: current.revision + 1,
       isLocating: false,
@@ -252,14 +252,14 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
       final sample = await _currentSample(requestPermission);
       if (!_isCurrent(token)) return;
       state = AsyncData(base.copyWith(
-        cards: scenicSpotCards(base.catalog, sample: sample),
+        cards: scenicAreaCards(base.catalog, sample: sample),
         isLocating: false,
         clearLocationFailure: true,
       ));
     } on DiscoveryLocationFailure catch (failure) {
       if (!_isCurrent(token)) return;
       state = AsyncData(base.copyWith(
-        cards: scenicSpotCards(base.catalog),
+        cards: scenicAreaCards(base.catalog),
         isLocating: false,
         locationFailure: failure.reason,
       ));
@@ -295,7 +295,7 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     final current = state.asData?.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(
-      cards: scenicSpotCards(current.catalog),
+      cards: scenicAreaCards(current.catalog),
       isLocating: false,
       locationFailure: reason,
       revision: current.revision + 1,
@@ -344,40 +344,42 @@ String normalizeDiscoveryLocality(String value) {
   return normalized;
 }
 
-List<ScenicSpotCard> scenicSpotCards(
+List<ScenicAreaCard> scenicAreaCards(
   CityDiscoveryCatalog catalog, {
   DiscoveryLocationSample? sample,
 }) {
-  final routes = {for (final route in catalog.routes) route.id: route};
-  final indexed = <({int index, ScenicSpotCard card})>[];
-  for (var index = 0; index < catalog.scenicSpots.length; index++) {
-    final spot = catalog.scenicSpots[index];
-    final route = routes[spot.routeId];
-    if (route == null) continue;
+  final indexed = <({int index, ScenicAreaCard card})>[];
+  for (var index = 0; index < catalog.routes.length; index++) {
+    final route = catalog.routes[index];
+    final latitude = route.centerLatitude;
+    final longitude = route.centerLongitude;
     indexed.add((
       index: index,
-      card: ScenicSpotCard(
-        spot: spot,
+      card: ScenicAreaCard(
         route: route,
-        distanceMeters: sample == null
+        distanceMeters: sample == null || latitude == null || longitude == null
             ? null
             : discoveryDistanceMeters(
                 sample.latitude,
                 sample.longitude,
-                spot.latitude,
-                spot.longitude,
+                latitude,
+                longitude,
               ),
       ),
     ));
   }
   if (sample != null) {
     indexed.sort((left, right) {
+      final leftDistance = left.card.distanceMeters;
+      final rightDistance = right.card.distanceMeters;
+      if (leftDistance == null && rightDistance != null) return 1;
+      if (leftDistance != null && rightDistance == null) return -1;
       final distance =
-          left.card.distanceMeters!.compareTo(right.card.distanceMeters!);
+          leftDistance == null ? 0 : leftDistance.compareTo(rightDistance!);
       if (distance != 0) return distance;
       final serverOrder = left.index.compareTo(right.index);
       if (serverOrder != 0) return serverOrder;
-      return left.card.spot.id.compareTo(right.card.spot.id);
+      return left.card.route.id.compareTo(right.card.route.id);
     });
   }
   return indexed.map((item) => item.card).toList(growable: false);

@@ -155,7 +155,7 @@ class _StoryDiscoveryController extends DiscoveryController {
           subtitle: '测试城市',
           heroImage: '',
         ),
-        catalog: CityDiscoveryCatalog(routes: [], scenicSpots: []),
+        catalog: CityDiscoveryCatalog(routes: []),
         cards: [],
         storyHome: CityStoryHome(
           isEmpty: false,

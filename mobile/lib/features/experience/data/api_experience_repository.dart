@@ -64,15 +64,7 @@ class ApiExperienceRepository implements ExperienceRepository {
         name: 'jiandi.catalog',
       );
     }
-    final routeIds = published.map((route) => route.id).toSet();
-    final scenicSpots = (data['scenic_spots'] as List<dynamic>? ?? const [])
-        .map((item) => ScenicSpot.fromJson(item as Map<String, dynamic>))
-        .where((spot) => routeIds.contains(spot.routeId))
-        .toList(growable: false);
-    return CityDiscoveryCatalog(
-      routes: published,
-      scenicSpots: scenicSpots,
-    );
+    return CityDiscoveryCatalog(routes: published);
   }
 
   @override
