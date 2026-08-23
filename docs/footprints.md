@@ -48,7 +48,7 @@ docker compose run --rm api alembic upgrade head
 docker compose up -d mysql api
 docker compose ps
 
-cd /root/Travel-Admin
+cd /root/DeepTravel-admin
 docker compose up -d --build
 docker compose ps
 ```
