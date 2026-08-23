@@ -46,8 +46,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('还没有留下足迹'), findsOneWidget);
-    expect(find.textContaining('完整走完一条路线后'), findsOneWidget);
+    expect(find.textContaining('只听了部分故事'), findsOneWidget);
     expect(find.byType(RefreshIndicator), findsOneWidget);
+  });
+
+  testWidgets('partially completed journey remains visible and resumable',
+      (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentJourneyLibraryProvider.overrideWith(
+          (ref) async => [_item('active', '还在行走', completed: false)],
+        ),
+      ],
+      child: const MaterialApp(home: FootprintsPage()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('还在行走'), findsOneWidget);
+    expect(find.text('进行中'), findsNWidgets(2));
+    expect(find.text('继续自由漫游'), findsOneWidget);
+    expect(find.textContaining('3/5 条线索'), findsOneWidget);
   });
 
   testWidgets('system back returns footprint list home and detail to list',
@@ -116,17 +134,18 @@ JourneyLibraryItem _item(
   String id,
   String title, {
   bool archived = false,
+  bool completed = true,
   int evidence = 0,
 }) =>
     JourneyLibraryItem(
       journey: JourneySession(
         id: '$id-journey',
         routeId: '$id-route',
-        status: 'completed',
-        currentStopPosition: 5,
+        status: completed ? 'completed' : 'active',
+        currentStopPosition: completed ? 5 : 3,
         arrivedStopId: null,
         answeredStopIds: const {},
-        progress: 1,
+        progress: completed ? 1 : .6,
       ),
       route: RouteExperience(
         id: '$id-route',
@@ -143,7 +162,7 @@ JourneyLibraryItem _item(
         stops: const [],
       ),
       journeyKind: 'fragmented',
-      collectedCount: 5,
+      collectedCount: completed ? 5 : 3,
       totalCount: 5,
       evidenceCount: evidence,
     );

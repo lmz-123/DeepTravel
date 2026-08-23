@@ -770,8 +770,7 @@ final currentJourneyLibraryProvider =
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return const <JourneyLibraryItem>[];
   return ref.watch(
-    journeyLibraryProvider(UserJourneyFilter(userId, status: 'completed'))
-        .future,
+    journeyLibraryProvider(UserJourneyFilter(userId)).future,
   );
 });
 

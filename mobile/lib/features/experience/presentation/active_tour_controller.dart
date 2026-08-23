@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/logging/runtime_log_reporter.dart';
+import '../application/nearby_story_points.dart';
 import '../application/trigger_engine.dart';
 import '../data/api_experience_repository.dart';
 import '../data/local_tour_store.dart';
@@ -47,7 +48,7 @@ final preparedRouteServiceProvider =
 
 enum EvidenceUploadPhase { captured, uploading, queued, accepted }
 
-enum TourPlaybackMode { live, revisit }
+enum TourPlaybackMode { live, liveReplay, revisit }
 
 class PlaybackOwner {
   const PlaybackOwner({
@@ -98,6 +99,7 @@ class ActiveTourState {
     this.ledger,
     this.current,
     this.queue = const [],
+    this.nearbyStoryPoints = const [],
     this.preparedPaths = const {},
     this.isBusy = false,
     this.isPlaying = false,
@@ -123,6 +125,7 @@ class ActiveTourState {
   final StoryLedger? ledger;
   final StoryFragment? current;
   final List<StoryFragment> queue;
+  final List<NearbyStoryPoint> nearbyStoryPoints;
   final Map<String, String> preparedPaths;
   final bool isBusy;
   final bool isPlaying;
@@ -149,6 +152,7 @@ class ActiveTourState {
           StoryFragment? current,
           bool clearCurrent = false,
           List<StoryFragment>? queue,
+          List<NearbyStoryPoint>? nearbyStoryPoints,
           Map<String, String>? preparedPaths,
           bool? isBusy,
           bool? isPlaying,
@@ -179,6 +183,7 @@ class ActiveTourState {
         ledger: ledger ?? this.ledger,
         current: clearCurrent ? null : current ?? this.current,
         queue: queue ?? this.queue,
+        nearbyStoryPoints: nearbyStoryPoints ?? this.nearbyStoryPoints,
         preparedPaths: preparedPaths ?? this.preparedPaths,
         isBusy: isBusy ?? this.isBusy,
         isPlaying: isPlaying ?? this.isPlaying,
@@ -225,6 +230,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   int _transitionGeneration = 0;
   int _playbackGeneration = 0;
   int? _audioOwnershipGeneration;
+  LocationSample? _latestLocationSample;
 
   ExperienceRepository get _repository =>
       ref.read(experienceRepositoryProvider);
@@ -349,6 +355,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           locationMessage:
               _restoredLocationMessage(restoredCurrent, locationMessage),
           clearError: true);
+      _refreshNearbyStoryPoints();
       await _store.saveJson('active_tour', {
         'journey_id': session.id,
         'route_slug': route.slug,
@@ -451,27 +458,38 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     );
   }
 
-  Future<bool> selectCollectedFragment(String fragmentId) async {
+  Future<bool> selectCollectedFragment(String fragmentId) =>
+      selectRevealedFragment(fragmentId);
+
+  Future<bool> selectRevealedFragment(String fragmentId) async {
     final entry = state.ledger?.entries
         .where((item) => item.id == fragmentId)
         .firstOrNull;
-    if (entry == null || !entry.isCollected || !entry.isRevealed) {
+    if (entry == null || !entry.isRevealed) {
       state = state.copyWith(locationMessage: '这条线索尚未解锁，继续行走后再回来听。');
       return false;
     }
-    final wasLive = state.playbackMode == TourPlaybackMode.live;
-    if (wasLive) await _stopLocationMonitoring();
+    final activeJourney = state.session?.isCompleted == false &&
+        state.playbackMode != TourPlaybackMode.revisit;
+    final liveId = state.playbackMode == TourPlaybackMode.live
+        ? state.queue.lastOrNull?.id ?? state.current?.id
+        : state.liveFragmentId;
     state = state.copyWith(
-      playbackMode: TourPlaybackMode.revisit,
-      liveFragmentId: wasLive ? state.current?.id : state.liveFragmentId,
+      playbackMode: activeJourney
+          ? TourPlaybackMode.liveReplay
+          : TourPlaybackMode.revisit,
+      liveFragmentId: activeJourney ? liveId : state.liveFragmentId,
       current: entry,
       selectedFragmentId: entry.id,
-      queue: const [],
-      status: 'revisit',
-      locationMessage: '正在回听第 ${entry.position} 条已解锁线索；旅程进度不会改变。',
+      queue: activeJourney ? state.queue : const [],
+      status: activeJourney ? state.status : 'revisit',
+      locationMessage: activeJourney
+          ? '正在回听已触发故事点；附近故事点仍会继续识别。'
+          : '正在回听第 ${entry.position} 条已解锁线索；旅程进度不会改变。',
       clearError: true,
     );
     await _playNarration(entry);
+    await _restorePlaybackProgress(entry);
     return true;
   }
 
@@ -540,13 +558,13 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> _onLocation(LocationSample sample) async {
     if (state.locationMode != TourLocationMode.real ||
-        state.status != 'monitoring' ||
-        _triggering) {
+        state.status != 'monitoring') {
       return;
     }
     final manifest = state.route?.audioTour;
     final ledger = state.ledger;
     if (manifest == null || ledger == null) return;
+    _latestLocationSample = sample;
     final candidate = _triggerEngine.process(
         sample,
         manifest.fragments,
@@ -554,9 +572,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
             .where((value) => value.isRevealed)
             .map((value) => value.id)
             .toSet());
-    if (candidate == null) return;
+    _refreshNearbyStoryPoints(sample);
+    if (_triggering || candidate == null) return;
     await _trigger(candidate.fragment,
         method: 'location', sample: candidate.sample);
+    _refreshNearbyStoryPoints(sample);
   }
 
   Future<void> triggerNextDemo() async {
@@ -820,7 +840,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> _enqueueNarration(StoryFragment fragment) async {
     if (state.current != null && state.isPlaying) {
-      state = state.copyWith(queue: [...state.queue, fragment]);
+      state = state.copyWith(
+        queue: [...state.queue, fragment],
+        liveFragmentId: fragment.id,
+      );
       await _persistNarrationQueue();
       return;
     }
@@ -847,13 +870,15 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     // completed processing state. Reset it immediately so the next trigger is
     // started instead of becoming stranded behind an already-finished item.
     StoryFragment? next;
-    if (writesProgress && state.queue.isNotEmpty) {
+    if ((writesProgress || state.playbackMode == TourPlaybackMode.liveReplay) &&
+        state.queue.isNotEmpty) {
       next = state.queue.first;
       state = state.copyWith(
         current: next,
         liveFragmentId: next.id,
         selectedFragmentId: next.id,
         queue: state.queue.skip(1).toList(),
+        playbackMode: TourPlaybackMode.live,
         isPlaying: false,
         position: Duration.zero,
       );
@@ -864,7 +889,10 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       );
     }
     await _persistNarrationQueue();
-    if (!writesProgress) return;
+    if (!writesProgress) {
+      if (next != null) await _playNarration(next);
+      return;
+    }
 
     final key = _uuid.v4();
     try {
@@ -1120,6 +1148,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           : state.liveFragmentId,
       selectedFragmentId: refreshedCurrent?.id,
     );
+    _refreshNearbyStoryPoints();
     await _store.saveJson('ledger_${session.id}', {
       'collected_count': ledger.collectedCount,
       'total_count': ledger.totalCount,
@@ -1133,6 +1162,37 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           .toList(),
       'updated_at': DateTime.now().toUtc().toIso8601String()
     });
+  }
+
+  void _refreshNearbyStoryPoints([LocationSample? sample]) {
+    final manifest = state.route?.audioTour;
+    final ledger = state.ledger;
+    if (manifest == null || ledger == null) {
+      state = state.copyWith(nearbyStoryPoints: const []);
+      return;
+    }
+    state = state.copyWith(
+      nearbyStoryPoints: projectNearbyStoryPoints(
+        manifestFragments: manifest.fragments,
+        ledgerEntries: ledger.entries,
+        presenceOf: _triggerEngine.stateOf,
+        sample: sample ?? _latestLocationSample,
+      ),
+    );
+  }
+
+  Future<void> _restorePlaybackProgress(StoryFragment fragment) async {
+    final progress = fragment.playbackProgress;
+    if (progress <= 0 || progress >= 1) return;
+    try {
+      final duration = await _player.durationStream
+          .firstWhere((value) => value != null && value > Duration.zero)
+          .timeout(const Duration(milliseconds: 800));
+      if (duration == null) return;
+      await _player.seek(duration * progress);
+    } catch (_) {
+      // A stream without a duration can still be replayed from the beginning.
+    }
   }
 
   Future<void> _persistNarrationQueue() async {
@@ -1254,9 +1314,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       return;
     }
     if (mode == TourLocationMode.simulated) {
+      _latestLocationSample = null;
       state = state.copyWith(
           locationMode: mode,
           status: paused ? 'paused' : 'simulated',
+          nearbyStoryPoints: const [],
           locationMessage: paused
               ? '已切换为模拟定位；继续导览后可手动模拟到达。'
               : '模拟定位已开启：不会读取真实位置，请手动模拟到达下一条线索。',
@@ -1275,11 +1337,12 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> stopTour() async {
     final session = state.session;
-    final wasLive = state.playbackMode == TourPlaybackMode.live;
+    final wasLive = state.playbackMode != TourPlaybackMode.revisit;
     _transitionGeneration += 1;
     _playbackGeneration += 1;
     await _cancelPlayerBindings();
     await _stopLocationMonitoring();
+    _latestLocationSample = null;
     await _player.stop();
     final ownership = _audioOwnershipGeneration;
     if (ownership != null) {
@@ -1295,6 +1358,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         status: 'stopped',
         isPlaying: false,
         queue: const [],
+        nearbyStoryPoints: const [],
         clearPlaybackOwner: true,
         generation: _playbackGeneration,
         locationMessage: '本次自动导览已停止，已收集线索仍会保留。');
@@ -1302,11 +1366,12 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> clearForAccountExit() async {
     final session = state.session;
-    final wasLive = state.playbackMode == TourPlaybackMode.live;
+    final wasLive = state.playbackMode != TourPlaybackMode.revisit;
     _transitionGeneration += 1;
     _playbackGeneration += 1;
     await _cancelPlayerBindings();
     await _stopLocationMonitoring();
+    _latestLocationSample = null;
     try {
       await _player.stop();
     } catch (_) {}
@@ -1530,22 +1595,30 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           locationMessage: _locationPermissionMessage(permission));
       if (permission == TourLocationPermission.granted) {
         _listenToRealLocation();
+      } else {
+        _latestLocationSample = null;
+        _refreshNearbyStoryPoints();
       }
     } catch (error) {
+      _latestLocationSample = null;
       state = state.copyWith(
           status: 'recoverable_error',
           errorMessage: _message(error),
           locationMessage: '真实定位暂时无法启动，请稍后重试。');
+      _refreshNearbyStoryPoints();
     }
   }
 
   void _listenToRealLocation() {
     _locations ??= ref.read(locationTrackerProvider).samples().listen(
-          _onLocation,
-          onError: (_) => state = state.copyWith(
-              status: 'recoverable_error',
-              locationMessage: '定位暂时中断，回到应用后会继续尝试'),
-        );
+      _onLocation,
+      onError: (_) {
+        _latestLocationSample = null;
+        state = state.copyWith(
+            status: 'recoverable_error', locationMessage: '定位暂时中断，回到应用后会继续尝试');
+        _refreshNearbyStoryPoints();
+      },
+    );
   }
 
   Future<void> _stopLocationMonitoring() async {
@@ -1590,6 +1663,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     await _cancelPlayerBindings();
     await _player.stop();
     await _stopLocationMonitoring();
+    _latestLocationSample = null;
     _loadedFragmentId = null;
     _loadedProfileId = null;
     _triggering = false;
@@ -1597,7 +1671,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         previousRoute != null &&
         (previousSession.id != nextJourneyId ||
             previousRoute.id != nextRouteId) &&
-        state.playbackMode == TourPlaybackMode.live) {
+        state.playbackMode != TourPlaybackMode.revisit) {
       try {
         await _repository.stopActiveTour(previousSession.id);
       } catch (_) {
@@ -1612,6 +1686,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     await _cancelPlayerBindings();
     await _locations?.cancel();
     _locations = null;
+    _latestLocationSample = null;
     try {
       await player.stop();
     } catch (_) {}

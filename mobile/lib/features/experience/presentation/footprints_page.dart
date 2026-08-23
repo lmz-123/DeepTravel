@@ -52,7 +52,7 @@ class FootprintsPage extends ConsumerWidget {
                     child: _LibraryMessage(
                       icon: Icons.route_outlined,
                       title: '还没有留下足迹',
-                      message: '完整走完一条路线后，它会安静地留在这里。',
+                      message: '开始一段漫游后，即使只听了部分故事，也会保留在这里。',
                     ),
                   )
                 : ListView.separated(
@@ -83,6 +83,7 @@ class _FootprintSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final clues = items.fold<int>(0, (sum, item) => sum + item.collectedCount);
     final photos = items.fold<int>(0, (sum, item) => sum + item.evidenceCount);
+    final active = items.where((item) => !item.journey.isCompleted).length;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -91,7 +92,8 @@ class _FootprintSummary extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _SummaryValue(value: '${items.length}', label: '处走完'),
+          _SummaryValue(value: '${items.length}', label: '段足迹'),
+          _SummaryValue(value: '$active', label: '进行中'),
           _SummaryValue(value: '$clues', label: '条线索'),
           _SummaryValue(value: '$photos', label: '张留念'),
         ],
@@ -121,16 +123,16 @@ class _SummaryValue extends StatelessWidget {
       );
 }
 
-class _FootprintCard extends StatelessWidget {
+class _FootprintCard extends ConsumerWidget {
   const _FootprintCard({required this.item});
 
   final JourneyLibraryItem item;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context, WidgetRef ref) => Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => context.push('/footprints/${item.journey.id}'),
+          onTap: () => _open(context, ref),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -148,6 +150,8 @@ class _FootprintCard extends StatelessWidget {
                         ),
                         if (item.route.contentStatus == 'archived')
                           const Chip(label: Text('已归档')),
+                        if (!item.journey.isCompleted)
+                          const Chip(label: Text('进行中')),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -155,15 +159,26 @@ class _FootprintCard extends StatelessWidget {
                       '${item.collectedCount}/${item.totalCount} 条线索 · ${item.evidenceCount} 张照片',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
+                    if (_activityLabel(item.journey) != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        _activityLabel(item.journey)!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                     const SizedBox(height: 13),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.replay_rounded,
-                            size: 18, color: AppColors.moss),
-                        SizedBox(width: 7),
-                        Text('线索已全部解锁，可随时重听'),
-                        Spacer(),
-                        Icon(Icons.chevron_right_rounded),
+                        Icon(
+                            item.journey.isCompleted
+                                ? Icons.replay_rounded
+                                : Icons.directions_walk_rounded,
+                            size: 18,
+                            color: AppColors.moss),
+                        const SizedBox(width: 7),
+                        Text(item.journey.isCompleted ? '查看足迹并回听故事' : '继续自由漫游'),
+                        const Spacer(),
+                        const Icon(Icons.chevron_right_rounded),
                       ],
                     ),
                   ],
@@ -173,6 +188,38 @@ class _FootprintCard extends StatelessWidget {
           ),
         ),
       );
+
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    if (item.journey.isCompleted) {
+      context.push('/footprints/${item.journey.id}');
+      return;
+    }
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    try {
+      final key = UserJourneyKey(userId, item.journey.id);
+      final ownerContext = await ref.read(journeyContextProvider(key).future);
+      if (!context.mounted) return;
+      ref
+          .read(journeyControllerProvider.notifier)
+          .resume(ownerContext.route, ownerContext.journey);
+      context.go('/journey/${ownerContext.journey.id}');
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('旅程进度暂时无法恢复，请稍后重试')),
+      );
+    }
+  }
+
+  String? _activityLabel(JourneySession journey) {
+    final time = journey.updatedAt ?? journey.completedAt ?? journey.startedAt;
+    if (time == null) return null;
+    final local = time.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '最近活动 ${local.year}-$month-$day';
+  }
 }
 
 class _ScrollableCenter extends StatelessWidget {

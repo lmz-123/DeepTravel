@@ -55,6 +55,72 @@ void main() {
     expect(modeStore.mode, TourLocationMode.real);
   });
 
+  testWidgets(
+      'real journey shows backend nearby metadata without a mandatory next action',
+      (tester) async {
+    final store = _MemoryTourStore();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(_FragmentRepository()),
+      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(_SilentNarrationPlayer()),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider
+          .overrideWithValue(_MemoryLocationModeStore(TourLocationMode.real)),
+    ]);
+    addTearDown(container.dispose);
+    container.read(journeyControllerProvider.notifier).resume(_route, _session);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-1')),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('附近故事点'), findsOneWidget);
+    expect(find.textContaining('潮汐里的旧城'), findsOneWidget);
+    expect(find.textContaining('约 3 分钟'), findsOneWidget);
+    expect(find.textContaining('不显示估算距离'), findsOneWidget);
+    expect(find.text('下一条线索（测试）'), findsNothing);
+    expect(find.byType(Switch), findsNothing);
+  });
+
+  test('denied location keeps nearby points ordered without fake distances',
+      () async {
+    final store = _MemoryTourStore();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider
+          .overrideWithValue(_ProgressingFragmentRepository()),
+      locationTrackerProvider.overrideWithValue(_DeniedLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(_SilentNarrationPlayer()),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider
+          .overrideWithValue(_MemoryLocationModeStore(TourLocationMode.real)),
+    ]);
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    await container
+        .read(activeTourControllerProvider.notifier)
+        .start(_twoFragmentRoute, _session);
+    final state = container.read(activeTourControllerProvider);
+
+    expect(state.status, 'permission_limited');
+    expect(state.nearbyStoryPoints.map((point) => point.fragment.id),
+        ['fragment-1', 'fragment-2']);
+    expect(
+        state.nearbyStoryPoints.every((point) => point.distanceMeters == null),
+        isTrue);
+  });
+
   test('simulated startup skips GPS and runtime switch restores real GPS',
       () async {
     final location = _RecordingLocationTracker();
@@ -483,6 +549,75 @@ void main() {
   });
 
   test(
+      'active replay keeps real location running and hands a new trigger back to live playback',
+      () async {
+    final store = _MemoryTourStore();
+    final player = _ControllableNarrationPlayer();
+    final location = _StreamingLocationTracker();
+    final repository = _ReplayProgressRepository();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(location),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider
+          .overrideWithValue(_MemoryLocationModeStore(TourLocationMode.real)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await location.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.start(_twoFragmentRoute, _session);
+    expect(await controller.selectRevealedFragment('fragment-1'), isTrue);
+    expect(location.sampleSubscriptions, 1);
+    expect(container.read(activeTourControllerProvider).playbackMode,
+        TourPlaybackMode.liveReplay);
+
+    final time = DateTime.utc(2026, 8, 23, 12);
+    location.emit(LocationSample(
+      latitude: _region.latitude,
+      longitude: _region.longitude,
+      accuracyM: 10,
+      recordedAt: time,
+    ));
+    await Future<void>.delayed(Duration.zero);
+    location.emit(LocationSample(
+      latitude: _region.latitude,
+      longitude: _region.longitude,
+      accuracyM: 10,
+      recordedAt: time.add(const Duration(seconds: 5)),
+    ));
+    await _waitUntil(() => repository.isTriggered('fragment-2'));
+
+    var state = container.read(activeTourControllerProvider);
+    expect(location.sampleSubscriptions, 1);
+    expect(state.queue.map((fragment) => fragment.id), ['fragment-2']);
+    expect(repository.acknowledgeCalls, 0);
+
+    player.completeNaturally();
+    await _waitUntil(() => player.playedFragmentIds.length == 2);
+    state = container.read(activeTourControllerProvider);
+    expect(state.playbackMode, TourPlaybackMode.live);
+    expect(player.playedFragmentIds, ['fragment-1', 'fragment-2']);
+    expect(repository.acknowledgeCalls, 0);
+
+    await controller.stopTour();
+    expect(container.read(activeTourControllerProvider).nearbyStoryPoints,
+        isEmpty);
+  });
+
+  test(
       'cross-attraction replacement rejects old callbacks and keeps one audio owner',
       () async {
     final store = _MemoryTourStore();
@@ -718,6 +853,8 @@ const _fragment = StoryFragment(
   reviewState: 'in_review',
   triggerRegion: _region,
   audio: _audio,
+  displayTheme: '潮汐里的旧城',
+  expectedDurationSeconds: 121,
 );
 
 const _secondFragment = StoryFragment(
@@ -1145,6 +1282,34 @@ class _CountingProgressRepository extends _ProgressingFragmentRepository {
   }
 }
 
+class _ReplayProgressRepository extends _ProgressingFragmentRepository {
+  _ReplayProgressRepository()
+      : super(initialStates: const {
+          'fragment-1': 'triggered',
+          'fragment-2': 'undiscovered',
+        });
+
+  int acknowledgeCalls = 0;
+
+  bool isTriggered(String fragmentId) => _states[fragmentId] == 'triggered';
+
+  @override
+  Future<StoryFragment> acknowledgePlayback(
+    String journeyId,
+    String fragmentId,
+    double progress,
+    String idempotencyKey,
+  ) async {
+    acknowledgeCalls += 1;
+    return super.acknowledgePlayback(
+      journeyId,
+      fragmentId,
+      progress,
+      idempotencyKey,
+    );
+  }
+}
+
 class _EarlyAdvanceRepository extends _ProgressingFragmentRepository {
   _EarlyAdvanceRepository()
       : super(initialStates: const {
@@ -1385,6 +1550,40 @@ class _RecordingLocationTracker implements LocationTracker {
   Future<void> stop() async {
     stopCalls += 1;
   }
+}
+
+class _DeniedLocationTracker implements LocationTracker {
+  @override
+  Future<TourLocationPermission> requestPermission() async =>
+      TourLocationPermission.denied;
+
+  @override
+  Stream<LocationSample> samples() => const Stream.empty();
+
+  @override
+  Future<void> stop() async {}
+}
+
+class _StreamingLocationTracker implements LocationTracker {
+  final _samples = StreamController<LocationSample>.broadcast(sync: true);
+  int sampleSubscriptions = 0;
+
+  void emit(LocationSample sample) => _samples.add(sample);
+
+  @override
+  Future<TourLocationPermission> requestPermission() async =>
+      TourLocationPermission.granted;
+
+  @override
+  Stream<LocationSample> samples() {
+    sampleSubscriptions += 1;
+    return _samples.stream;
+  }
+
+  @override
+  Future<void> stop() async {}
+
+  Future<void> dispose() => _samples.close();
 }
 
 class _MemoryLocationModeStore implements LocationModeStore {

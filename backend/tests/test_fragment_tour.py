@@ -16,6 +16,7 @@ from app.infrastructure.persistence.models import (
     PhotoMissionModel,
     RouteModel,
     StoryArcModel,
+    StoryFragmentModel,
 )
 
 
@@ -45,9 +46,9 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     assert tour["download_size_bytes"] == 0
     assert "transcript" not in tour["fragments"][0]
     assert tour["fragments"][0]["audio"]["url"].endswith(".m4a")
-    audio = client.get(
-        "/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-conversational.3.m4a"
-    )
+    assert tour["fragments"][0]["display_theme"] == "定位音频 · 碎片叙事"
+    assert tour["fragments"][0]["expected_duration_seconds"] > 0
+    audio = client.get("/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-conversational.3.m4a")
     assert audio.status_code == 404
 
 
@@ -93,9 +94,7 @@ def test_public_voice_profiles_require_complete_current_coverage_and_preserve_de
         session.flush()
 
         def add_track(fragment, voice, *, stale_hash=False):
-            transcript_hash = hashlib.sha256(
-                fragment.narration_script.strip().encode()
-            ).hexdigest()
+            transcript_hash = hashlib.sha256(fragment.narration_script.strip().encode()).hexdigest()
             session.add(
                 FragmentNarrationTrackModel(
                     id=str(uuid4()),
@@ -135,9 +134,10 @@ def test_public_voice_profiles_require_complete_current_coverage_and_preserve_de
         item["audio_url"].startswith("http://localhost/")
         for item in first_fragment["narration_tracks"].values()
     )
-    assert first_fragment["audio"]["url"] == first_fragment["narration_tracks"][
-        "default-narration-voice"
-    ]["audio_url"]
+    assert (
+        first_fragment["audio"]["url"]
+        == first_fragment["narration_tracks"]["default-narration-voice"]["audio_url"]
+    )
 
     _, journey = _start(client, user_headers)
     with database.session_factory() as session:
@@ -225,6 +225,25 @@ def test_real_location_can_trigger_out_of_order_but_demo_stays_dependency_ordere
     assert located.status_code == 200
     assert located.get_json()["data"]["fragment"]["id"] == later["id"]
 
+    first = route["audio_tour"]["fragments"][0]
+    returned = client.post(
+        f"/api/v1/journeys/{journey['id']}/fragments/{first['id']}/triggers",
+        json={
+            "method": "location",
+            "latitude": first["trigger_region"]["latitude"],
+            "longitude": first["trigger_region"]["longitude"],
+            "accuracy_m": 10,
+            "idempotency_key": str(uuid4()),
+        },
+        headers=guest_headers,
+    )
+    assert returned.status_code == 200
+    ledger = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
+    ).get_json()["data"]
+    revealed = {item["id"] for item in ledger["entries"] if item.get("title")}
+    assert revealed == {later["id"], first["id"]}
+
     demo = client.post(
         endpoint,
         json={"method": "demo", "idempotency_key": str(uuid4())},
@@ -232,6 +251,67 @@ def test_real_location_can_trigger_out_of_order_but_demo_stays_dependency_ordere
     )
     assert demo.status_code == 409
     assert demo.get_json()["error"]["code"] == "fragment_locked"
+
+
+def test_real_trigger_requires_current_public_route_but_saved_progress_remains_readable(
+    app, client, guest_headers
+):
+    route, journey = _start(client, guest_headers)
+    first, second = route["audio_tour"]["fragments"][:2]
+    accepted = client.post(
+        f"/api/v1/journeys/{journey['id']}/fragments/{first['id']}/triggers",
+        json={
+            "method": "location",
+            "latitude": first["trigger_region"]["latitude"],
+            "longitude": first["trigger_region"]["longitude"],
+            "accuracy_m": 10,
+            "idempotency_key": str(uuid4()),
+        },
+        headers=guest_headers,
+    )
+    assert accepted.status_code == 200
+
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        stored_route = session.get(RouteModel, route["id"])
+        stored_route.content_status = "archived"
+        stored_route.published_at = None
+        session.commit()
+
+    blocked = client.post(
+        f"/api/v1/journeys/{journey['id']}/fragments/{second['id']}/triggers",
+        json={
+            "method": "location",
+            "latitude": second["trigger_region"]["latitude"],
+            "longitude": second["trigger_region"]["longitude"],
+            "accuracy_m": 10,
+            "idempotency_key": str(uuid4()),
+        },
+        headers=guest_headers,
+    )
+    assert blocked.status_code == 409
+    assert blocked.get_json()["error"]["code"] == "fragment_unavailable"
+
+    ledger = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
+    ).get_json()["data"]
+    saved = next(item for item in ledger["entries"] if item["id"] == first["id"])
+    assert saved["state"] == "triggered"
+    assert saved["transcript"]
+
+
+def test_fragment_display_theme_preserves_arbitrary_backend_label(app, client):
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        fragment = session.get(StoryFragmentModel, "nantou-fragment-1")
+        fragment.experience_tags_json = ["潮汐里的旧城"]
+        session.commit()
+
+    route = client.get("/api/v1/routes/nantou-time-layers").get_json()["data"]
+    fragment = route["audio_tour"]["fragments"][0]
+    assert fragment["display_theme"] == "潮汐里的旧城"
+    assert fragment["experience_tags"] == ["潮汐里的旧城"]
+    assert fragment["expected_duration_seconds"] > 0
 
 
 def test_legacy_photo_guidance_uses_safe_runtime_fallbacks(app, client, guest_headers):
@@ -371,19 +451,14 @@ def test_evidence_is_private_between_guests(app, client, guest_headers):
         headers=guest_headers,
         content_type="multipart/form-data",
     ).get_json()["data"]
-    listed = client.get(
-        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
-    )
+    listed = client.get(f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers)
     assert listed.status_code == 200
     metadata = listed.get_json()["data"]
     assert len(metadata) == 1
     assert metadata[0]["fragment_id"] == fragment["id"]
-    assert metadata[0]["url"].endswith(
-        f"/journeys/{journey['id']}/evidence/{evidence['id']}"
-    )
+    assert metadata[0]["url"].endswith(f"/journeys/{journey['id']}/evidence/{evidence['id']}")
     assert not (
-        {"object_key", "storage_provider", "canonical_reference", "sha256"}
-        & set(metadata[0])
+        {"object_key", "storage_provider", "canonical_reference", "sha256"} & set(metadata[0])
     )
     restarted_style_read = client.get(
         f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
@@ -394,9 +469,7 @@ def test_evidence_is_private_between_guests(app, client, guest_headers):
     other_token = client.post("/api/v1/sessions/guest").get_json()["data"]["token"]
     other_headers = {"Authorization": f"Bearer {other_token}"}
     assert (
-        client.get(
-            f"/api/v1/journeys/{journey['id']}/evidence", headers=other_headers
-        ).status_code
+        client.get(f"/api/v1/journeys/{journey['id']}/evidence", headers=other_headers).status_code
         == 404
     )
     response = client.get(
@@ -416,18 +489,24 @@ def test_evidence_is_private_between_guests(app, client, guest_headers):
     )
     assert expired.status_code == 410
     assert expired.get_json()["error"]["code"] == "evidence_expired"
-    assert client.get(
-        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
-    ).get_json()["data"][0]["is_expired"] is True
+    assert (
+        client.get(f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers).get_json()[
+            "data"
+        ][0]["is_expired"]
+        is True
+    )
 
     deleted = client.delete(
         f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
         headers=guest_headers,
     )
     assert deleted.status_code == 200
-    assert client.get(
-        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
-    ).get_json()["data"] == []
+    assert (
+        client.get(f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers).get_json()[
+            "data"
+        ]
+        == []
+    )
     assert (
         client.get(
             f"/api/v1/journeys/{journey['id']}/evidence/{evidence['id']}",
@@ -513,9 +592,12 @@ def test_photo_clue_collects_without_upload_and_legacy_pending_reconciles(
         headers=guest_headers,
     )
     assert completed.get_json()["data"]["fragment"]["state"] == "collected"
-    assert client.get(
-        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
-    ).get_json()["data"] == []
+    assert (
+        client.get(f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers).get_json()[
+            "data"
+        ]
+        == []
+    )
     next_trigger = client.post(
         f"/api/v1/journeys/{journey['id']}/fragments/{second['id']}/triggers",
         json={"method": "demo", "idempotency_key": str(uuid4())},
@@ -541,9 +623,12 @@ def test_photo_clue_collects_without_upload_and_legacy_pending_reconciles(
     ).get_json()["data"]
     assert no_photo_ledger["collected_count"] == no_photo_ledger["total_count"] == 5
     assert no_photo_ledger["reconstruction_unlocked"] is True
-    assert client.get(
-        f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers
-    ).get_json()["data"] == []
+    assert (
+        client.get(f"/api/v1/journeys/{journey['id']}/evidence", headers=guest_headers).get_json()[
+            "data"
+        ]
+        == []
+    )
 
     database = app.extensions["database"]
     with database.session_factory() as session:

@@ -32,6 +32,7 @@ from app.infrastructure.persistence.models import (
     NarrationVoiceProfileModel,
     PhotoMissionModel,
     ReconstructionModel,
+    RouteModel,
     StoryArcModel,
     StoryFragmentModel,
     TriggerRegionModel,
@@ -228,6 +229,18 @@ class FragmentTourService:
                 return duplicate
             fragment, state = self._fragment_state(session, journey, fragment_id)
             method = str(payload.get("method") or "location")
+            if method == "location":
+                route = session.get(RouteModel, journey.route_id)
+                if (
+                    route is None
+                    or route.content_status != "published"
+                    or route.published_at is None
+                ):
+                    raise FragmentOperationError(
+                        "fragment_unavailable",
+                        "该故事点当前不可用于新的现场触发",
+                        status_code=409,
+                    )
             if method == "demo":
                 dependencies = set(
                     session.scalars(
@@ -759,15 +772,17 @@ class FragmentTourService:
         region = fragment.trigger_region
         mission = fragment.photo_mission
         narration = narration or self._narration_context(session, fragment.arc)
+        experience_tags = normalize_experience_tags(fragment.experience_tags_json or [])
+        route_theme = fragment.arc.route.theme if fragment.arc.route is not None else ""
         return {
             "id": fragment.id,
             "position": fragment.position,
             "safe_preview": fragment.safe_preview,
             "interaction_type": fragment.interaction_type,
             "review_state": fragment.review_state,
-            "experience_tags": normalize_experience_tags(
-                fragment.experience_tags_json or []
-            ),
+            "experience_tags": experience_tags,
+            "display_theme": experience_tags[0] if experience_tags else route_theme,
+            "expected_duration_seconds": max(30, round(len(fragment.narration_script.strip()) / 4)),
             "trigger_region": {
                 "latitude": region.latitude,
                 "longitude": region.longitude,

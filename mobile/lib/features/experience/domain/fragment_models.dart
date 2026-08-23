@@ -192,6 +192,9 @@ class StoryFragment {
     this.sources = const [],
     this.dependencyIds = const [],
     this.narrationTracks = const {},
+    this.experienceTags = const [],
+    this.displayTheme,
+    this.expectedDurationSeconds,
   });
 
   final String id;
@@ -214,6 +217,9 @@ class StoryFragment {
   final List<HistoricalSource> sources;
   final List<String> dependencyIds;
   final Map<String, NarrationTrack> narrationTracks;
+  final List<String> experienceTags;
+  final String? displayTheme;
+  final int? expectedDurationSeconds;
 
   bool get isCollected => state == 'collected';
   bool get isMissionPending => state == 'mission_pending';
@@ -243,6 +249,9 @@ class StoryFragment {
         sources: sources,
         dependencyIds: dependencyIds,
         narrationTracks: narrationTracks,
+        experienceTags: experienceTags,
+        displayTheme: displayTheme,
+        expectedDurationSeconds: expectedDurationSeconds,
       );
 
   factory StoryFragment.fromJson(Map<String, dynamic> json) {
@@ -278,6 +287,11 @@ class StoryFragment {
               const <String, dynamic>{})
           .map((key, value) => MapEntry(
               key, NarrationTrack.fromJson(value as Map<String, dynamic>))),
+      experienceTags: List<String>.from(
+          json['experience_tags'] as List<dynamic>? ?? const []),
+      displayTheme: _nonEmptyString(json['display_theme']),
+      expectedDurationSeconds:
+          (json['expected_duration_seconds'] as num?)?.round(),
     );
   }
 }

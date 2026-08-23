@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../application/nearby_story_points.dart';
 import '../domain/fragment_models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
@@ -135,7 +136,10 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
               Text(manifest.centralQuestion,
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 18),
-              _FragmentRail(manifest: manifest, ledger: ledger),
+              if (state.locationMode == TourLocationMode.real)
+                _NearbyStoryPointsPanel(points: state.nearbyStoryPoints)
+              else
+                _FragmentRail(manifest: manifest, ledger: ledger),
               const SizedBox(height: 22),
               AnimatedSwitcher(
                   duration: const Duration(milliseconds: 380),
@@ -167,7 +171,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                         : const Icon(Icons.my_location_rounded),
                     label: Text(state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）')),
               ],
-              if (state.playbackMode == TourPlaybackMode.revisit &&
+              if (state.playbackMode == TourPlaybackMode.liveReplay &&
                   state.liveFragmentId != null) ...[
                 const SizedBox(height: 10),
                 TextButton.icon(
@@ -666,6 +670,116 @@ class _FragmentRail extends ConsumerWidget {
         );
       }).toList(),
     );
+  }
+}
+
+class _NearbyStoryPointsPanel extends ConsumerWidget {
+  const _NearbyStoryPointsPanel({required this.points});
+
+  final List<NearbyStoryPoint> points;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (points.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(18),
+          child: Text('当前漫游暂无可展示的已发布故事点。'),
+        ),
+      );
+    }
+    final hasDistance = points.any((point) => point.distanceMeters != null);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('附近故事点', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 6),
+            Text(
+              hasDistance
+                  ? '自由选择行走方向；靠近任意故事点都会自动触发。'
+                  : '定位暂不可用，以下按后台推荐顺序展示，不显示估算距离。',
+            ),
+            const SizedBox(height: 10),
+            for (final point in points) _NearbyStoryPointTile(point: point),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NearbyStoryPointTile extends ConsumerWidget {
+  const _NearbyStoryPointTile({required this.point});
+
+  final NearbyStoryPoint point;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fragment = point.fragment;
+    final durationSeconds = fragment.expectedDurationSeconds;
+    final durationMinutes = durationSeconds == null
+        ? null
+        : (durationSeconds / 60).ceil().clamp(1, 99);
+    final metadata = <String>[
+      if (fragment.displayTheme != null) fragment.displayTheme!,
+      if (durationMinutes != null) '约 $durationMinutes 分钟',
+      _statusLabel(point.status),
+      if (point.distanceMeters != null) _distanceLabel(point.distanceMeters!),
+    ];
+    final replayable = point.canReplay;
+    return Semantics(
+      button: replayable,
+      label: '${fragment.title ?? fragment.safePreview}，${metadata.join('，')}',
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading:
+            Icon(_statusIcon(point.status), color: _statusColor(point.status)),
+        title: Text(fragment.title ?? fragment.safePreview),
+        subtitle: Text(metadata.join(' · ')),
+        trailing:
+            replayable ? const Icon(Icons.play_circle_outline_rounded) : null,
+        onTap: replayable
+            ? () => ref
+                .read(activeTourControllerProvider.notifier)
+                .selectRevealedFragment(fragment.id)
+            : null,
+      ),
+    );
+  }
+
+  String _statusLabel(NearbyStoryPointStatus status) => switch (status) {
+        NearbyStoryPointStatus.locationUnavailable => '等待定位',
+        NearbyStoryPointStatus.outside => '尚未进入范围',
+        NearbyStoryPointStatus.approaching => '正在确认位置',
+        NearbyStoryPointStatus.inRange => '已进入触发范围',
+        NearbyStoryPointStatus.triggered => '已触发，可回听',
+        NearbyStoryPointStatus.heard => '已听过，可回听',
+      };
+
+  IconData _statusIcon(NearbyStoryPointStatus status) => switch (status) {
+        NearbyStoryPointStatus.locationUnavailable =>
+          Icons.location_off_outlined,
+        NearbyStoryPointStatus.outside => Icons.radio_button_unchecked_rounded,
+        NearbyStoryPointStatus.approaching => Icons.radar_rounded,
+        NearbyStoryPointStatus.inRange => Icons.location_on_outlined,
+        NearbyStoryPointStatus.triggered => Icons.volume_up_outlined,
+        NearbyStoryPointStatus.heard => Icons.check_circle_outline_rounded,
+      };
+
+  Color _statusColor(NearbyStoryPointStatus status) => switch (status) {
+        NearbyStoryPointStatus.triggered ||
+        NearbyStoryPointStatus.inRange =>
+          AppColors.terracotta,
+        NearbyStoryPointStatus.heard => AppColors.moss,
+        _ => AppColors.ink,
+      };
+
+  String _distanceLabel(double meters) {
+    if (meters < 1000) return '${meters.round()} 米';
+    return '${(meters / 1000).toStringAsFixed(1)} 公里';
   }
 }
 
