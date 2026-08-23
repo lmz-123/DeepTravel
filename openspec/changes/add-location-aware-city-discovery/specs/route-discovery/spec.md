@@ -28,10 +28,10 @@ The system SHALL return only selectable cities with formally published content a
 - **THEN** the sheet closes, the selected city takes precedence, and discovery reloads only that city's content before attempting point-distance sorting
 
 ### Requirement: Home scenic-point ordering is truthful and scoped
-When a fresh real sample with reported accuracy of 25 metres or better exists for the current discovery event, the client SHALL calculate geodesic distance to every eligible home point in the active city and order point cards by ascending unrounded distance. Exact ties SHALL retain server response order and then stable point ID. When no accepted sample exists, the client SHALL preserve server response order and MUST NOT display or imply a calculated distance. This ranking SHALL NOT reorder routes, fragments, or stops after a card is opened.
+When a real position is successfully acquired for the current discovery event, the client SHALL calculate geodesic distance to every eligible home point in the active city and order point cards by ascending unrounded distance without checking reported accuracy. Exact ties SHALL retain server response order and then stable point ID. When acquisition fails, the client SHALL preserve server response order and MUST NOT display or imply a calculated distance. This ranking SHALL NOT reorder routes, fragments, or stops after a card is opened.
 
 #### Scenario: Nearest point is first on home
-- **WHEN** an accepted sample exists and the active city has multiple published home points
+- **WHEN** a successfully acquired position exists and the active city has multiple published home points
 - **THEN** the first home card represents the point with the smallest calculated distance
 
 #### Scenario: Equal point distances
@@ -39,7 +39,7 @@ When a fresh real sample with reported accuracy of 25 metres or better exists fo
 - **THEN** their relative order follows server response order and stable point ID
 
 #### Scenario: No accepted location exists
-- **WHEN** discovery does not obtain an accepted position for the current event
+- **WHEN** discovery does not obtain a position for the current event
 - **THEN** point cards remain in server order and display no default, stale, estimated, or placeholder distance
 
 #### Scenario: Point card opens its route

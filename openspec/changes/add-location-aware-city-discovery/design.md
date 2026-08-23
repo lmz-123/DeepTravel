@@ -8,7 +8,7 @@ The requested behavior is intentionally small: location affects the initial defa
 
 **Goals:**
 
-- Use one high-accuracy platform position on cold discovery entry, refresh, and city switch.
+- Use one platform position on cold discovery entry, refresh, and city switch without accuracy gating.
 - Select the initial city only when the platform locality matches a backend-selectable city with published points; otherwise use Shenzhen.
 - Sort published scenic/story point cards for the active city by geodesic distance.
 - Keep point tags fully backend-driven and location samples transient.
@@ -24,13 +24,13 @@ The requested behavior is intentionally small: location affects the initial defa
 
 ### 1. Initial city uses platform locality plus the existing backend catalog
 
-On cold entry, discovery asks for one real high-accuracy position and resolves its administrative locality through the platform location stack. A pure normalizer compares that locality with the names of cities already returned by the backend's selectable city catalog. Generic normalization may remove administrative suffixes such as `市`; Flutter does not contain a city list.
+On cold entry, discovery asks for one real current position and resolves its administrative locality through the platform location stack. A pure normalizer compares that locality with the names of cities already returned by the backend's selectable city catalog. Generic normalization may remove administrative suffixes such as `市`; Flutter does not contain a city list.
 
 The locality is accepted only when the matched backend city has at least one published scenic/story point in the discovery payload. If locality is unavailable, unmatched, or has no published point, discovery uses the project's existing Shenzhen default. This design never reads a city center, recognition radius, or boundary and never calculates distance from the user to a city.
 
 The same automatic city choice is not rerun after a manual switch. Location acquired for refresh or switching is used only to sort the already active city.
 
-### 2. Location attempts are event-scoped and require 25-metre accuracy
+### 2. Location attempts are event-scoped and do not gate on accuracy
 
 Create a discovery-only `CurrentLocationSource` with a bounded one-shot operation returning a real platform position and optional locality. Invoke it only for:
 
@@ -38,7 +38,7 @@ Create a discovery-only `CurrentLocationSource` with a bounded one-shot operatio
 2. an explicit home refresh;
 3. completion of a manual city switch.
 
-Only a fresh sample whose reported horizontal accuracy is at most 25 metres can produce distance ordering or distance labels. An inaccurate, denied, disabled, timed-out, or failed attempt is treated as unavailable. Discovery never starts the journey stream and never substitutes simulated journey coordinates.
+Every successful one-shot real position can produce distance ordering and distance labels. Discovery does not read or branch on reported horizontal accuracy. Denied, disabled, timed-out, or failed acquisition is treated as unavailable. Discovery never starts the journey stream and never substitutes simulated journey coordinates.
 
 No first-entry-processed value is persisted. “Cold entry” is an in-memory page/application lifecycle event, not an installation-history flag.
 
@@ -52,11 +52,11 @@ Flutter renders one home card per projected point using the current route-card v
 
 ### 4. Ranking is local, scoped to the selected city, and does not leak inward
 
-For an accepted sample, a pure Flutter service calculates Haversine distance to every projected point in the active city and sorts ascending by unrounded metres. Exact ties use the server response order followed by stable point ID. The first home card is therefore the closest published point.
+For a successfully acquired position, a pure Flutter service calculates Haversine distance to every projected point in the active city and sorts ascending by unrounded metres. Exact ties use the server response order followed by stable point ID. The first home card is therefore the closest published point.
 
 On refresh, the active city is unchanged. On manual switch, the user's chosen backend city is applied before acquisition and cannot be replaced by locality. Ranking affects only the home carousel. Route details, fragment/stop position, and journey progression remain untouched.
 
-Without an accepted sample, the client preserves server response order and omits all distance copy. A prior event's sample is not reused after a refresh or switch failure.
+When acquisition fails, the client preserves server response order and omits all distance copy. A prior event's position is not reused after a refresh or switch failure.
 
 ### 5. Tags live only on point records
 
@@ -72,13 +72,13 @@ On cold-entry failure, retain Shenzhen and server order. On refresh or switch fa
 
 ### 7. Privacy boundary
 
-Coordinates, accuracy, locality, sample timestamps, and calculated distances exist only in transient client memory. They are not sent to the API/admin service, persisted, or written to logs/analytics. Logs may record only a coarse outcome category. Disposing or replacing the ranking state releases the prior sample.
+Coordinates, locality, sample timestamps, and calculated distances exist only in transient client memory. They are not sent to the API/admin service, persisted, or written to logs/analytics. Reported accuracy is ignored by discovery business logic. Logs may record only a coarse outcome category. Disposing or replacing the ranking state releases the prior sample.
 
 ## API and Module Boundaries
 
 - Backend catalog: filters published cities/points and serializes compact point metadata; it never receives traveler coordinates.
 - Main Alembic: owns the two additive point-tag columns.
-- Flutter discovery domain: owns locality matching, quality checks, Haversine ranking, and stable fallback.
+- Flutter discovery domain: owns locality matching, Haversine ranking, and stable fallback without an accuracy threshold.
 - Flutter presentation: owns purpose/failure copy, the existing city selector, and the retained card visual.
 - Journey location: remains unchanged and is not a discovery dependency.
 - Independent admin: edits matching point tags and consumes the main migration without creating one.
@@ -94,7 +94,7 @@ Coordinates, accuracy, locality, sample timestamps, and calculated distances exi
 ## Risks / Trade-offs
 
 - [Platform locality names can differ from backend display names] → Apply generic administrative-suffix normalization; unmatched results deliberately fall back to Shenzhen rather than adding a city-coordinate system.
-- [25-metre accuracy may be unavailable indoors] → Fall back to server order and omit distance instead of accepting imprecise data.
+- [Platform coordinates may be less precise in some environments] → Use the successful one-shot position consistently; discovery ordering does not claim or expose a precision guarantee.
 - [A point card still opens a parent route] → Keep the existing navigation contract while ensuring the home title/tags/distance describe the point, not a newly ranked route.
 - [Two point storage models exist] → Add the same tag field to stops and fragments, project managed fragments first and legacy stops only for legacy routes.
 
@@ -103,5 +103,5 @@ Coordinates, accuracy, locality, sample timestamps, and calculated distances exi
 1. Add the main Alembic revision for stop/fragment point tags and update compatible API mappings/projection.
 2. Deploy the API migration and response before the independent admin and Flutter client.
 3. Deploy admin point-tag support; existing import/export paths preserve the new field without adding a new import feature.
-4. Ship the Flutter client, then verify cold-entry match/fallback, refresh, city switch, 25-metre gating, nearest-first point cards, tag passthrough, and denial fallback.
+4. Ship the Flutter client, then verify cold-entry match/fallback, refresh, city switch, ordering across different reported accuracy values, nearest-first point cards, tag passthrough, and denial fallback.
 5. Roll back application versions without dropping the additive tag columns.

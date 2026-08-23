@@ -14,8 +14,8 @@ The client SHALL present concise Simplified Chinese purpose copy before its firs
 ### Requirement: Home cards present scenic points without redesigning the route flow
 The client SHALL retain the current home card visual structure and existing parent-route opening behavior while making each home card's title, tags, and optional distance describe one published scenic/story point. The home carousel SHALL reset to the first card after a completed refresh or city change. Route details and journey presentation SHALL remain unchanged.
 
-#### Scenario: Accurate distance is available
-- **WHEN** a point card has distance calculated from the current accepted sample
+#### Scenario: Current distance is available
+- **WHEN** a point card has distance calculated from the current successful one-shot position
 - **THEN** the card shows an honest human-readable distance and backend-provided point tags
 
 #### Scenario: Distance is unavailable
