@@ -37,11 +37,26 @@
     "central_question": "为什么深圳的城市史从南头讲起，而今天的深圳中心却不在南头？",
     "complete_story": "好啦，走到这里，我们把刚才遇见的几个南头放在一起。三百三十一年，是郡县行政在这一带落下的起点；一三九四年，明代沿海守御体系在这里修筑所城；一五七三年以后，南头又成了新安县治。所以别人再问南头有多少年，你不用急着抢一个唯一答案——行政的开头和城墙的开头，本来就不是同一天。后来，迁界让县的建置和许多居民的生活一起中断；恢复以后，南头继续做了很久的县城，直到一九五三年县治迁往深圳镇。现代深圳从这里把中心搬走，很快长到旧城墙之外，又在更新中回到南头，重新看看自己从哪里来。沿途的城门、街巷和新旧用途，不能单独替所有往事作证，却像一扇扇小门，把行政、海防、人口和城市发展重新连了起来。南头最动人的地方，也许不是它永远站在中心，而是每次身份改变以后，都还留下一点东西，等我们走慢一点，再把它认出来。",
     "causal_model": [
-      "行政建置早于现存城垣",
-      "县治迁走，不等于地点失去所有功能",
-      "军事所城后来承载新安县治",
-      "国家政策可以让行政中心和居民生活同时中断",
-      "现代中心迁走后，旧城被重新赋予历史与文化角色"
+      {
+        "id": "nantou-cause-1",
+        "text": "行政建置早于现存城垣"
+      },
+      {
+        "id": "nantou-cause-2",
+        "text": "县治迁走，不等于地点失去所有功能"
+      },
+      {
+        "id": "nantou-cause-3",
+        "text": "军事所城后来承载新安县治"
+      },
+      {
+        "id": "nantou-cause-4",
+        "text": "国家政策可以让行政中心和居民生活同时中断"
+      },
+      {
+        "id": "nantou-cause-5",
+        "text": "现代中心迁走后，旧城被重新赋予历史与文化角色"
+      }
     ],
     "pronunciation_notes": [
       "东官郡：dōng guān jùn",
@@ -98,8 +113,8 @@
         "id": "trigger-nantou-fragment-1",
         "latitude": 22.5381,
         "longitude": 113.9227,
-        "entry_radius_m": 14,
-        "exit_radius_m": 35,
+        "entry_radius_m": 8,
+        "exit_radius_m": 24,
         "max_accuracy_m": 20,
         "qualifying_samples": 2,
         "sample_window_seconds": 15,
@@ -167,8 +182,8 @@
         "id": "trigger-nantou-fragment-2",
         "latitude": 22.53903,
         "longitude": 113.92314,
-        "entry_radius_m": 14,
-        "exit_radius_m": 35,
+        "entry_radius_m": 8,
+        "exit_radius_m": 24,
         "max_accuracy_m": 20,
         "qualifying_samples": 2,
         "sample_window_seconds": 15,
@@ -223,8 +238,8 @@
         "id": "trigger-nantou-fragment-3",
         "latitude": 22.5396,
         "longitude": 113.92293,
-        "entry_radius_m": 14,
-        "exit_radius_m": 35,
+        "entry_radius_m": 8,
+        "exit_radius_m": 24,
         "max_accuracy_m": 20,
         "qualifying_samples": 2,
         "sample_window_seconds": 15,
@@ -291,8 +306,8 @@
         "id": "trigger-nantou-fragment-4",
         "latitude": 22.54015,
         "longitude": 113.92318,
-        "entry_radius_m": 14,
-        "exit_radius_m": 35,
+        "entry_radius_m": 8,
+        "exit_radius_m": 24,
         "max_accuracy_m": 20,
         "qualifying_samples": 2,
         "sample_window_seconds": 15,
@@ -350,8 +365,8 @@
         "id": "trigger-nantou-fragment-5",
         "latitude": 22.54065,
         "longitude": 113.92335,
-        "entry_radius_m": 14,
-        "exit_radius_m": 35,
+        "entry_radius_m": 8,
+        "exit_radius_m": 24,
         "max_accuracy_m": 20,
         "qualifying_samples": 2,
         "sample_window_seconds": 15,
