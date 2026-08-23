@@ -76,7 +76,7 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0010"
+    assert version == "20260823_0011"
 
 
 def test_narration_voice_migration_backfills_once_and_round_trips(tmp_path):
@@ -337,7 +337,7 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0010"
+        assert version == "20260823_0011"
 
 
 def test_node_community_migration_round_trips_without_touching_existing_data(tmp_path):

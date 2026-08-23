@@ -6,6 +6,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Double,
     Float,
     ForeignKey,
     Index,
@@ -62,8 +63,8 @@ class CityModel(Base):
     name: Mapped[str] = mapped_column(String(80))
     subtitle: Mapped[str] = mapped_column(String(160))
     hero_image: Mapped[str] = mapped_column(String(255))
-    latitude: Mapped[float] = mapped_column(Float)
-    longitude: Mapped[float] = mapped_column(Float)
+    latitude: Mapped[float] = mapped_column(Double)
+    longitude: Mapped[float] = mapped_column(Double)
 
     routes: Mapped[list[RouteModel]] = relationship(
         back_populates="city", cascade="all, delete-orphan"
@@ -111,8 +112,8 @@ class StopModel(Base):
     title: Mapped[str] = mapped_column(String(160))
     kicker: Mapped[str] = mapped_column(String(120))
     address: Mapped[str] = mapped_column(String(255))
-    latitude: Mapped[float] = mapped_column(Float)
-    longitude: Mapped[float] = mapped_column(Float)
+    latitude: Mapped[float] = mapped_column(Double)
+    longitude: Mapped[float] = mapped_column(Double)
     arrival_radius_m: Mapped[int] = mapped_column(Integer, default=80)
     story_title: Mapped[str] = mapped_column(String(200))
     story_body: Mapped[str] = mapped_column(Text)
@@ -446,8 +447,8 @@ class TriggerRegionModel(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     fragment_id: Mapped[str] = mapped_column(ForeignKey("story_fragments.id"), unique=True)
-    latitude: Mapped[float] = mapped_column(Float)
-    longitude: Mapped[float] = mapped_column(Float)
+    latitude: Mapped[float] = mapped_column(Double)
+    longitude: Mapped[float] = mapped_column(Double)
     entry_radius_m: Mapped[int] = mapped_column(Integer, default=60)
     exit_radius_m: Mapped[int] = mapped_column(Integer, default=90)
     max_accuracy_m: Mapped[int] = mapped_column(Integer, default=50)

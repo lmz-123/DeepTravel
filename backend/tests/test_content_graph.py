@@ -261,3 +261,32 @@ def test_shanghai_readable_city_package_is_generic_audio_photo_content():
         path = root / "backend/media" / item["storage_path"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
+
+
+def test_shangqiu_field_package_preserves_wgs84_precision_and_unordered_unlocks():
+    root = Path(__file__).parents[2]
+    package = json.loads(
+        (root / "docs/content-packages/shangqiu-peoples-park-field-v1.json").read_text()
+    )
+    media = {item["storage_path"]: item["mime_type"] for item in package["media"]}
+
+    result = validate_content_graph(package, media_assets=media)
+
+    assert result["valid"] is True, result["errors"]
+    assert package["city"]["slug"] == "shangqiu"
+    assert len(package["fragments"]) == 5
+    assert all(not item["dependency_ids"] for item in package["fragments"])
+    assert [
+        (item["trigger_region"]["latitude"], item["trigger_region"]["longitude"])
+        for item in package["fragments"]
+    ] == [
+        (34.4575224, 115.6617156),
+        (34.4572294, 115.658464),
+        (34.4583296, 115.6578027),
+        (34.4589831, 115.6596198),
+        (34.4615291, 115.6595436),
+    ]
+    for item in package["media"]:
+        path = root / "backend/media" / item["storage_path"]
+        assert path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
