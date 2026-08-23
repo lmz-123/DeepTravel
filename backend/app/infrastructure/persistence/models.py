@@ -56,6 +56,9 @@ class UserModel(Base):
     favorites: Mapped[list[TravelerFavoriteModel]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    footprint_entries: Mapped[list[FootprintEntryModel]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class CityModel(Base):
@@ -550,6 +553,10 @@ class StoryFragmentModel(Base):
     experience_tags_json: Mapped[list[str] | None] = mapped_column(
         JSON, default=list, nullable=True
     )
+    footprint_editorial_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    footprint_summary_options_json: Mapped[list[dict] | None] = mapped_column(
+        JSON, default=list, nullable=True
+    )
 
     arc: Mapped[StoryArcModel] = relationship(back_populates="fragments")
     trigger_region: Mapped[TriggerRegionModel] = relationship(
@@ -693,6 +700,101 @@ class JourneyFragmentModel(Base):
     )
 
     journey: Mapped[JourneyModel] = relationship(back_populates="fragments")
+
+
+class FootprintEntryModel(Base):
+    __tablename__ = "footprint_entries"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "journey_id",
+            "source_kind",
+            "source_id",
+            name="uq_footprint_source",
+        ),
+        Index("ix_footprints_user_created", "user_id", "created_at", "id"),
+        Index("ix_footprints_user_city_created", "user_id", "city_slug", "created_at"),
+        Index(
+            "ix_footprints_user_journey_state",
+            "user_id",
+            "journey_id",
+            "organization_state",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    journey_id: Mapped[str] = mapped_column(ForeignKey("journeys.id"), index=True)
+    source_kind: Mapped[str] = mapped_column(String(30))
+    source_id: Mapped[str] = mapped_column(String(36), index=True)
+    city_id: Mapped[str] = mapped_column(ForeignKey("cities.id"), index=True)
+    city_slug: Mapped[str] = mapped_column(String(80), index=True)
+    city_name: Mapped[str] = mapped_column(String(80))
+    scene_id: Mapped[str] = mapped_column(String(36))
+    scene_title: Mapped[str] = mapped_column(String(160))
+    story_title: Mapped[str] = mapped_column(String(255))
+    editorial_summary: Mapped[str] = mapped_column(Text)
+    source_revision: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    summary_options_json: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    themes_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    selected_summary_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    selected_summary_text: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    user_observation: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    user_sentence: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    organization_state: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    journey_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[UserModel] = relationship(back_populates="footprint_entries")
+    photo: Mapped[FootprintPhotoModel | None] = relationship(
+        back_populates="entry", cascade="all, delete-orphan", uselist=False
+    )
+    theme_rows: Mapped[list[FootprintThemeModel]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan"
+    )
+
+
+class FootprintThemeModel(Base):
+    __tablename__ = "footprint_themes"
+    __table_args__ = (
+        UniqueConstraint("footprint_id", "theme", name="uq_footprint_theme"),
+        Index("ix_footprint_themes_user_theme", "user_id", "theme", "footprint_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    footprint_id: Mapped[str] = mapped_column(
+        ForeignKey("footprint_entries.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    theme: Mapped[str] = mapped_column(String(80), index=True)
+
+    entry: Mapped[FootprintEntryModel] = relationship(back_populates="theme_rows")
+
+
+class FootprintPhotoModel(Base):
+    __tablename__ = "footprint_photos"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    footprint_id: Mapped[str] = mapped_column(
+        ForeignKey("footprint_entries.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    object_key: Mapped[str] = mapped_column(String(500), unique=True)
+    storage_provider: Mapped[str] = mapped_column(String(20), default="local")
+    canonical_reference: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    mime_type: Mapped[str] = mapped_column(String(80))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    idempotency_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    entry: Mapped[FootprintEntryModel] = relationship(back_populates="photo")
 
 
 class ActiveTourModel(Base):

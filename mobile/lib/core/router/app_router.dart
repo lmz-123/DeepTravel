@@ -38,7 +38,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/footprints/:id',
           builder: (context, state) =>
-              FootprintDetailPage(journeyId: state.pathParameters['id']!),
+              FootprintDetailPage(footprintId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/story',

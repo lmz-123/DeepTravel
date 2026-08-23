@@ -9,6 +9,7 @@ from flask_cors import CORS
 
 from app.application.city_story_service import CityStoryService
 from app.application.community_service import CommunityService
+from app.application.footprint_service import FootprintService
 from app.application.fragment_services import FragmentTourService
 from app.application.historical_content_service import HistoricalContentService
 from app.application.media_migration import MediaMigrationService
@@ -89,6 +90,12 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
             int(app.config["EVIDENCE_MAX_BYTES"]),
             int(app.config["EVIDENCE_MAX_EDGE"]),
         )
+    footprint_photo_storage = EvidenceStorage(
+        private_storage,
+        int(app.config["EVIDENCE_MAX_BYTES"]),
+        int(app.config["EVIDENCE_MAX_EDGE"]),
+        prefix="private/footprints",
+    )
     app.extensions["object_storage"] = {
         "public": public_storage,
         "private": private_storage,
@@ -131,6 +138,7 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
             media_root=str(app.config["MEDIA_ROOT"]),
             asset_url_builder=asset_url,
         ),
+        "footprints": FootprintService(database.session_factory, footprint_photo_storage),
         "historical_content": HistoricalContentService(database.session_factory),
         "story_listening": StoryListeningService(database.session_factory, asset_url),
         "city_stories": CityStoryService(database.session_factory, asset_url),
@@ -182,5 +190,23 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
         )
         for missing in report["missing"]:
             click.echo(f"missing: {missing}")
+
+    @app.cli.command("backfill-footprints")
+    @click.option("--dry-run", is_flag=True, help="Report changes without writing.")
+    @click.option("--skip-photos", is_flag=True, help="Do not copy eligible private evidence.")
+    def backfill_footprints_command(dry_run: bool, skip_photos: bool) -> None:
+        report = app.extensions["services"]["footprints"].backfill(
+            dry_run=dry_run,
+            copy_photos=not skip_photos,
+        )
+        click.echo(
+            f"created={report['created']} photos_copied={report['photos_copied']} "
+            f"failures={len(report['failures'])} dry_run={str(report['dry_run']).lower()}"
+        )
+        for failure in report["failures"]:
+            click.echo(
+                f"failure footprint={failure['footprint_id']} "
+                f"evidence={failure['evidence_id']} code={failure['code']}"
+            )
 
     return app

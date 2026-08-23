@@ -7,6 +7,7 @@ import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/fade_slide_in.dart';
 import '../domain/discovery_location.dart';
+import '../domain/footprint_models.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
 import 'active_tour_controller.dart';
@@ -76,6 +77,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   Widget build(BuildContext context) {
     final discovery = ref.watch(discoveryControllerProvider);
     final archivedJourneys = ref.watch(archivedActiveJourneysProvider);
+    final footprintResume = ref.watch(currentFootprintResumeProvider);
     return Scaffold(
       body: Stack(
         children: [
@@ -84,6 +86,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
             child: RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(archivedActiveJourneysProvider);
+                ref.invalidate(currentFootprintResumeProvider);
                 await ref
                     .read(discoveryControllerProvider.notifier)
                     .refreshDiscovery();
@@ -118,6 +121,17 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                         data: (items) => items.isEmpty
                             ? const SizedBox.shrink()
                             : _ArchivedJourneyCard(journey: items.first),
+                        orElse: () => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    sliver: SliverToBoxAdapter(
+                      child: footprintResume.maybeWhen(
+                        data: (item) => item == null
+                            ? const SizedBox.shrink()
+                            : _ResumeFootprintCard(entry: item),
                         orElse: () => const SizedBox.shrink(),
                       ),
                     ),
@@ -420,6 +434,51 @@ class _ArchivedJourneyCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _ResumeFootprintCard extends StatelessWidget {
+  const _ResumeFootprintCard({required this.entry});
+  final FootprintEntry entry;
+
+  @override
+  Widget build(BuildContext context) => FadeSlideIn(
+        child: Material(
+          color: AppColors.ink,
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(22),
+            onTap: () => context.push('/footprints/${entry.id}'),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(children: [
+                const Icon(Icons.edit_note_rounded, color: AppColors.gold),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('继续我的足迹',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(color: AppColors.gold)),
+                      const SizedBox(height: 3),
+                      Text('${entry.cityName} · ${entry.storyTitle}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: AppColors.white)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_rounded, color: AppColors.white),
+              ]),
+            ),
+          ),
+        ),
+      );
 }
 
 class _HeaderPlaceholder extends StatelessWidget {

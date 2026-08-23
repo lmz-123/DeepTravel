@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -7,6 +8,8 @@ import '../../../core/config/app_config.dart';
 import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/api_experience_repository.dart';
 import '../data/demo_experience_repository.dart';
+import '../data/footprint_photo_picker.dart';
+import '../data/footprint_share_service.dart';
 import '../data/narration_voice_preference_repository.dart';
 import '../data/pretrip_preparation_service.dart';
 import '../data/user_preferences_repository.dart';
@@ -14,6 +17,7 @@ import '../domain/experience_repository.dart';
 import '../domain/community_models.dart';
 import '../domain/city_story.dart';
 import '../domain/fragment_models.dart';
+import '../domain/footprint_models.dart';
 import '../domain/models.dart';
 import '../../auth/presentation/auth_provider.dart';
 import 'location_mode_controller.dart';
@@ -55,6 +59,9 @@ final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {
   }
   return DemoExperienceRepository();
 });
+
+final footprintPhotoPickerProvider =
+    Provider<FootprintPhotoPicker>((ref) => ImagePickerFootprintPhotoPicker());
 
 final pretripPreparationServiceProvider = Provider<PretripPreparationService>(
   (ref) => PretripPreparationService(ref.watch(dioProvider)),
@@ -130,6 +137,23 @@ class EvidenceBytesKey {
 
   @override
   int get hashCode => Object.hash(userId, journeyId, evidence.id, evidence.url);
+}
+
+class FootprintPhotoBytesKey {
+  const FootprintPhotoBytesKey(this.userId, this.footprintId, this.photo);
+  final String userId;
+  final String footprintId;
+  final FootprintPhoto photo;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FootprintPhotoBytesKey &&
+      other.userId == userId &&
+      other.footprintId == footprintId &&
+      other.photo.id == photo.id;
+
+  @override
+  int get hashCode => Object.hash(userId, footprintId, photo.id);
 }
 
 class CommunityFeedKey {
@@ -765,6 +789,158 @@ final orbPositionProvider =
     FutureProvider.family<NormalizedOrbPosition, String>((ref, userId) =>
         ref.watch(userPreferencesRepositoryProvider).readOrbPosition(userId));
 
+class FootprintFilterController extends Notifier<FootprintFilter> {
+  @override
+  FootprintFilter build() => const FootprintFilter();
+
+  void selectCity(String? slug) => state = FootprintFilter(
+        citySlug: slug,
+        theme: state.theme,
+        journeyState: state.journeyState,
+        organizationState: state.organizationState,
+        month: state.month,
+        order: state.order,
+      );
+
+  void selectTheme(String? theme) => state = FootprintFilter(
+        citySlug: state.citySlug,
+        theme: theme,
+        journeyState: state.journeyState,
+        organizationState: state.organizationState,
+        month: state.month,
+        order: state.order,
+      );
+
+  void selectJourneyState(String? value) => state = FootprintFilter(
+        citySlug: state.citySlug,
+        theme: state.theme,
+        journeyState: value,
+        organizationState: state.organizationState,
+        month: state.month,
+        order: state.order,
+      );
+
+  void selectOrganizationState(String? value) => state = FootprintFilter(
+        citySlug: state.citySlug,
+        theme: state.theme,
+        journeyState: state.journeyState,
+        organizationState: value,
+        month: state.month,
+        order: state.order,
+      );
+
+  void selectMonth(String? value) => state = FootprintFilter(
+        citySlug: state.citySlug,
+        theme: state.theme,
+        journeyState: state.journeyState,
+        organizationState: state.organizationState,
+        month: value,
+        order: state.order,
+      );
+
+  void selectOrder(String value) => state = FootprintFilter(
+        citySlug: state.citySlug,
+        theme: state.theme,
+        journeyState: state.journeyState,
+        organizationState: state.organizationState,
+        month: state.month,
+        order: value,
+      );
+}
+
+final footprintFilterProvider =
+    NotifierProvider<FootprintFilterController, FootprintFilter>(
+        FootprintFilterController.new);
+
+final currentFootprintsProvider = FutureProvider<FootprintPageResult>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) {
+    return const FootprintPageResult(
+        items: [], cities: [], themes: [], months: [], total: 0);
+  }
+  return ref
+      .watch(experienceRepositoryProvider)
+      .footprints(ref.watch(footprintFilterProvider));
+});
+
+final currentFootprintResumeProvider =
+    FutureProvider<FootprintEntry?>((ref) async {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
+  return ref.watch(experienceRepositoryProvider).footprintResumeCandidate();
+});
+
+class FootprintEditorController extends AsyncNotifier<FootprintEntry> {
+  FootprintEditorController(this.footprintId);
+  final String footprintId;
+
+  ExperienceRepository get _repository =>
+      ref.read(experienceRepositoryProvider);
+
+  @override
+  Future<FootprintEntry> build() => _repository.footprint(footprintId);
+
+  Future<void> save(FootprintDraft draft) async {
+    final previous = state.asData?.value;
+    try {
+      state = AsyncData(await _repository.updateFootprint(footprintId, draft));
+      _invalidateCollections();
+    } catch (_) {
+      if (previous != null) state = AsyncData(previous);
+      rethrow;
+    }
+  }
+
+  Future<void> uploadPhoto(String path) async {
+    final previous = state.asData?.value;
+    try {
+      await _repository.uploadFootprintPhoto(footprintId, path);
+      state = AsyncData(await _repository.footprint(footprintId));
+      _invalidateCollections();
+    } catch (_) {
+      if (previous != null) state = AsyncData(previous);
+      rethrow;
+    }
+  }
+
+  Future<void> deletePhoto() async {
+    final previous = state.asData?.value;
+    try {
+      await _repository.deleteFootprintPhoto(footprintId);
+      state = AsyncData(await _repository.footprint(footprintId));
+      _invalidateCollections();
+    } catch (_) {
+      if (previous != null) state = AsyncData(previous);
+      rethrow;
+    }
+  }
+
+  void _invalidateCollections() {
+    ref.invalidate(currentFootprintsProvider);
+    ref.invalidate(currentFootprintResumeProvider);
+    ref.invalidate(footprintPhotoBytesProvider);
+  }
+}
+
+final footprintEditorControllerProvider = AsyncNotifierProvider.family
+    .autoDispose<FootprintEditorController, FootprintEntry, String>(
+  FootprintEditorController.new,
+);
+
+final footprintRelatedContentProvider = FutureProvider.autoDispose
+    .family<List<RelatedCityContent>, String>((ref, footprintId) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return const <RelatedCityContent>[];
+  return ref
+      .watch(experienceRepositoryProvider)
+      .footprintRelatedContent(footprintId);
+});
+
+final footprintPhotoBytesProvider = FutureProvider.autoDispose
+    .family<Uint8List, FootprintPhotoBytesKey>((ref, key) => ref
+        .watch(experienceRepositoryProvider)
+        .footprintPhotoBytes(key.footprintId, key.photo));
+
 final currentJourneyLibraryProvider =
     FutureProvider<List<JourneyLibraryItem>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
@@ -810,6 +986,11 @@ void invalidatePrivateExperience(Ref ref) {
   ref.invalidate(currentJourneyLibraryProvider);
   ref.invalidate(currentAllJourneysProvider);
   ref.invalidate(routeJourneyIndexProvider);
+  ref.invalidate(currentFootprintsProvider);
+  ref.invalidate(currentFootprintResumeProvider);
+  ref.invalidate(footprintEditorControllerProvider);
+  ref.invalidate(footprintRelatedContentProvider);
+  ref.invalidate(footprintPhotoBytesProvider);
 }
 
 void invalidatePrivateExperienceFromWidget(WidgetRef ref) {
@@ -825,13 +1006,23 @@ void invalidatePrivateExperienceFromWidget(WidgetRef ref) {
   ref.invalidate(currentJourneyLibraryProvider);
   ref.invalidate(currentAllJourneysProvider);
   ref.invalidate(routeJourneyIndexProvider);
+  ref.invalidate(currentFootprintsProvider);
+  ref.invalidate(currentFootprintResumeProvider);
+  ref.invalidate(footprintEditorControllerProvider);
+  ref.invalidate(footprintRelatedContentProvider);
+  ref.invalidate(footprintPhotoBytesProvider);
 }
 
 final privateExperienceLifecycleProvider = Provider<void>((ref) {
   ref.listen(authControllerProvider, (previous, next) {
     final previousId = previous?.asData?.value?.user.id;
     final nextId = next.asData?.value?.user.id;
-    if (previousId != nextId) invalidatePrivateExperience(ref);
+    if (previousId != nextId) {
+      invalidatePrivateExperience(ref);
+      unawaited(
+        ref.read(footprintShareServiceProvider).cleanup().catchError((_) {}),
+      );
+    }
   });
 });
 

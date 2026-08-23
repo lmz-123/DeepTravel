@@ -71,7 +71,7 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0013"
+    assert version == "20260823_0014"
 
 
 def test_city_story_catalog_migration_round_trips(tmp_path):
@@ -363,7 +363,7 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert version == "20260823_0013"
+        assert version == "20260823_0014"
 
 
 def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
@@ -393,7 +393,44 @@ def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0013"
+    assert version == "20260823_0014"
+
+
+def test_private_footprint_migration_has_no_location_or_voice_columns(tmp_path):
+    database_path = tmp_path / "private-footprints.db"
+    engine = create_engine(f"sqlite:///{database_path}")
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database_path}")
+
+    command.upgrade(config, "head")
+    tables = set(inspect(engine).get_table_names())
+    assert {"footprint_entries", "footprint_themes", "footprint_photos"} <= tables
+    columns = {item["name"] for item in inspect(engine).get_columns("footprint_entries")}
+    assert {
+        "editorial_summary",
+        "summary_options_json",
+        "themes_json",
+        "source_revision",
+        "user_observation",
+        "user_sentence",
+    } <= columns
+    assert {
+        "latitude",
+        "longitude",
+        "audio_url",
+        "playback_progress",
+        "voice_provider",
+        "voice_version",
+    }.isdisjoint(columns)
+    photo_columns = {item["name"] for item in inspect(engine).get_columns("footprint_photos")}
+    assert {"idempotency_key", "deleted_at", "sha256"} <= photo_columns
+    assert {"audio_url", "voice_provider", "access_key_secret"}.isdisjoint(photo_columns)
+
+    command.downgrade(config, "20260823_0013")
+    assert {"footprint_entries", "footprint_themes", "footprint_photos"}.isdisjoint(
+        inspect(engine).get_table_names()
+    )
+    command.upgrade(config, "head")
 
 
 def test_node_community_migration_round_trips_without_touching_existing_data(tmp_path):

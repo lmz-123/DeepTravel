@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import '../domain/community_models.dart';
@@ -6,6 +7,7 @@ import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/home_story.dart';
 import '../domain/fragment_models.dart';
+import '../domain/footprint_models.dart';
 import 'demo_content.dart';
 
 class DemoExperienceRepository implements ExperienceRepository {
@@ -17,6 +19,8 @@ class DemoExperienceRepository implements ExperienceRepository {
   final List<CommunityPost> _communityPosts = [];
   final Map<String, List<CommunityComment>> _communityComments = {};
   final Set<String> _favorites = {};
+  final Map<String, FootprintDraft> _footprintDrafts = {};
+  final Map<String, DemoFootprintPhotoBytes> _footprintPhotos = {};
 
   @override
   Future<HomeStory> randomHomeStory({
@@ -295,6 +299,165 @@ class DemoExperienceRepository implements ExperienceRepository {
         evidenceCount: 0,
       ),
     ];
+  }
+
+  @override
+  Future<FootprintPageResult> footprints(FootprintFilter filter,
+      {String? cursor}) async {
+    await _pause();
+    var items = _answers.keys.map(_footprintForStop).toList(growable: false);
+    if (filter.citySlug != null) {
+      items = items
+          .where((item) => item.citySlug == filter.citySlug)
+          .toList(growable: false);
+    }
+    if (filter.theme != null) {
+      items = items
+          .where((item) => item.themes.contains(filter.theme))
+          .toList(growable: false);
+    }
+    if (filter.journeyState != null) {
+      items = items
+          .where((item) => item.journeyState == filter.journeyState)
+          .toList(growable: false);
+    }
+    if (filter.organizationState != null) {
+      items = items
+          .where((item) => item.organizationState == filter.organizationState)
+          .toList(growable: false);
+    }
+    if (filter.month != null) {
+      items = items
+          .where((item) =>
+              '${item.createdAt.year}-${item.createdAt.month.toString().padLeft(2, '0')}' ==
+              filter.month)
+          .toList(growable: false);
+    }
+    items = [...items]..sort((a, b) => filter.order == 'oldest'
+        ? a.createdAt.compareTo(b.createdAt)
+        : b.createdAt.compareTo(a.createdAt));
+    return FootprintPageResult(
+      items: items,
+      cities: items.isEmpty
+          ? const []
+          : [
+              FootprintCityFacet(
+                  slug: 'shanghai', name: '上海', count: items.length)
+            ],
+      themes: const [FootprintThemeFacet(name: '建筑与城市生活', count: 1)],
+      months: items.isEmpty
+          ? const []
+          : [
+              FootprintTimeFacet(
+                  key:
+                      '${items.first.createdAt.year}-${items.first.createdAt.month.toString().padLeft(2, '0')}',
+                  label:
+                      '${items.first.createdAt.year}年${items.first.createdAt.month}月',
+                  count: items.length)
+            ],
+      total: items.length,
+    );
+  }
+
+  @override
+  Future<FootprintEntry?> footprintResumeCandidate() async {
+    final result = await footprints(const FootprintFilter());
+    return result.items.where((item) => item.needsOrganization).firstOrNull;
+  }
+
+  @override
+  Future<FootprintEntry> footprint(String footprintId) async {
+    await _pause();
+    final stopId = footprintId.replaceFirst('demo-footprint-', '');
+    if (!_answers.containsKey(stopId)) throw StateError('足迹不存在');
+    return _footprintForStop(stopId);
+  }
+
+  @override
+  Future<FootprintEntry> updateFootprint(
+      String footprintId, FootprintDraft draft) async {
+    await footprint(footprintId);
+    _footprintDrafts[footprintId] = draft;
+    return footprint(footprintId);
+  }
+
+  @override
+  Future<List<RelatedCityContent>> footprintRelatedContent(
+          String footprintId) async =>
+      const [
+        RelatedCityContent(
+          id: 'demo-home-story',
+          citySlug: 'shanghai',
+          title: '一条街怎样保存生活的尺度',
+          summary: '从树荫、围墙和门洞继续读懂这座城市。',
+          coverImage: '',
+          themes: ['建筑与城市生活'],
+          contentType: '街角故事',
+        )
+      ];
+
+  @override
+  Future<FootprintPhoto> uploadFootprintPhoto(
+      String footprintId, String filePath) async {
+    await footprint(footprintId);
+    final bytes = await File(filePath).readAsBytes();
+    final photo = FootprintPhoto(
+      id: 'demo-photo-$footprintId',
+      url: 'demo://$footprintId',
+      mimeType: 'image/jpeg',
+      width: 0,
+      height: 0,
+      createdAt: DateTime.now(),
+    );
+    _footprintPhotos[footprintId] = DemoFootprintPhotoBytes(photo, bytes);
+    return photo;
+  }
+
+  @override
+  Future<Uint8List> footprintPhotoBytes(
+      String footprintId, FootprintPhoto photo) async {
+    final value = _footprintPhotos[footprintId];
+    if (value == null) throw StateError('照片不存在');
+    return value.bytes;
+  }
+
+  @override
+  Future<void> deleteFootprintPhoto(String footprintId) async {
+    _footprintPhotos.remove(footprintId);
+  }
+
+  FootprintEntry _footprintForStop(String stopId) {
+    final stop = demoRoute.stops.firstWhere((item) => item.id == stopId);
+    final id = 'demo-footprint-$stopId';
+    final draft = _footprintDrafts[id];
+    final option = FootprintSummaryOption(
+        id: 'insight',
+        text: stop.insight.substring(0, stop.insight.length.clamp(0, 160)));
+    final selected = draft?.selectedSummaryId == option.id ? option.text : null;
+    final time = _journey?.startedAt ?? DateTime.now();
+    return FootprintEntry(
+      id: id,
+      journeyId: _journey?.id ?? 'demo-journey',
+      cityId: 'demo-shanghai',
+      citySlug: 'shanghai',
+      cityName: '上海',
+      sceneId: stop.id,
+      sceneTitle: stop.title,
+      storyTitle: stop.storyTitle,
+      editorialSummary: stop.insight,
+      summaryOptions: [option],
+      themes: const ['建筑与城市生活'],
+      organizationState:
+          draft == null || draft.deferOrganization ? 'draft' : 'organized',
+      journeyState: _journey?.isCompleted == true ? 'completed' : 'partial',
+      createdAt: time,
+      updatedAt: DateTime.now(),
+      selectedSummaryId: draft?.selectedSummaryId,
+      selectedSummaryText: selected,
+      observation: draft?.observation,
+      sentence: draft?.sentence,
+      photo: _footprintPhotos[id]?.photo,
+    );
   }
 
   @override

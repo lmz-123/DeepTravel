@@ -1,30 +1,22 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/editorial_image.dart';
-import '../domain/fragment_models.dart';
-import '../domain/models.dart';
-import 'active_tour_controller.dart';
+import '../data/footprint_share_service.dart';
+import '../domain/footprint_models.dart';
 import 'experience_providers.dart';
-import 'widgets/evidence_photo_widgets.dart';
-import 'widgets/node_community_section.dart';
 
 class FootprintDetailPage extends ConsumerWidget {
-  const FootprintDetailPage({required this.journeyId, super.key});
-
-  final String journeyId;
+  const FootprintDetailPage({required this.footprintId, super.key});
+  final String footprintId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userId = ref.watch(currentUserIdProvider);
-    if (userId == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    final key = UserJourneyKey(userId, journeyId);
-    final contextValue = ref.watch(journeyContextProvider(key));
+    final value = ref.watch(footprintEditorControllerProvider(footprintId));
     return RouteBackScope(
       fallbackLocation: '/footprints',
       child: Scaffold(
@@ -36,335 +28,432 @@ class FootprintDetailPage extends ConsumerWidget {
             icon: const Icon(Icons.arrow_back_rounded),
           ),
         ),
-        body: contextValue.when(
+        body: value.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => _DetailError(
-            onRetry: () => ref.invalidate(journeyContextProvider(key)),
+          error: (_, __) => Center(
+            child: FilledButton.tonal(
+              onPressed: () => ref
+                  .invalidate(footprintEditorControllerProvider(footprintId)),
+              child: const Text('重新加载这条足迹'),
+            ),
           ),
-          data: (value) => _DetailContent(
-            value: value,
-            evidence: ref.watch(journeyEvidenceProvider(key)),
-            onRefresh: () async {
-              ref.invalidate(journeyContextProvider(key));
-              ref.invalidate(journeyEvidenceProvider(key));
-              await ref.read(journeyContextProvider(key).future);
-            },
-          ),
+          data: (entry) => _FootprintEditor(entry: entry),
         ),
       ),
     );
   }
 }
 
-class _DetailContent extends ConsumerStatefulWidget {
-  const _DetailContent({
-    required this.value,
-    required this.evidence,
-    required this.onRefresh,
-  });
-
-  final JourneyContext value;
-  final AsyncValue<List<EvidenceRecord>> evidence;
-  final Future<void> Function() onRefresh;
+class _FootprintEditor extends ConsumerStatefulWidget {
+  const _FootprintEditor({required this.entry});
+  final FootprintEntry entry;
 
   @override
-  ConsumerState<_DetailContent> createState() => _DetailContentState();
+  ConsumerState<_FootprintEditor> createState() => _FootprintEditorState();
 }
 
-class _DetailContentState extends ConsumerState<_DetailContent> {
-  String? _selectedFragmentId;
+class _FootprintEditorState extends ConsumerState<_FootprintEditor> {
+  late final TextEditingController _observation;
+  late final TextEditingController _sentence;
+  String? _selectedSummaryId;
+  bool _busy = false;
 
-  StoryFragment? get _selected {
-    final entries = widget.value.ledger?.entries ?? const <StoryFragment>[];
-    final revealed = entries.where((entry) => entry.isRevealed).toList();
-    if (revealed.isEmpty) return null;
-    return revealed.firstWhere(
-      (entry) => entry.id == _selectedFragmentId,
-      orElse: () => revealed.last,
-    );
+  @override
+  void initState() {
+    super.initState();
+    _observation = TextEditingController(text: widget.entry.observation);
+    _sentence = TextEditingController(text: widget.entry.sentence);
+    _selectedSummaryId = widget.entry.selectedSummaryId;
+  }
+
+  @override
+  void didUpdateWidget(covariant _FootprintEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.updatedAt != widget.entry.updatedAt) {
+      _observation.text = widget.entry.observation ?? '';
+      _sentence.text = widget.entry.sentence ?? '';
+      _selectedSummaryId = widget.entry.selectedSummaryId;
+    }
+  }
+
+  @override
+  void dispose() {
+    _observation.dispose();
+    _sentence.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final userId = ref.watch(currentUserIdProvider);
+    final entry = widget.entry;
     return RefreshIndicator(
-      onRefresh: widget.onRefresh,
+      onRefresh: () async {
+        ref.invalidate(footprintEditorControllerProvider(entry.id));
+        await ref.read(footprintEditorControllerProvider(entry.id).future);
+      },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 44),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 44),
         children: [
-          EditorialImage(source: widget.value.route.heroImage, height: 260),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+          Row(children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${entry.cityName} · ${entry.sceneTitle}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(color: AppColors.moss)),
+                  const SizedBox(height: 6),
+                  Text(entry.storyTitle,
+                      style: Theme.of(context).textTheme.headlineMedium),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: '生成分享卡',
+              onPressed: _busy ? null : () => _share(entry),
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
+          ]),
+          if (entry.isPartialJourney) ...[
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              onPressed: _busy ? null : () => _resumeJourney(entry),
+              icon: const Icon(Icons.directions_walk_rounded),
+              label: const Text('继续这次未完成的漫游'),
+            ),
+          ],
+          const SizedBox(height: 24),
+          _Section(
+            eyebrow: '见地讲述',
+            title: '经过审核的事实与故事概括',
+            child: Text(entry.editorialSummary,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(height: 1.65)),
+          ),
+          const SizedBox(height: 18),
+          _Section(
+            eyebrow: '我看到的',
+            title: '现场观察与私人照片',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (widget.value.route.contentStatus == 'archived')
-                  const Chip(label: Text('这条路线已归档，足迹仍为你保留')),
-                Text(widget.value.route.title,
-                    style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 7),
-                Text(
-                  '${widget.value.collectedCount}/${widget.value.totalCount} 条线索已解锁',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(color: AppColors.moss),
-                ),
-                const SizedBox(height: 26),
-                Text(
-                    widget.value.journeyKind == 'fragmented'
-                        ? '已解锁的线索'
-                        : '旅程回顾',
-                    style: Theme.of(context).textTheme.titleLarge),
+                if (entry.photo != null) ...[
+                  _PrivateFootprintPhoto(entry: entry),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: _busy ? null : () => _deletePhoto(entry),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: const Text('移除私人照片'),
+                  ),
+                ] else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: AppColors.paperDeep,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Text('照片是可选的，只作为你的私人留念。'),
+                  ),
                 const SizedBox(height: 12),
-                if (widget.value.journeyKind == 'fragmented')
-                  ...?widget.value.ledger?.entries.map(
-                    (fragment) => _ClueRow(
-                      fragment: fragment,
-                      selected: _selected?.id == fragment.id,
-                      onTap: fragment.isRevealed
-                          ? () =>
-                              setState(() => _selectedFragmentId = fragment.id)
-                          : null,
-                    ),
-                  )
-                else
-                  ...widget.value.route.stops.map(
-                    (stop) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.check_circle_rounded,
-                          color: AppColors.moss),
-                      title: Text(stop.title),
-                      subtitle: Text(stop.insight),
-                    ),
-                  ),
-                if (_selected != null) ...[
-                  const SizedBox(height: 24),
-                  _SelectedFragmentRecap(
-                    fragment: _selected!,
-                    onRevisit: () async {
-                      await ref
-                          .read(activeTourControllerProvider.notifier)
-                          .startRevisit(widget.value);
-                      await ref
-                          .read(activeTourControllerProvider.notifier)
-                          .selectCollectedFragment(_selected!.id);
-                      if (context.mounted) {
-                        context.go('/journey/${widget.value.journey.id}');
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 26),
-                  Text('这条线索的留念',
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 12),
-                ],
-                widget.evidence.when(
-                  loading: () => const LinearProgressIndicator(),
-                  error: (error, _) => const _PhotoMessage(
-                    icon: Icons.broken_image_outlined,
-                    message: '照片暂时无法读取，线索与足迹不受影响。下拉可重试。',
-                  ),
-                  data: (items) {
-                    final matching = _selected == null
-                        ? items
-                        : items
-                            .where((item) => item.fragmentId == _selected!.id)
-                            .toList();
-                    return matching.isEmpty
-                        ? const _PhotoMessage(
-                            icon: Icons.photo_outlined,
-                            message: '这条线索没有上传照片，完整足迹仍然保留。',
-                          )
-                        : _EvidenceGallery(
-                            value: widget.value, items: matching);
-                  },
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _pickPhoto(entry),
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: Text(entry.photo == null ? '拍一张私人留念' : '更换私人照片'),
                 ),
-                if (_selected != null && userId != null)
-                  NodeCommunitySection(
-                    userId: userId,
-                    journeyId: widget.value.journey.id,
-                    fragment: _selected!,
-                    evidence: widget.evidence.asData?.value ?? const [],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _observation,
+                  maxLength: 280,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '我看到的细节（可选）',
+                    hintText: '一句话就够了，例如：墙脚有一段颜色更浅的旧砖。',
                   ),
+                ),
               ],
             ),
           ),
+          const SizedBox(height: 18),
+          _Section(
+            eyebrow: '我留下的',
+            title: '选择一种概括，或写下自己的短句',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  child: RadioGroup<String>(
+                    groupValue: _selectedSummaryId,
+                    onChanged: _busy
+                        ? (_) {}
+                        : (value) => setState(() => _selectedSummaryId = value),
+                    child: Column(
+                      children: [
+                        for (final option in entry.summaryOptions)
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: option.id,
+                            title: Text(option.text),
+                          ),
+                        if (_selectedSummaryId != null)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () =>
+                                      setState(() => _selectedSummaryId = null),
+                              child: const Text('清除已选概括'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                TextField(
+                  controller: _sentence,
+                  maxLength: 160,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: '我留下的一句话（可选）',
+                    hintText: '不用写长文字。',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _busy ? null : () => _save(entry, defer: true),
+                child: const Text('稍后再整理'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                onPressed: _busy ? null : () => _save(entry),
+                child: Text(_busy ? '保存中…' : '保存足迹'),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 28),
+          _RelatedContent(footprintId: entry.id),
         ],
+      ),
+    );
+  }
+
+  Future<void> _save(FootprintEntry entry, {bool defer = false}) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(footprintEditorControllerProvider(entry.id).notifier).save(
+            FootprintDraft(
+              selectedSummaryId: _selectedSummaryId,
+              observation: _observation.text,
+              sentence: _sentence.text,
+              deferOrganization: defer,
+            ),
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(defer ? '已经保留，之后可以继续整理' : '足迹已经保存')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('暂时没有保存成功，你写的内容仍留在页面上')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pickPhoto(FootprintEntry entry) async {
+    final path =
+        await ref.read(footprintPhotoPickerProvider).pickPrivateKeepsake();
+    if (path == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(footprintEditorControllerProvider(entry.id).notifier)
+          .uploadPhoto(path);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('照片暂时没有保存成功，请稍后重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deletePhoto(FootprintEntry entry) async {
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(footprintEditorControllerProvider(entry.id).notifier)
+          .deletePhoto();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resumeJourney(FootprintEntry entry) async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    setState(() => _busy = true);
+    try {
+      final owner = await ref.read(
+          journeyContextProvider(UserJourneyKey(userId, entry.journeyId))
+              .future);
+      if (!mounted) return;
+      ref
+          .read(journeyControllerProvider.notifier)
+          .resume(owner.route, owner.journey);
+      context.go('/journey/${entry.journeyId}');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('漫游进度暂时无法恢复，请稍后重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _share(FootprintEntry entry) async {
+    var includePhoto = false;
+    if (entry.photo != null) {
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('生成足迹卡'),
+          content: const Text('私人照片默认不会加入分享卡。你可以明确选择是否带上这张照片。'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('不带照片')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('带上照片')),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return;
+      includePhoto = choice;
+    }
+    setState(() => _busy = true);
+    try {
+      Uint8List? photoBytes;
+      final userId = ref.read(currentUserIdProvider);
+      if (includePhoto && entry.photo != null && userId != null) {
+        photoBytes = await ref.read(footprintPhotoBytesProvider(
+          FootprintPhotoBytesKey(userId, entry.id, entry.photo!),
+        ).future);
+      }
+      await ref.read(footprintShareServiceProvider).share(
+            entry,
+            explicitlyIncludedPhoto: photoBytes,
+          );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('分享卡暂时没有生成成功')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section(
+      {required this.eyebrow, required this.title, required this.child});
+  final String eyebrow;
+  final String title;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.ink.withValues(alpha: .08)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(eyebrow,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(color: AppColors.moss)),
+          const SizedBox(height: 4),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 16),
+          child,
+        ]),
+      );
+}
+
+class _PrivateFootprintPhoto extends ConsumerWidget {
+  const _PrivateFootprintPhoto({required this.entry});
+  final FootprintEntry entry;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userId = ref.watch(currentUserIdProvider);
+    final photo = entry.photo;
+    if (userId == null || photo == null) return const SizedBox.shrink();
+    final bytes = ref.watch(footprintPhotoBytesProvider(
+        FootprintPhotoBytesKey(userId, entry.id, photo)));
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: bytes.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => const ColoredBox(
+            color: AppColors.paperDeep,
+            child: Center(child: Text('私人照片暂时无法读取')),
+          ),
+          data: (value) => Image.memory(value, fit: BoxFit.cover),
+        ),
       ),
     );
   }
 }
 
-class _ClueRow extends StatelessWidget {
-  const _ClueRow(
-      {required this.fragment, required this.selected, required this.onTap});
-
-  final StoryFragment fragment;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        selected: selected,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        tileColor: selected ? AppColors.moss.withValues(alpha: .1) : null,
-        leading: CircleAvatar(
-          backgroundColor:
-              fragment.isRevealed ? AppColors.moss : AppColors.paperDeep,
-          foregroundColor: AppColors.white,
-          child: Text('${fragment.position}'.padLeft(2, '0')),
-        ),
-        title: Text(fragment.title ?? fragment.safePreview),
-        subtitle: fragment.transcript == null
-            ? null
-            : Text(fragment.transcript!,
-                maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: Icon(fragment.isRevealed
-            ? Icons.chevron_right_rounded
-            : Icons.lock_outline),
-        onTap: onTap,
-      );
-}
-
-class _SelectedFragmentRecap extends StatelessWidget {
-  const _SelectedFragmentRecap(
-      {required this.fragment, required this.onRevisit});
-  final StoryFragment fragment;
-  final VoidCallback onRevisit;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppColors.paperDeep,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(fragment.title ?? fragment.safePreview,
-              style: Theme.of(context).textTheme.titleLarge),
-          if (fragment.transcript != null) ...[
-            const SizedBox(height: 9),
-            Text(fragment.transcript!,
-                maxLines: 6, overflow: TextOverflow.ellipsis),
-          ],
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRevisit,
-            icon: const Icon(Icons.headphones_rounded),
-            label: const Text('回听这条线索'),
-          ),
-        ]),
-      );
-}
-
-class _EvidenceGallery extends ConsumerWidget {
-  const _EvidenceGallery({required this.value, required this.items});
-
-  final JourneyContext value;
-  final List<EvidenceRecord> items;
-
+class _RelatedContent extends ConsumerWidget {
+  const _RelatedContent({required this.footprintId});
+  final String footprintId;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userId = ref.watch(currentUserIdProvider);
-    if (userId == null) return const SizedBox.shrink();
-    final groups = <String, List<EvidenceRecord>>{};
-    for (final item in items) {
-      (groups[item.fragmentId ?? 'other'] ??= []).add(item);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: groups.entries.map((group) {
-        final fragment = value.ledger?.entries
-            .where((entry) => entry.id == group.key)
-            .firstOrNull;
-        final title = fragment?.title ?? fragment?.safePreview ?? '旅途留念';
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
+    final value = ref.watch(footprintRelatedContentProvider(footprintId));
+    return value.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (items) => items.isEmpty
+          ? const SizedBox.shrink()
+          : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('还可以读读这座城市', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 12,
-                runSpacing: 14,
-                children: group.value.map((item) {
-                  final time = item.capturedAt ?? item.uploadedAt;
-                  return SizedBox(
-                    width: 142,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        EvidenceThumbnail(
-                          userId: userId,
-                          journeyId: value.journey.id,
-                          evidence: item,
-                          title: title,
-                          width: 136,
-                        ),
-                        if (time != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6, left: 3),
-                            child: Text(
-                              _formatEvidenceTime(time),
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+              for (final item in items)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.auto_stories_outlined),
+                    title: Text(item.title),
+                    subtitle: Text(item.summary,
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                    onTap: () => context.push('/story/${item.id}'),
+                  ),
+                ),
+            ]),
     );
   }
-}
-
-String _formatEvidenceTime(DateTime value) {
-  String two(int number) => number.toString().padLeft(2, '0');
-  return '${value.year}.${two(value.month)}.${two(value.day)} '
-      '${two(value.hour)}:${two(value.minute)}';
-}
-
-class _PhotoMessage extends StatelessWidget {
-  const _PhotoMessage({required this.icon, required this.message});
-
-  final IconData icon;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppColors.paperDeep,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.moss),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-      );
-}
-
-class _DetailError extends StatelessWidget {
-  const _DetailError({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: FilledButton.tonal(
-          onPressed: onRetry,
-          child: const Text('重新加载这条足迹'),
-        ),
-      );
 }

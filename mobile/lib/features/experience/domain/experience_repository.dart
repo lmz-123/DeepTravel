@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'community_models.dart';
 import 'city_story.dart';
 import 'fragment_models.dart';
+import 'footprint_models.dart';
 import 'models.dart';
 import 'home_story.dart';
 
@@ -45,6 +46,26 @@ abstract interface class ExperienceRepository {
   Future<JourneyRecap> recap(String journeyId);
 
   Future<List<JourneyLibraryItem>> journeys({String? status});
+
+  Future<FootprintPageResult> footprints(FootprintFilter filter,
+      {String? cursor});
+
+  Future<FootprintEntry?> footprintResumeCandidate();
+
+  Future<FootprintEntry> footprint(String footprintId);
+
+  Future<FootprintEntry> updateFootprint(
+      String footprintId, FootprintDraft draft);
+
+  Future<List<RelatedCityContent>> footprintRelatedContent(String footprintId);
+
+  Future<FootprintPhoto> uploadFootprintPhoto(
+      String footprintId, String filePath);
+
+  Future<Uint8List> footprintPhotoBytes(
+      String footprintId, FootprintPhoto photo);
+
+  Future<void> deleteFootprintPhoto(String footprintId);
 
   Future<JourneyContext> journeyContext(String journeyId);
 

@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../domain/community_models.dart';
@@ -9,6 +10,7 @@ import '../domain/city_story.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
+import '../domain/footprint_models.dart';
 import '../domain/home_story.dart';
 
 class ExperienceFailure implements Exception {
@@ -267,6 +269,119 @@ class ApiExperienceRepository implements ExperienceRepository {
         .map(
             (item) => JourneyLibraryItem.fromJson(item as Map<String, dynamic>))
         .toList(growable: false);
+  }
+
+  @override
+  Future<FootprintPageResult> footprints(FootprintFilter filter,
+      {String? cursor}) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/footprints',
+          queryParameters: {
+            if (filter.citySlug != null) 'city_slug': filter.citySlug,
+            if (filter.theme != null) 'theme': filter.theme,
+            if (filter.journeyState != null)
+              'journey_state': filter.journeyState,
+            if (filter.organizationState != null)
+              'organization_state': filter.organizationState,
+            if (filter.month != null) 'month': filter.month,
+            if (cursor != null) 'cursor': cursor,
+            'order': filter.order,
+          },
+          options: _authorized,
+        ));
+    return FootprintPageResult.fromJson(
+        response.data['data'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<FootprintEntry?> footprintResumeCandidate() async {
+    await _ensureAuth();
+    final response = await _request(
+        () => _dio.get('/footprints/resume-candidate', options: _authorized));
+    final value = response.data['data'];
+    return value is Map<String, dynamic>
+        ? FootprintEntry.fromJson(value)
+        : null;
+  }
+
+  @override
+  Future<FootprintEntry> footprint(String footprintId) async {
+    await _ensureAuth();
+    final response = await _request(
+        () => _dio.get('/footprints/$footprintId', options: _authorized));
+    return FootprintEntry.fromJson(
+        response.data['data'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<FootprintEntry> updateFootprint(
+      String footprintId, FootprintDraft draft) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.patch(
+          '/footprints/$footprintId',
+          data: draft.toJson(),
+          options: _authorized,
+        ));
+    return FootprintEntry.fromJson(
+        response.data['data'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<RelatedCityContent>> footprintRelatedContent(
+      String footprintId) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get(
+          '/footprints/$footprintId/related-content',
+          options: _authorized,
+        ));
+    return (response.data['data'] as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(RelatedCityContent.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<FootprintPhoto> uploadFootprintPhoto(
+      String footprintId, String filePath) async {
+    await _ensureAuth();
+    final form = FormData.fromMap({
+      'photo': await MultipartFile.fromFile(filePath),
+      'idempotency_key': const Uuid().v4(),
+    });
+    final response = await _request(() => _dio.post(
+          '/footprints/$footprintId/photo',
+          data: form,
+          options: _authorized,
+        ));
+    return FootprintPhoto.fromJson(
+        response.data['data'] as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Uint8List> footprintPhotoBytes(
+      String footprintId, FootprintPhoto photo) async {
+    await _ensureAuth();
+    final response = await _request(() => _dio.get<List<int>>(
+          _privateAssetPath(photo.url),
+          options: _authorized.copyWith(responseType: ResponseType.bytes),
+        ));
+    return Uint8List.fromList(response.data ?? const <int>[]);
+  }
+
+  String _privateAssetPath(String value) {
+    final uri = Uri.tryParse(value);
+    if (uri != null && uri.hasScheme) return value;
+    const prefix = '/api/v1';
+    if (value.startsWith('$prefix/')) return value.substring(prefix.length);
+    return value.startsWith('/') ? value : '/$value';
+  }
+
+  @override
+  Future<void> deleteFootprintPhoto(String footprintId) async {
+    await _ensureAuth();
+    await _request(() =>
+        _dio.delete('/footprints/$footprintId/photo', options: _authorized));
   }
 
   @override

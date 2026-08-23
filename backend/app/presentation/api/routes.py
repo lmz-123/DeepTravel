@@ -167,6 +167,26 @@ def evidence_policy():
     )
 
 
+@api.get("/policies/footprints")
+@require_user
+def footprint_policy():
+    return jsonify(
+        {
+            "data": {
+                "photo_upload_enabled": True,
+                "max_bytes": int(current_app.config["EVIDENCE_MAX_BYTES"]),
+                "max_edge_pixels": int(current_app.config["EVIDENCE_MAX_EDGE"]),
+                "allowed_mime_types": ["image/jpeg", "image/png", "image/webp"],
+                "private_by_default": True,
+                "durable": True,
+                "exif_removed": True,
+                "observation_max_length": 280,
+                "sentence_max_length": 160,
+            }
+        }
+    )
+
+
 @api.get("/policies/community")
 @require_user
 def community_policy():
@@ -498,6 +518,12 @@ def trigger_fragment(journey_id: str, fragment_id: str):
     result = _services()["fragment_tours"].trigger(
         g.current_user.id, journey_id, fragment_id, payload
     )
+    try:
+        _services()["footprints"].reconcile_journey(g.current_user.id, journey_id)
+    except Exception:
+        current_app.logger.exception(
+            "footprint_reconcile_failed journey=%s fragment=%s", journey_id, fragment_id
+        )
     current_app.logger.info(
         "fragment_trigger_accepted journey=%s fragment=%s method=%s",
         journey_id,
@@ -505,6 +531,88 @@ def trigger_fragment(journey_id: str, fragment_id: str):
         method,
     )
     return jsonify({"data": result})
+
+
+@api.get("/footprints")
+@require_user
+def list_footprints():
+    return jsonify(
+        {
+            "data": _services()["footprints"].list(
+                g.current_user.id,
+                city_slug=request.args.get("city_slug"),
+                theme=request.args.get("theme"),
+                journey_state=request.args.get("journey_state"),
+                organization_state=request.args.get("organization_state"),
+                month=request.args.get("month"),
+                order=request.args.get("order", "recent"),
+                cursor=request.args.get("cursor"),
+                limit=_page_limit(default=20),
+            )
+        }
+    )
+
+
+@api.get("/footprints/resume-candidate")
+@require_user
+def footprint_resume_candidate():
+    return jsonify({"data": _services()["footprints"].resume_candidate(g.current_user.id)})
+
+
+@api.get("/footprints/<footprint_id>")
+@require_user
+def footprint_detail(footprint_id: str):
+    return jsonify({"data": _services()["footprints"].detail(g.current_user.id, footprint_id)})
+
+
+@api.patch("/footprints/<footprint_id>")
+@require_user
+def update_footprint(footprint_id: str):
+    return jsonify(
+        {"data": _services()["footprints"].update(g.current_user.id, footprint_id, _json_body())}
+    )
+
+
+@api.get("/footprints/<footprint_id>/related-content")
+@require_user
+def footprint_related_content(footprint_id: str):
+    return jsonify(
+        {"data": _services()["footprints"].related_content(g.current_user.id, footprint_id)}
+    )
+
+
+@api.post("/footprints/<footprint_id>/photo")
+@require_user
+def upload_footprint_photo(footprint_id: str):
+    photo = request.files.get("photo")
+    idempotency_key = request.form.get("idempotency_key", "")
+    if photo is None or not idempotency_key:
+        raise ValidationError("photo 与 idempotency_key 为必填字段")
+    return (
+        jsonify(
+            {
+                "data": _services()["footprints"].upload_photo(
+                    g.current_user.id, footprint_id, photo, idempotency_key
+                )
+            }
+        ),
+        201,
+    )
+
+
+@api.get("/footprints/<footprint_id>/photo")
+@require_user
+def get_footprint_photo(footprint_id: str):
+    stream, mime_type = _services()["footprints"].open_photo(g.current_user.id, footprint_id)
+    return send_file(stream, mimetype=mime_type, download_name=f"footprint-{footprint_id}")
+
+
+@api.delete("/footprints/<footprint_id>/photo")
+@require_user
+def delete_footprint_photo(footprint_id: str):
+    return jsonify(
+        {"data": _services()["footprints"].delete_photo(g.current_user.id, footprint_id)}
+    )
 
 
 @api.post("/journeys/<journey_id>/fragments/<fragment_id>/playback")
@@ -749,6 +857,10 @@ def delete_evidence(journey_id: str, evidence_id: str):
 @require_user
 def story_ledger(journey_id: str):
     ledger = _services()["fragment_tours"].ledger(g.current_user.id, journey_id)
+    try:
+        _services()["footprints"].reconcile_journey(g.current_user.id, journey_id)
+    except Exception:
+        current_app.logger.exception("footprint_ledger_reconcile_failed journey=%s", journey_id)
     state_counts: dict[str, int] = {}
     for entry in ledger["entries"]:
         entry_state = str(entry["state"])
