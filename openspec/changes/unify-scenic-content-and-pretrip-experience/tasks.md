@@ -38,7 +38,7 @@
 
 - [x] 6.1 Refactor route detail into a city-manual composition whose first eligible content is the concise pre-departure text plus one accessible play/pause/replay icon, with no large player, progress, seek, or duration controls; add configured/absent/error widget tests.
 - [x] 6.2 Render ordered free-form `experience_tags` for both legacy stops and managed fragments with a shared wrapping component, unknown-value support, and no empty placeholder; add model and widget tests proving tags do not affect home-card granularity/order.
-- [ ] 6.3 Place the scenic/manual carousel and its indicator before city stories, remove device-specific overall fixed heights/offsets, and use content/viewport constraints plus normal sliver spacing; add regression tests for minimum supported phone, long bounded copy, safe areas, orientation, and 200% text scale.
+- [ ] 6.3 Place the scenic/manual carousel and its indicator before city stories, preserve the established 505/276 default scenic-card visual baseline while allowing measured accessibility growth, remove device-specific overall section offsets, and use normal sliver spacing; add regression tests for the default baseline, minimum supported phone, long bounded copy, safe areas, orientation, and 200% text scale.
 - [x] 6.4 Remove or redirect any separate client-facing “首页听故事” entry so current city-story cards reuse the unified detail/player, while preserving older deep links through compatibility routing; add navigation and semantics tests.
 
 ## 7. Cross-repository verification and production delivery

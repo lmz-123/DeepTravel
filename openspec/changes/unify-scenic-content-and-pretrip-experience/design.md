@@ -63,9 +63,9 @@ Alternative considered: keep local storage for developer convenience or give tes
 
 ### 6. Make discovery layout intrinsic and ordered
 
-The scenic/manual carousel is rendered before city stories. Card internals use bounded aspect ratios/minimum constraints and flexible text rather than one overall hard-coded height; the page indicator is part of the same column. A normal sliver gap separates its measured end from city stories. Golden/widget tests cover compact height, narrow width, long allowed copy, and 200% text scaling.
+The scenic/manual carousel is rendered before city stories. The existing default visual baseline remains 505 logical pixels for the carousel and 276 logical pixels for its hero image; those values are minimums, not a viewport-derived replacement ratio. Card internals measure bounded copy and may only grow above that baseline for accessibility scaling. The page indicator remains in the same normal-flow column, and a normal sliver gap separates its measured end from city stories. Golden/widget tests lock the default baseline and cover compact height, narrow width, long allowed copy, and 200% text scaling.
 
-Alternative considered: add a larger fixed top/bottom offset. Rejected because it reproduces the overlap on another screen or font scale.
+Alternative considered: replace the established card dimensions with a viewport-width formula. Rejected because this compresses the complete scenic card on common phones and can hide its lower content. A larger fixed top/bottom section offset is also rejected because it reproduces the overlap on another screen or font scale.
 
 ### 7. Keep module and API failure boundaries explicit
 

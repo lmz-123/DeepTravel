@@ -136,6 +136,7 @@ FRAGMENTS = (
         "position": 1,
         "title": "两个年份，一道城门",
         "safe_preview": "从南门辨认一座城市为何会拥有两个起点。",
+        "experience_tags": ["城市历史", "城门观察", "适合拍照"],
         "script": (
             "到啦，我们先在南门外停一小会儿。抬头看看门洞上方，是不是能找到“宁南”两个字？"
             "这里有个很容易把人绕晕的小问题：南头到底从哪一年算起？其实它有两个生日。"
@@ -170,6 +171,7 @@ FRAGMENTS = (
         "position": 2,
         "title": "中心离开之后，城为什么还在",
         "safe_preview": "寻找行政中心离开后，地点仍被保留的另一种力量。",
+        "experience_tags": ["海防历史", "城市变迁", "安静聆听"],
         "script": (
             "穿过门洞以后，先回头看一眼。是不是有点奇怪：既然这里这么像一座老城，"
             "它怎么会把“中心”弄丢呢？七五七年，宝安县治迁到今天的东莞一带，南头不再是县治。"
@@ -192,6 +194,7 @@ FRAGMENTS = (
         "position": 3,
         "title": "“新安”不是景点名，而是一套治理",
         "safe_preview": "从一个县名追踪命令、诉求与资源如何经过一座城。",
+        "experience_tags": ["县治文化", "制度历史", "适合拍照"],
         "script": (
             "到县治展示区域了。这里先和你做个小约定：看说明牌，也看看周围，但别急着把今天的展陈"
             "认成明代原物。一五七三年，东莞县析置新安县，县治就设在南头。兜了一圈，南头又回到了"
@@ -226,6 +229,7 @@ FRAGMENTS = (
         "position": 4,
         "title": "地图上的三年，居民的一次断裂",
         "safe_preview": "听见没有留下纪念物的历史空白。",
+        "experience_tags": ["迁界历史", "生活记忆", "安静聆听"],
         "script": (
             "这一站有点特别，我们不用找石碑，也不用找一个非拍不可的角度。找个不挡路、稍微安静的位置就好。"
             "清康熙五年至七年，迁界令要求沿海居民向内迁移，先是五十里，后来扩大到八十里；"
@@ -249,6 +253,7 @@ FRAGMENTS = (
         "position": 5,
         "title": "当深圳离开南头，又回来寻找南头",
         "safe_preview": "把旧街与现代用途放进同一个问题。",
+        "experience_tags": ["城市更新", "新旧共生", "适合拍照"],
         "script": (
             "走到北街口，可以慢一点。旧墙、店铺和今天过日子的人，正好挤在同一幅画面里。"
             "一九一四年，新安县改名宝安县；一九五三年，宝安县治又从南头迁到深圳镇。"
@@ -304,8 +309,7 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
     now = datetime.now(UTC)
     changed = False
     candidate_audio_ready = all(
-        (MEDIA_ROOT / f"audio/{item['id']}-{SCRIPT_VERSION}.m4a").is_file()
-        for item in FRAGMENTS
+        (MEDIA_ROOT / f"audio/{item['id']}-{SCRIPT_VERSION}.m4a").is_file() for item in FRAGMENTS
     )
     for item in SOURCES:
         if session.get(HistoricalSourceModel, item["id"]) is None:
@@ -400,6 +404,7 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
                 answers_question=item["answers"],
                 raises_question=item["raises"],
                 authenticity_label=item["authenticity"],
+                experience_tags_json=item["experience_tags"],
                 review_state="in_review",
             )
             session.add(fragment)
@@ -485,9 +490,7 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
             }
             if mission is None:
                 session.add(
-                    PhotoMissionModel(
-                        id=mission_data["id"], fragment_id=item["id"], **values
-                    )
+                    PhotoMissionModel(id=mission_data["id"], fragment_id=item["id"], **values)
                 )
                 changed = True
             else:

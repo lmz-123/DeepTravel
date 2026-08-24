@@ -48,7 +48,7 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     assert tour["download_size_bytes"] == 0
     assert "transcript" not in tour["fragments"][0]
     assert tour["fragments"][0]["audio"]["url"].endswith(".m4a")
-    assert tour["fragments"][0]["display_theme"] == "定位音频 · 碎片叙事"
+    assert tour["fragments"][0]["display_theme"] == "城市历史"
     assert tour["fragments"][0]["expected_duration_seconds"] > 0
     audio = client.get("/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-conversational.3.m4a")
     assert audio.status_code == 308

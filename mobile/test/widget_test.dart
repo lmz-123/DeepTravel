@@ -24,6 +24,20 @@ void main() {
     );
     expect(firstScenicArea, findsOneWidget);
     await _scrollToScenic(tester);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('route-carousel'))).height,
+      505,
+    );
+    expect(
+      tester
+          .getSize(
+            find.byKey(
+              const ValueKey('route-hero-wukang-urban-slices'),
+            ),
+          )
+          .height,
+      276,
+    );
     await tester.tap(firstScenicArea);
     await tester.pumpAndSettle();
 

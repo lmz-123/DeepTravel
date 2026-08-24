@@ -54,6 +54,16 @@ def test_shenzhen_featured_route_and_media(client):
     route = detail.get_json()["data"]
     assert route["content_status"] == "published"
     assert [stop["position"] for stop in route["stops"]] == [1, 2, 3, 4, 5]
+    assert route["stops"][0]["experience_tags"] == [
+        "城市历史",
+        "城门观察",
+        "适合拍照",
+    ]
+    assert route["audio_tour"]["fragments"][0]["experience_tags"] == [
+        "城市历史",
+        "城门观察",
+        "适合拍照",
+    ]
     assert route["hero_image"].endswith("/images/route_shenzhen.png")
 
     media = client.get("/api/v1/assets/images/route_shenzhen.png")

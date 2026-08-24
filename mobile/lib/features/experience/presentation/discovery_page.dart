@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -773,6 +775,9 @@ class _RouteCarousel extends ConsumerStatefulWidget {
 }
 
 class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
+  static const _baseCarouselHeight = 505.0;
+  static const _baseHeroHeight = 276.0;
+
   late final PageController _controller;
   var _selectedIndex = 0;
 
@@ -797,14 +802,10 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final textScale =
-                  MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
-              final cardWidth = constraints.maxWidth * .88;
-              final imageHeight = cardWidth / 2.24;
-              final contentHeight = cardWidth * .29 * textScale;
-              final carouselHeight = imageHeight + contentHeight;
+              final cardWidth = constraints.maxWidth * .88 - 12;
+              final layout = _measureCardLayout(context, cardWidth);
               return SizedBox(
-                height: carouselHeight,
+                height: layout.carouselHeight,
                 child: PageView.builder(
                   key: const ValueKey('route-carousel'),
                   controller: _controller,
@@ -837,6 +838,7 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       child: _RouteCard(
                         card: widget.cards[index],
+                        heroHeight: layout.heroHeight,
                         onTap: () {
                           if (_selectedIndex != index) {
                             _controller.animateToPage(
@@ -887,6 +889,100 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
     );
   }
 
+  _RouteCardLayout _measureCardLayout(
+    BuildContext context,
+    double cardWidth,
+  ) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final textDirection = Directionality.of(context);
+    final theme = Theme.of(context).textTheme;
+    final textWidth = math.max(1.0, cardWidth - 44);
+    var heroGrowth = 0.0;
+    var bodyGrowth = 0.0;
+
+    for (final scenicCard in widget.cards) {
+      final route = scenicCard.route;
+      final heroStyle = theme.headlineMedium ?? const TextStyle(fontSize: 28);
+      final themeStyle = theme.labelMedium ?? const TextStyle(fontSize: 12);
+      final subtitleStyle = theme.bodyLarge ?? const TextStyle(fontSize: 16);
+
+      final scaledHeroText = _measureTextHeight(
+            route.theme,
+            themeStyle,
+            textWidth,
+            scaler,
+            textDirection,
+          ) +
+          _measureTextHeight(
+            route.title,
+            heroStyle,
+            textWidth,
+            scaler,
+            textDirection,
+          );
+      final baseHeroText = _measureTextHeight(
+            route.theme,
+            themeStyle,
+            textWidth,
+            TextScaler.noScaling,
+            textDirection,
+          ) +
+          _measureTextHeight(
+            route.title,
+            heroStyle,
+            textWidth,
+            TextScaler.noScaling,
+            textDirection,
+          );
+      heroGrowth = math.max(heroGrowth, scaledHeroText - baseHeroText);
+
+      final scaledSubtitle = _measureTextHeight(
+        route.subtitle,
+        subtitleStyle,
+        textWidth,
+        scaler,
+        textDirection,
+        maxLines: 2,
+      );
+      final baseSubtitle = _measureTextHeight(
+        route.subtitle,
+        subtitleStyle,
+        textWidth,
+        TextScaler.noScaling,
+        textDirection,
+        maxLines: 2,
+      );
+      bodyGrowth = math.max(bodyGrowth, scaledSubtitle - baseSubtitle);
+    }
+
+    // The original scenic card is the visual baseline. Accessibility scaling may
+    // only grow it; viewport-relative calculations must never shrink it again.
+    final safeHeroGrowth = math.max(0, heroGrowth);
+    final safeBodyGrowth = math.max(0, bodyGrowth);
+    return _RouteCardLayout(
+      heroHeight: _baseHeroHeight + safeHeroGrowth,
+      carouselHeight: _baseCarouselHeight + safeHeroGrowth + safeBodyGrowth,
+    );
+  }
+
+  double _measureTextHeight(
+    String text,
+    TextStyle style,
+    double maxWidth,
+    TextScaler scaler,
+    TextDirection textDirection, {
+    int? maxLines,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: textDirection,
+      textScaler: scaler,
+      maxLines: maxLines,
+      ellipsis: maxLines == null ? null : '…',
+    )..layout(maxWidth: maxWidth);
+    return painter.height;
+  }
+
   Future<void> _openRoute(
       RouteExperience route, JourneyLibraryItem? libraryItem) async {
     if (libraryItem == null) {
@@ -922,9 +1018,14 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
 }
 
 class _RouteCard extends ConsumerWidget {
-  const _RouteCard({required this.card, required this.onTap});
+  const _RouteCard({
+    required this.card,
+    required this.heroHeight,
+    required this.onTap,
+  });
 
   final ScenicAreaCard card;
+  final double heroHeight;
   final VoidCallback onTap;
 
   @override
@@ -948,45 +1049,44 @@ class _RouteCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AspectRatio(
-                aspectRatio: 2.24,
-                child: EditorialImage(
-                  source: route.heroImage,
-                  heroTag: 'route-${route.slug}',
-                  child: Padding(
-                    padding: const EdgeInsets.all(22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            _GlassPill(
-                              label: card.distanceMeters == null
-                                  ? route.isFeatured
-                                      ? '本周精选'
-                                      : '城市景区'
-                                  : _formatDistance(card.distanceMeters!),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Text(
-                          route.theme,
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: AppColors.gold,
-                                  ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          route.title,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(color: AppColors.white),
-                        ),
-                      ],
-                    ),
+              EditorialImage(
+                key: ValueKey('route-hero-${route.slug}'),
+                source: route.heroImage,
+                height: heroHeight,
+                heroTag: 'route-${route.slug}',
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          _GlassPill(
+                            label: card.distanceMeters == null
+                                ? route.isFeatured
+                                    ? '本周精选'
+                                    : '城市景区'
+                                : _formatDistance(card.distanceMeters!),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        route.theme,
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: AppColors.gold,
+                                ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        route.title,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(color: AppColors.white),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1050,6 +1150,16 @@ class _RouteCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _RouteCardLayout {
+  const _RouteCardLayout({
+    required this.heroHeight,
+    required this.carouselHeight,
+  });
+
+  final double heroHeight;
+  final double carouselHeight;
 }
 
 class _OfflinePackageButton extends StatelessWidget {
