@@ -11,6 +11,7 @@ import 'package:jiandi/features/experience/data/demo_experience_repository.dart'
 import 'package:jiandi/features/experience/data/location_mode_preferences.dart';
 import 'package:jiandi/features/experience/data/narration_voice_preference_repository.dart';
 import 'package:jiandi/features/experience/data/prepared_route_service.dart';
+import 'package:jiandi/features/experience/data/route_offline_package_service.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
@@ -128,6 +129,78 @@ void main() {
     expect(repository.stateOf('fragment-2'), 'undiscovered');
     expect(repository.selectionTriggerCalls, 0);
     expect(repository.selectionAcknowledgeCalls, 0);
+  });
+
+  test('verified package starts offline, restores text, and syncs once',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = _MemoryTourStore();
+    final repository = _ProgressingFragmentRepository();
+    final session = _sessionFor('offline:account-a:route-1', 'route-1');
+    await store.enqueue(OutboxEvent(
+      id: 'start_journey:${session.id}',
+      type: 'start_journey',
+      payload: {
+        'local_journey_id': session.id,
+        'route_id': session.routeId,
+      },
+    ));
+    final container = ProviderContainer(overrides: [
+      authRepositoryProvider.overrideWithValue(_AuthenticatedRepository()),
+      experienceRepositoryProvider.overrideWithValue(repository),
+      locationTrackerProvider.overrideWithValue(_DeniedLocationTracker()),
+      narrationPlayerProvider.overrideWithValue(_SilentNarrationPlayer()),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      routeOfflinePackageServiceProvider.overrideWithValue(
+        _OfflinePackageService(store),
+      ),
+      connectivityChangesProvider.overrideWithValue(const Stream.empty()),
+      locationModeStoreProvider.overrideWithValue(
+        _MemoryLocationModeStore(TourLocationMode.simulated),
+      ),
+    ]);
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      activeTourControllerProvider,
+      (_, __) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+
+    await controller.start(_offlineRoute, session);
+    expect(container.read(activeTourControllerProvider).status, 'simulated');
+    expect(
+        container.read(activeTourControllerProvider).ledger!.entries.single,
+        isNot(isA<StoryFragment>().having(
+          (fragment) => fragment.isRevealed,
+          'revealed',
+          true,
+        )));
+
+    await controller.triggerNextDemo();
+    final triggered =
+        container.read(activeTourControllerProvider).ledger!.entries.single;
+    expect(triggered.state, 'triggered');
+    expect(triggered.transcript, '离线完整文字稿');
+    expect(store.outbox.map((event) => event.type),
+        containsAllInOrder(['start_journey', 'trigger']));
+
+    await controller.reconcileOutbox();
+    expect(repository.selectionTriggerCalls, 1);
+    expect(store.outbox, isEmpty);
+    expect(
+      (await store
+          .readJson('journey_alias_${session.id}'))?['remote_journey_id'],
+      'journey-1',
+    );
+    await controller.reconcileOutbox();
+    expect(repository.selectionTriggerCalls, 1);
+
+    final restored = await store.readJson('ledger_${session.id}');
+    expect((restored!['fragments'] as List).single['state'], 'triggered');
   });
 
   test('denied location keeps nearby points ordered without fake distances',
@@ -955,6 +1028,46 @@ const _route = RouteExperience(
   audioTour: _manifest,
 );
 
+const _offlineFragment = StoryFragment(
+  id: 'fragment-1',
+  position: 1,
+  safePreview: '第一条线索',
+  interactionType: 'passive',
+  reviewState: 'reviewed',
+  triggerRegion: _region,
+  audio: _audio,
+  title: '离线第一条线索',
+  transcript: '离线完整文字稿',
+  state: 'undiscovered',
+);
+
+const _offlineRoute = RouteExperience(
+  id: 'route-1',
+  slug: 'test-route',
+  title: '测试路线',
+  subtitle: '测试',
+  description: '测试',
+  durationMinutes: 10,
+  distanceKm: 1,
+  difficulty: 'easy',
+  theme: 'history',
+  heroImage: '',
+  contentStatus: 'published',
+  stops: [],
+  audioTour: AudioTourManifest(
+    title: '测试导览',
+    centralQuestion: '中心为什么迁移？',
+    scriptVersion: 'v1',
+    reviewState: 'reviewed',
+    fieldAuditState: 'reviewed',
+    productionReady: true,
+    demoLabel: null,
+    contentMethod: '测试内容',
+    downloadSizeBytes: 0,
+    fragments: [_offlineFragment],
+  ),
+);
+
 const _twoFragmentManifest = AudioTourManifest(
   title: '测试导览',
   centralQuestion: '中心为什么迁移？',
@@ -1656,6 +1769,30 @@ class _NoopPreparedRouteService extends PreparedRouteService {
   Future<Map<String, String>> prepare(
           AudioTourManifest manifest, String? profileId) async =>
       {};
+}
+
+class _OfflinePackageService extends RouteOfflinePackageService {
+  _OfflinePackageService(TourStore store)
+      : super(Dio(), store, _NoopPreparedRouteService(store));
+
+  @override
+  Future<InstalledRoutePackage?> load(String slug) async =>
+      const InstalledRoutePackage(
+        city: CityExperience(
+          id: 'city-a',
+          slug: 'city-a',
+          name: '测试城',
+          subtitle: '测试',
+          heroImage: '',
+        ),
+        route: _offlineRoute,
+        version: 'v1',
+        checksumSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        narrationProfileId: null,
+        preparedPaths: {'fragment-1': '/cache/fragment-1.m4a'},
+        raw: {},
+      );
 }
 
 class _RecordingPreparedRouteService extends PreparedRouteService {

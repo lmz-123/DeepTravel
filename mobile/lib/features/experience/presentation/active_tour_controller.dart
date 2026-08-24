@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -11,6 +12,7 @@ import '../data/local_tour_store.dart';
 import '../data/narration_voice_preference_repository.dart';
 import '../data/platform_tour_adapters.dart';
 import '../data/prepared_route_service.dart';
+import '../data/route_offline_package_service.dart';
 import '../data/user_preferences_repository.dart';
 import '../data/home_story_audio_player.dart';
 import '../domain/experience_repository.dart';
@@ -45,6 +47,44 @@ final preparedRouteServiceProvider =
                 .readDownloadPolicy(userId);
           },
         ));
+final routeOfflinePackageServiceProvider = Provider<RouteOfflinePackageService>(
+  (ref) => RouteOfflinePackageService(
+    ref.watch(dioProvider),
+    ref.watch(tourStoreProvider),
+    ref.watch(preparedRouteServiceProvider),
+  ),
+);
+final connectivityChangesProvider = Provider<Stream<List<ConnectivityResult>>>(
+  (ref) => Connectivity().onConnectivityChanged,
+);
+final tourOutboxSyncLifecycleProvider = Provider<void>((ref) {
+  void reconcileWhenOnline(List<ConnectivityResult> transports) {
+    if (transports.any((item) => item != ConnectivityResult.none)) {
+      unawaited(
+        ref.read(activeTourControllerProvider.notifier).reconcileOutbox(),
+      );
+    }
+  }
+
+  final subscription = ref
+      .watch(connectivityChangesProvider)
+      .listen(reconcileWhenOnline, onError: (_) {});
+  ref.onDispose(subscription.cancel);
+  ref.listen<String?>(currentUserIdProvider, (previous, next) {
+    if (next != null && next != previous) {
+      unawaited(
+        ref.read(activeTourControllerProvider.notifier).reconcileOutbox(),
+      );
+    }
+  });
+  unawaited(() async {
+    try {
+      reconcileWhenOnline(await Connectivity().checkConnectivity());
+    } catch (_) {
+      // Platforms without the connectivity plugin still reconcile on tour start.
+    }
+  }());
+});
 
 enum EvidenceUploadPhase { captured, uploading, queued, accepted }
 
@@ -225,12 +265,14 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   StreamSubscription<Duration?>? _duration;
   bool _triggering = false;
   bool _changingLocationMode = false;
+  bool _reconciling = false;
   String? _loadedFragmentId;
   String? _loadedProfileId;
   int _transitionGeneration = 0;
   int _playbackGeneration = 0;
   int? _audioOwnershipGeneration;
   LocationSample? _latestLocationSample;
+  int _lastOfflineCheckpointBucket = -1;
 
   ExperienceRepository get _repository =>
       ref.read(experienceRepositoryProvider);
@@ -283,7 +325,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
             .read(narrationVoicePreferenceRepositoryProvider)
             .read(preferenceKey);
     if (!_isTransitionCurrent(transition)) return;
-    final profileId = manifest.effectiveProfileId(savedProfileId);
+    var profileId = manifest.effectiveProfileId(savedProfileId);
     final speed = userId == null
         ? 1.0
         : await ref
@@ -316,11 +358,27 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     _refreshNearbyStoryPoints();
     var prepared = <String, String>{};
     try {
-      prepared = await ref
-          .read(preparedRouteServiceProvider)
-          .prepare(manifest, profileId);
+      if (_isOfflineSession(session)) {
+        final package =
+            await ref.read(routeOfflinePackageServiceProvider).load(route.slug);
+        if (package == null) throw StateError('离线包不完整，请重新下载');
+        profileId = package.narrationProfileId;
+        prepared = package.preparedPaths;
+      } else {
+        prepared = await ref
+            .read(preparedRouteServiceProvider)
+            .prepare(manifest, profileId);
+      }
       if (!_isTransitionCurrent(transition)) return;
     } catch (error) {
+      if (_isOfflineSession(session)) {
+        state = state.copyWith(
+          status: 'recoverable_error',
+          isBusy: false,
+          errorMessage: '离线包不完整，请重新下载后再开始路线。',
+        );
+        return;
+      }
       final detail = error is RoutePreparationSkipped
           ? error.message
           : '部分音频未下载，将在有网络时播放；文字稿仍可使用。';
@@ -334,6 +392,38 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     final locationMessage = locationMode == TourLocationMode.simulated
         ? '模拟定位已开启：不会读取真实位置，请手动模拟到达下一条线索。'
         : _locationPermissionMessage(permission!);
+    if (_isOfflineSession(session)) {
+      final ledger = await _restoreOfflineLedger(session, manifest);
+      if (!_isTransitionCurrent(transition)) return;
+      await _player.setSpeed(speed);
+      final restoredCurrent = _restorableCurrent(ledger);
+      state = state.copyWith(
+        status: locationMode == TourLocationMode.simulated
+            ? 'simulated'
+            : permission == TourLocationPermission.granted
+                ? 'monitoring'
+                : 'permission_limited',
+        ledger: ledger,
+        current: restoredCurrent,
+        liveFragmentId: restoredCurrent?.id,
+        selectedFragmentId: restoredCurrent?.id,
+        preparedPaths: prepared,
+        narrationProfileId: profileId,
+        isBusy: false,
+        locationMessage: restoredCurrent == null
+            ? '$locationMessage · 当前使用已校验离线包'
+            : _restoredLocationMessage(restoredCurrent, locationMessage),
+        clearError: true,
+      );
+      _refreshNearbyStoryPoints();
+      await _persistStartedTour(manifest, profileId, prepared);
+      if (locationMode == TourLocationMode.real &&
+          permission == TourLocationPermission.granted) {
+        _listenToRealLocation();
+      }
+      await _restorePendingEvidence();
+      return;
+    }
     try {
       await _repository.startActiveTour(session.id);
       if (!_isTransitionCurrent(transition)) return;
@@ -555,6 +645,12 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     _position = _player.positionStream.listen((value) {
       if (_isPlaybackCurrent(generation)) {
         state = state.copyWith(position: value);
+        final bucket = value.inSeconds ~/ 5;
+        if (_isOfflineSession(state.session) &&
+            bucket != _lastOfflineCheckpointBucket) {
+          _lastOfflineCheckpointBucket = bucket;
+          unawaited(_checkpointOfflinePlayback(value));
+        }
         final token = _audioOwnershipGeneration;
         if (token != null) {
           ref
@@ -654,14 +750,13 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       if (currentEntry != null && !currentEntry.isCollected) {
         final session = state.session!;
         final key = _uuid.v4();
-        try {
-          await _repository.acknowledgePlayback(
-            session.id,
-            currentEntry.id,
-            1,
-            key,
+        if (_isOfflineSession(session)) {
+          await _updateOfflineFragment(
+            currentEntry.withOfflineState(
+              state: 'collected',
+              playbackProgress: 1,
+            ),
           );
-        } catch (error) {
           await _store.enqueue(OutboxEvent(
             id: key,
             type: 'playback',
@@ -671,13 +766,32 @@ class ActiveTourController extends Notifier<ActiveTourState> {
               'progress': 1.0,
             },
           ));
-          state = state.copyWith(
-            errorMessage: _message(error),
-            locationMessage: '当前线索的完成状态尚未同步，请再次点击“下一条线索”。',
-          );
-          return;
+        } else {
+          try {
+            await _repository.acknowledgePlayback(
+              session.id,
+              currentEntry.id,
+              1,
+              key,
+            );
+          } catch (error) {
+            await _store.enqueue(OutboxEvent(
+              id: key,
+              type: 'playback',
+              payload: {
+                'journey_id': session.id,
+                'fragment_id': currentEntry.id,
+                'progress': 1.0,
+              },
+            ));
+            state = state.copyWith(
+              errorMessage: _message(error),
+              locationMessage: '当前线索的完成状态尚未同步，请再次点击“下一条线索”。',
+            );
+            return;
+          }
+          await _refreshLedger();
         }
-        await _refreshLedger();
       }
 
       final next = _nextDemoFragment();
@@ -801,6 +915,29 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         'method': method,
       },
     ));
+    if (_isOfflineSession(session)) {
+      try {
+        final revealed = fragment.withOfflineState(state: 'triggered');
+        await _updateOfflineFragment(revealed);
+        await _store.enqueue(OutboxEvent(
+          id: key,
+          type: 'trigger',
+          payload: {
+            'journey_id': session.id,
+            'fragment_id': fragment.id,
+            'method': method,
+            'latitude': sample?.latitude,
+            'longitude': sample?.longitude,
+            'accuracy_m': sample?.accuracyM,
+          },
+        ));
+        _triggerEngine.acknowledge(fragment.id);
+        await _enqueueNarration(revealed);
+        return true;
+      } finally {
+        _triggering = false;
+      }
+    }
     try {
       final revealed = await _repository.triggerFragment(
           session.id, fragment.id,
@@ -915,6 +1052,25 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     }
 
     final key = _uuid.v4();
+    if (_isOfflineSession(session)) {
+      await _updateOfflineFragment(
+        completed.withOfflineState(
+          state: 'collected',
+          playbackProgress: 1,
+        ),
+      );
+      await _store.enqueue(OutboxEvent(
+        id: key,
+        type: 'playback',
+        payload: {
+          'journey_id': session.id,
+          'fragment_id': completed.id,
+          'progress': 1.0,
+        },
+      ));
+      if (next != null) await _playNarration(next);
+      return;
+    }
     try {
       await _repository.acknowledgePlayback(session.id, completed.id, 1, key);
       await _refreshLedger();
@@ -930,6 +1086,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> _playNarration(StoryFragment fragment) async {
     final generation = ++_playbackGeneration;
+    _lastOfflineCheckpointBucket = -1;
     await _cancelPlayerBindings();
     await ref.read(homeStoryAudioPlayerProvider).stop();
     await _player.stop();
@@ -1144,9 +1301,150 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     }
   }
 
+  bool _isOfflineSession(JourneySession? session) =>
+      session != null && _isOfflineJourneyId(session.id);
+
+  static bool _isOfflineJourneyId(String journeyId) =>
+      journeyId.startsWith('offline:');
+
+  Future<String> _resolvedJourneyId(String journeyId) async {
+    if (!_isOfflineJourneyId(journeyId)) return journeyId;
+    final alias = await _store.readJson('journey_alias_$journeyId');
+    return alias?['remote_journey_id'] as String? ?? journeyId;
+  }
+
+  Future<StoryLedger> _restoreOfflineLedger(
+    JourneySession session,
+    AudioTourManifest manifest,
+  ) async {
+    final snapshot = await _store.readJson('ledger_${session.id}');
+    final states = <String, Map<String, dynamic>>{
+      for (final value
+          in snapshot?['fragments'] as List<dynamic>? ?? const <dynamic>[])
+        if (value is Map && value['id'] is String)
+          value['id'] as String: Map<String, dynamic>.from(value),
+    };
+    final entries = manifest.fragments.map((fragment) {
+      final saved = states[fragment.id];
+      final savedState = saved?['state'] as String? ?? 'undiscovered';
+      if (savedState == 'undiscovered') return fragment.asUndiscovered();
+      return fragment.withOfflineState(
+        state: savedState,
+        playbackProgress:
+            (saved?['playback_progress'] as num?)?.toDouble() ?? 0,
+        evidenceId: saved?['evidence_id'] as String?,
+      );
+    }).toList(growable: false);
+    return _offlineLedger(manifest, entries);
+  }
+
+  StoryLedger _offlineLedger(
+    AudioTourManifest manifest,
+    List<StoryFragment> entries,
+  ) {
+    final collected = entries.where((item) => item.isCollected).length;
+    return StoryLedger(
+      centralQuestion: manifest.centralQuestion,
+      collectedCount: collected,
+      totalCount: entries.length,
+      reconstructionUnlocked: entries.isNotEmpty && collected == entries.length,
+      entries: entries,
+      defaultNarrationProfileId: manifest.defaultNarrationProfileId,
+      narrationProfiles: manifest.narrationProfiles,
+    );
+  }
+
+  Future<void> _updateOfflineFragment(StoryFragment updated) async {
+    final session = state.session;
+    final manifest = state.route?.audioTour;
+    final ledger = state.ledger;
+    if (session == null || manifest == null || ledger == null) return;
+    final entries = [
+      for (final entry in ledger.entries)
+        if (entry.id == updated.id) updated else entry,
+    ];
+    final next = _offlineLedger(manifest, entries);
+    state = state.copyWith(
+      ledger: next,
+      current: state.current?.id == updated.id ? updated : state.current,
+    );
+    _refreshNearbyStoryPoints();
+    await _persistOfflineLedger(session, next);
+  }
+
+  Future<void> _persistOfflineLedger(
+    JourneySession session,
+    StoryLedger ledger,
+  ) =>
+      _store.saveJson('ledger_${session.id}', {
+        'collected_count': ledger.collectedCount,
+        'total_count': ledger.totalCount,
+        'fragments': ledger.entries
+            .map((item) => {
+                  'id': item.id,
+                  'state': item.state,
+                  'playback_progress': item.playbackProgress,
+                  'evidence_id': item.evidenceId,
+                })
+            .toList(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+
+  Future<void> _checkpointOfflinePlayback(Duration position) async {
+    final current = state.current;
+    final duration = state.duration;
+    if (current == null || duration == null || duration <= Duration.zero) {
+      return;
+    }
+    final progress =
+        (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    await _updateOfflineFragment(
+      current.withOfflineState(
+        state: current.state,
+        playbackProgress: progress,
+      ),
+    );
+  }
+
+  Future<void> _persistStartedTour(
+    AudioTourManifest manifest,
+    String? profileId,
+    Map<String, String> prepared,
+  ) async {
+    final session = state.session;
+    final route = state.route;
+    if (session == null || route == null) return;
+    await _store.saveJson('active_tour', {
+      'journey_id': session.id,
+      'route_slug': route.slug,
+      'status': state.status,
+      'location_mode': state.locationMode.name,
+      'script_version': manifest.scriptVersion,
+      'narration_profile_id': profileId,
+    });
+    await _store.saveJson('prepared_manifest_${route.slug}', {
+      'script_version': manifest.scriptVersion,
+      'download_size_bytes': manifest.downloadSizeBytes,
+      'fragment_ids': manifest.fragments.map((item) => item.id).toList(),
+      'prepared_fragment_ids': prepared.keys.toList(),
+      'narration_profile_id': profileId,
+    });
+  }
+
   Future<void> _refreshLedger() async {
     final session = state.session;
     if (session == null) return;
+    if (_isOfflineSession(session)) {
+      if (state.ledger == null && state.route?.audioTour != null) {
+        state = state.copyWith(
+          ledger: await _restoreOfflineLedger(
+            session,
+            state.route!.audioTour!,
+          ),
+        );
+      }
+      return;
+    }
     final transition = _transitionGeneration;
     final ledger = await _repository.ledger(session.id);
     if (!_isTransitionCurrent(transition) || state.session?.id != session.id) {
@@ -1226,26 +1524,57 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> reconcileOutbox() async {
+    if (_reconciling) return;
+    _reconciling = true;
+    try {
+      await _reconcileOutboxOnce();
+    } finally {
+      _reconciling = false;
+    }
+  }
+
+  Future<void> _reconcileOutboxOnce() async {
     for (final event in await _store.pending()) {
       try {
         final payload = event.payload;
-        if (event.type == 'trigger') {
+        if (event.type == 'start_journey') {
+          final localId = payload['local_journey_id'] as String;
+          final remote = await _repository.startOrResume(
+            payload['route_id'] as String,
+          );
+          await _store.saveJson('journey_alias_$localId', {
+            'remote_journey_id': remote.id,
+            'resolved_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        } else if (event.type == 'trigger') {
+          final journeyId = await _resolvedJourneyId(
+            payload['journey_id'] as String,
+          );
+          if (_isOfflineJourneyId(journeyId)) break;
           await _repository.triggerFragment(
-              payload['journey_id'] as String, payload['fragment_id'] as String,
+              journeyId, payload['fragment_id'] as String,
               method: payload['method'] as String,
               idempotencyKey: event.id,
               latitude: payload['latitude'] as double?,
               longitude: payload['longitude'] as double?,
               accuracyM: payload['accuracy_m'] as double?);
         } else if (event.type == 'playback') {
+          final journeyId = await _resolvedJourneyId(
+            payload['journey_id'] as String,
+          );
+          if (_isOfflineJourneyId(journeyId)) break;
           await _repository.acknowledgePlayback(
-              payload['journey_id'] as String,
+              journeyId,
               payload['fragment_id'] as String,
               (payload['progress'] as num).toDouble(),
               event.id);
         } else if (event.type == 'evidence') {
+          final journeyId = await _resolvedJourneyId(
+            payload['journey_id'] as String,
+          );
+          if (_isOfflineJourneyId(journeyId)) break;
           final evidence = await _repository.uploadEvidence(
-              payload['journey_id'] as String,
+              journeyId,
               payload['fragment_id'] as String,
               payload['file_path'] as String,
               event.id);
@@ -1263,7 +1592,9 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         break;
       }
     }
-    if (state.session != null) await _refreshLedger();
+    final session = state.session;
+    if (session == null) return;
+    if (!_isOfflineSession(session)) await _refreshLedger();
   }
 
   Future<void> pauseTour() async {
@@ -1371,7 +1702,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     }
     _loadedFragmentId = null;
     _loadedProfileId = null;
-    if (session != null && wasLive) {
+    if (session != null && wasLive && !_isOfflineSession(session)) {
       await _repository.stopActiveTour(session.id);
     }
     state = state.copyWith(
@@ -1400,7 +1731,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       ref.read(audioOwnershipProvider.notifier).clear(ownership);
       _audioOwnershipGeneration = null;
     }
-    if (session != null && wasLive) {
+    if (session != null && wasLive && !_isOfflineSession(session)) {
       try {
         await _repository.stopActiveTour(session.id);
       } catch (_) {}
@@ -1691,7 +2022,8 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         previousRoute != null &&
         (previousSession.id != nextJourneyId ||
             previousRoute.id != nextRouteId) &&
-        state.playbackMode != TourPlaybackMode.revisit) {
+        state.playbackMode != TourPlaybackMode.revisit &&
+        !_isOfflineSession(previousSession)) {
       try {
         await _repository.stopActiveTour(previousSession.id);
       } catch (_) {

@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import 'package:jiandi/features/experience/data/prepared_route_service.dart';
+import 'package:jiandi/features/experience/data/route_offline_package_service.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
+import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
@@ -52,6 +58,44 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
     await tester.pumpAndSettle();
     expect(find.text('headphone-gate'), findsOneWidget);
+  });
+
+  testWidgets('offline package control is 48dp and never opens the route',
+      (tester) async {
+    final service = _RecordingOfflinePackageService(holdDownload: true);
+    await _pumpDiscovery(
+      tester,
+      journeyItem: null,
+      context: null,
+      offlineService: service,
+      userId: null,
+    );
+    final button = find.byKey(const ValueKey('offline-package-route-a'));
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(button), const Size(48, 48));
+    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+
+    await tester.tap(button);
+    await tester.pump();
+
+    final progress = tester.widget<CircularProgressIndicator>(
+      find.descendant(
+        of: button,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+    );
+    expect(progress.value, .5);
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+
+    expect(service.installedSlug, 'route-a');
+    expect(find.text('headphone-gate'), findsNothing);
+    expect(find.byKey(const ValueKey('route-card-route-a')), findsOneWidget);
+
+    service.finishDownload();
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.download_done_rounded), findsOneWidget);
   });
 
   testWidgets('active route opens its existing journey directly',
@@ -134,6 +178,8 @@ Future<void> _pumpDiscovery(
   required JourneyContext? context,
   _RecordingRevisitController? activeController,
   DiscoveryController? discoveryController,
+  RouteOfflinePackageService? offlineService,
+  String? userId = 'user-a',
 }) async {
   final router = GoRouter(routes: [
     GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
@@ -153,7 +199,7 @@ Future<void> _pumpDiscovery(
   addTearDown(router.dispose);
   await tester.pumpWidget(ProviderScope(
     overrides: [
-      currentUserIdProvider.overrideWithValue('user-a'),
+      currentUserIdProvider.overrideWithValue(userId),
       discoveryControllerProvider.overrideWith(
         () => discoveryController ?? _FixedDiscoveryController(),
       ),
@@ -170,10 +216,80 @@ Future<void> _pumpDiscovery(
       activeTourControllerProvider.overrideWith(
         () => activeController ?? _RecordingRevisitController(),
       ),
+      routeOfflinePackageServiceProvider.overrideWithValue(
+        offlineService ?? _RecordingOfflinePackageService(),
+      ),
     ],
     child: MaterialApp.router(routerConfig: router),
   ));
   await tester.pumpAndSettle();
+}
+
+class _RecordingOfflinePackageService extends RouteOfflinePackageService {
+  _RecordingOfflinePackageService({this.holdDownload = false})
+      : super(Dio(), _CardStore(), PreparedRouteService(Dio(), _CardStore()));
+
+  final bool holdDownload;
+  final _downloadGate = Completer<void>();
+  String? installedSlug;
+
+  void finishDownload() {
+    if (!_downloadGate.isCompleted) _downloadGate.complete();
+  }
+
+  @override
+  Future<OfflinePackageStatus> status(
+    String slug, {
+    String? currentVersion,
+  }) async =>
+      const OfflinePackageStatus.idle();
+
+  @override
+  Future<InstalledRoutePackage> install(
+    String slug, {
+    String? preferredNarrationProfileId,
+    void Function(int complete, int total)? onProgress,
+  }) async {
+    installedSlug = slug;
+    onProgress?.call(1, 2);
+    if (holdDownload) await _downloadGate.future;
+    return const InstalledRoutePackage(
+      city: _city,
+      route: _route,
+      version: 'v1',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      narrationProfileId: null,
+      preparedPaths: {'fragment-a': '/cache/fragment-a.m4a'},
+      raw: {},
+    );
+  }
+}
+
+class _CardStore implements TourStore {
+  @override
+  Future<void> acknowledge(String id) async {}
+  @override
+  Future<void> clearPrivateData() async {}
+  @override
+  Future<void> enqueue(OutboxEvent event) async {}
+  @override
+  Future<List<OutboxEvent>> pending() async => const [];
+  @override
+  Future<String?> preparedAsset(
+          String url, String version, int sizeBytes) async =>
+      null;
+  @override
+  Future<List<PreparedAssetRecord>> preparedAssets() async => const [];
+  @override
+  Future<void> removePreparedAsset(String url) async {}
+  @override
+  Future<Map<String, dynamic>?> readJson(String key) async => null;
+  @override
+  Future<void> saveJson(String key, Map<String, dynamic> value) async {}
+  @override
+  Future<void> savePreparedAsset(
+      String url, String path, String version, int sizeBytes) async {}
 }
 
 class _RecordingRevisitController extends ActiveTourController {

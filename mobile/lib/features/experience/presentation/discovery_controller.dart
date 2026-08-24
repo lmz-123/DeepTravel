@@ -7,6 +7,7 @@ import '../domain/discovery_location.dart';
 import '../domain/city_story.dart';
 import '../domain/experience_repository.dart';
 import '../domain/models.dart';
+import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 
 enum DiscoveryStartupAction { completed, needsPurposeExplanation }
@@ -78,21 +79,46 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
 
   @override
   Future<DiscoveryState> build() async {
-    final cities = await _repository.cities();
-    final city = fallbackDiscoveryCity(cities);
-    final catalog = city == null
-        ? const CityDiscoveryCatalog(routes: [])
-        : await _repository.discoveryForCity(city.slug);
-    final storyHome =
-        city == null ? CityStoryHome.empty : await _loadStoryHome(city.slug);
-    return DiscoveryState(
-      cities: cities,
-      city: city,
-      catalog: catalog,
-      cards: scenicAreaCards(catalog),
-      storyHome: storyHome,
-      revision: 0,
-    );
+    try {
+      final cities = await _repository.cities();
+      final city = fallbackDiscoveryCity(cities);
+      final catalog = city == null
+          ? const CityDiscoveryCatalog(routes: [])
+          : await _repository.discoveryForCity(city.slug);
+      final storyHome =
+          city == null ? CityStoryHome.empty : await _loadStoryHome(city.slug);
+      return DiscoveryState(
+        cities: cities,
+        city: city,
+        catalog: catalog,
+        cards: scenicAreaCards(catalog),
+        storyHome: storyHome,
+        revision: 0,
+      );
+    } catch (_) {
+      final packages = await ref
+          .read(routeOfflinePackageServiceProvider)
+          .installedPackages();
+      if (packages.isEmpty) rethrow;
+      final citiesBySlug = {
+        for (final package in packages) package.city.slug: package.city,
+      };
+      final cities = citiesBySlug.values.toList(growable: false);
+      final city = fallbackDiscoveryCity(cities);
+      final routes = packages
+          .where((package) => package.city.slug == city?.slug)
+          .map((package) => package.route)
+          .toList(growable: false);
+      final catalog = CityDiscoveryCatalog(routes: routes);
+      return DiscoveryState(
+        cities: cities,
+        city: city,
+        catalog: catalog,
+        cards: scenicAreaCards(catalog),
+        revision: 0,
+        locationFailure: DiscoveryLocationFailureReason.unavailable,
+      );
+    }
   }
 
   Future<DiscoveryStartupAction> prepareColdStart() async {

@@ -46,6 +46,9 @@ void main() {
       databasePath: paths.join(directory.path, 'tour.db'),
     );
     await store.saveJson('active_tour', {'journey_id': 'tester-a-journey'});
+    await store.saveJson('offline_package_route-a', {
+      'data': {'package_version': 'v1'}
+    });
     await store.enqueue(
       const OutboxEvent(
         id: 'tester-a-photo',
@@ -63,6 +66,10 @@ void main() {
     await store.clearPrivateData();
 
     expect(await store.readJson('active_tour'), isNull);
+    expect(
+      (await store.readJson('offline_package_route-a'))?['data'],
+      {'package_version': 'v1'},
+    );
     expect(await store.pending(), isEmpty);
     expect(
       await store.preparedAsset(

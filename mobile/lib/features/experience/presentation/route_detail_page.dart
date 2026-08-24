@@ -9,8 +9,10 @@ import '../domain/tour_runtime.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
+import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'location_mode_controller.dart';
+import 'offline_package_controller.dart';
 import 'widgets/route_canvas.dart';
 
 class RouteDetailPage extends ConsumerWidget {
@@ -19,7 +21,7 @@ class RouteDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final route = ref.watch(routeProvider(slug));
+    final route = ref.watch(offlineAwareRouteProvider(slug));
     return route.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -66,8 +68,7 @@ class _RouteDetail extends ConsumerWidget {
           busy: journey.isBusy,
           icon: Icons.directions_walk_rounded,
           onPressed: () async {
-            final id =
-                await ref.read(journeyControllerProvider.notifier).start(route);
+            final id = await _startRoute(ref);
             if (id != null && context.mounted) context.go('/journey/$id');
           },
         ),
@@ -163,25 +164,53 @@ class _RouteDetail extends ConsumerWidget {
       ),
     );
   }
+
+  Future<String?> _startRoute(WidgetRef ref) async {
+    final controller = ref.read(journeyControllerProvider.notifier);
+    final onlineId = await controller.start(route);
+    if (onlineId != null) return onlineId;
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return null;
+    final package =
+        await ref.read(routeOfflinePackageServiceProvider).load(route.slug);
+    if (package == null) return null;
+    final localId = 'offline:$userId:${route.id}';
+    final now = DateTime.now().toUtc();
+    final session = JourneySession(
+      id: localId,
+      routeId: route.id,
+      status: 'active',
+      currentStopPosition: 1,
+      arrivedStopId: null,
+      answeredStopIds: const {},
+      progress: 0,
+      startedAt: now,
+      updatedAt: now,
+    );
+    final store = ref.read(tourStoreProvider);
+    await store.enqueue(OutboxEvent(
+      id: 'start_journey:$localId',
+      type: 'start_journey',
+      payload: {
+        'local_journey_id': localId,
+        'route_id': route.id,
+      },
+    ));
+    await store.saveJson('offline_session_$localId', {
+      'route_slug': route.slug,
+      'created_at': now.toIso8601String(),
+    });
+    return controller.resume(package.route, session);
+  }
 }
 
-class _PretripSection extends ConsumerStatefulWidget {
+class _PretripSection extends StatelessWidget {
   const _PretripSection({required this.pretrip});
 
   final PretripExperience pretrip;
 
   @override
-  ConsumerState<_PretripSection> createState() => _PretripSectionState();
-}
-
-class _PretripSectionState extends ConsumerState<_PretripSection> {
-  var _busy = false;
-  var _complete = 0;
-  String? _message;
-
-  @override
   Widget build(BuildContext context) {
-    final pretrip = widget.pretrip;
     final tips = <(String, IconData, List<String>)>[
       ('安全', Icons.shield_outlined, pretrip.tips.safety),
       ('休息', Icons.chair_outlined, pretrip.tips.rest),
@@ -246,66 +275,9 @@ class _PretripSectionState extends ConsumerState<_PretripSection> {
             const SizedBox(height: 5),
             ...tip.$3.map((text) => Text('• $text')),
           ],
-          if (pretrip.offlineResources.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Row(children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _prepare,
-                  icon: const Icon(Icons.download_rounded),
-                  label: Text(_busy
-                      ? '正在准备 $_complete/${pretrip.offlineResources.length}'
-                      : '提前准备音频和文字'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: '移除已准备内容',
-                onPressed: _busy ? null : _remove,
-                icon: const Icon(Icons.delete_outline_rounded),
-              ),
-            ]),
-            if (_message != null) ...[
-              const SizedBox(height: 8),
-              Text(_message!, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ],
         ],
       ),
     );
-  }
-
-  Future<void> _prepare() async {
-    setState(() {
-      _busy = true;
-      _complete = 0;
-      _message = null;
-    });
-    final result = await ref.read(pretripPreparationServiceProvider).prepare(
-      widget.pretrip.offlineResources,
-      onProgress: (complete, _) {
-        if (mounted) setState(() => _complete = complete);
-      },
-    );
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _message = result.isComplete
-          ? '音频和文字已校验并准备完成。'
-          : '已准备 ${result.preparedCount} 项，${result.failures.length} 项失败；可再次点击重试。';
-    });
-  }
-
-  Future<void> _remove() async {
-    setState(() => _busy = true);
-    final removed = await ref
-        .read(pretripPreparationServiceProvider)
-        .remove(widget.pretrip.offlineResources);
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _message = '已移除 $removed 项离线内容。';
-    });
   }
 }
 

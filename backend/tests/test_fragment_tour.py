@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
+from pathlib import Path
 from uuid import uuid4
 
 from PIL import Image
@@ -50,6 +52,50 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     assert tour["fragments"][0]["expected_duration_seconds"] > 0
     audio = client.get("/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-conversational.3.m4a")
     assert audio.status_code == 404
+
+
+def test_offline_package_is_hidden_when_published_audio_has_no_checksum(client):
+    response = client.get("/api/v1/routes/nantou-time-layers/offline-package")
+
+    assert response.status_code == 404
+
+
+def test_offline_package_is_complete_versioned_and_canonical(app, client):
+    database = app.extensions["database"]
+    media_root = Path(app.config["MEDIA_ROOT"])
+    with database.session_factory() as session:
+        route = session.scalar(select(RouteModel).where(RouteModel.slug == "nantou-time-layers"))
+        arc = session.scalar(select(StoryArcModel).where(StoryArcModel.route_id == route.id))
+        arc.script_version = "nantou-2026.08-review.1"
+        for fragment in arc.fragments:
+            path = f"audio/nantou-fragment-{fragment.position}-nantou-2026.08-review.1.m4a"
+            fragment.audio_path = path
+            fragment.audio_size_bytes = (media_root / path).stat().st_size
+            fragment.script_version = arc.script_version
+        session.query(FragmentNarrationTrackModel).delete()
+        session.commit()
+
+    public_route = client.get("/api/v1/routes/nantou-time-layers").get_json()["data"]
+    assert "transcript" not in public_route["audio_tour"]["fragments"][0]
+
+    response = client.get("/api/v1/routes/nantou-time-layers/offline-package")
+
+    assert response.status_code == 200
+    package = response.get_json()["data"]
+    checksum = package.pop("package_checksum_sha256")
+    canonical = json.dumps(
+        package,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    assert checksum == hashlib.sha256(canonical).hexdigest()
+    assert package["package_version"] == package["route"]["audio_tour"]["script_version"]
+    assert package["city"]["slug"] == "shenzhen"
+    fragments = package["route"]["audio_tour"]["fragments"]
+    assert all(item["transcript"] for item in fragments)
+    assert all(item["state"] == "undiscovered" for item in fragments)
+    assert all(len(item["audio"]["checksum_sha256"]) == 64 for item in fragments)
 
 
 def test_public_voice_profiles_require_complete_current_coverage_and_preserve_default(

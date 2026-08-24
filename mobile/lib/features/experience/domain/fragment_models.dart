@@ -39,17 +39,20 @@ class NarrationAsset {
       {required this.url,
       required this.mimeType,
       required this.sizeBytes,
-      required this.scriptVersion});
+      required this.scriptVersion,
+      this.checksumSha256});
   final String url;
   final String mimeType;
   final int sizeBytes;
   final String scriptVersion;
+  final String? checksumSha256;
 
   factory NarrationAsset.fromJson(Map<String, dynamic> json) => NarrationAsset(
         url: json['url'] as String,
         mimeType: json['mime_type'] as String,
         sizeBytes: json['size_bytes'] as int? ?? 0,
         scriptVersion: json['script_version'] as String,
+        checksumSha256: json['checksum_sha256'] as String?,
       );
 }
 
@@ -93,6 +96,7 @@ class NarrationTrack {
           mimeType: json['mime_type'] as String,
           sizeBytes: json['size_bytes'] as int? ?? 0,
           scriptVersion: json['script_version'] as String,
+          checksumSha256: json['checksum_sha256'] as String?,
         ),
         transcriptHash: json['transcript_hash'] as String,
       );
@@ -246,6 +250,55 @@ class StoryFragment {
         playbackProgress: playbackProgress,
         mission: mission,
         evidenceId: evidenceId,
+        sources: sources,
+        dependencyIds: dependencyIds,
+        narrationTracks: narrationTracks,
+        experienceTags: experienceTags,
+        displayTheme: displayTheme,
+        expectedDurationSeconds: expectedDurationSeconds,
+      );
+
+  StoryFragment asUndiscovered() => StoryFragment(
+        id: id,
+        position: position,
+        safePreview: safePreview,
+        interactionType: interactionType,
+        reviewState: reviewState,
+        triggerRegion: triggerRegion,
+        audio: audio,
+        state: 'undiscovered',
+        mission: mission,
+        sources: sources,
+        dependencyIds: dependencyIds,
+        narrationTracks: narrationTracks,
+        experienceTags: experienceTags,
+        displayTheme: displayTheme,
+        expectedDurationSeconds: expectedDurationSeconds,
+      );
+
+  StoryFragment withOfflineState({
+    required String state,
+    double? playbackProgress,
+    String? evidenceId,
+  }) =>
+      StoryFragment(
+        id: id,
+        position: position,
+        safePreview: safePreview,
+        interactionType: interactionType,
+        reviewState: reviewState,
+        triggerRegion: triggerRegion,
+        audio: audio,
+        title: title,
+        transcript: transcript,
+        keyClaim: keyClaim,
+        answersQuestion: answersQuestion,
+        raisesQuestion: raisesQuestion,
+        authenticityLabel: authenticityLabel,
+        state: state,
+        playbackProgress: playbackProgress ?? this.playbackProgress,
+        mission: mission,
+        evidenceId: evidenceId ?? this.evidenceId,
         sources: sources,
         dependencyIds: dependencyIds,
         narrationTracks: narrationTracks,

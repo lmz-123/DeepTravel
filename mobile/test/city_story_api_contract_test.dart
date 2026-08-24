@@ -128,8 +128,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('今天听一段城市故事'), findsOneWidget);
+    expect(find.text('继续我的足迹'), findsNothing);
+    final scrollView = tester.widget<CustomScrollView>(
+      find.byType(CustomScrollView),
+    );
+    final sliverKeys = scrollView.slivers.map((sliver) => sliver.key).toList();
+    expect(
+      sliverKeys.indexOf(const ValueKey('route-selection-section')),
+      lessThan(sliverKeys.indexOf(const ValueKey('city-story-section'))),
+    );
     final storyCard = find.bySemanticsLabel(RegExp('未来类型.*街角的旧砖'));
     expect(storyCard, findsOneWidget);
+    await tester.scrollUntilVisible(
+      storyCard,
+      300,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(storyCard);
     await tester.pumpAndSettle();
     expect(find.text('story:catalog-a'), findsOneWidget);

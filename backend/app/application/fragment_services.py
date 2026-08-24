@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -151,6 +152,45 @@ class FragmentTourService:
                 ),
                 "fragments": fragments,
             }
+
+    def offline_manifest(self, route_id: str) -> dict | None:
+        """Return the published manifest with the text needed for offline use.
+
+        Journey state is intentionally reset. The client keeps this content in
+        the verified package and reveals it according to the normal trigger
+        rules instead of treating download as journey progress.
+        """
+        manifest = self.public_manifest(route_id)
+        if manifest is None:
+            return None
+        with self._session() as session:
+            arc = session.scalar(
+                select(StoryArcModel)
+                .where(StoryArcModel.route_id == route_id)
+                .options(
+                    selectinload(StoryArcModel.fragments).selectinload(
+                        StoryFragmentModel.trigger_region
+                    ),
+                    selectinload(StoryArcModel.fragments).selectinload(
+                        StoryFragmentModel.photo_mission
+                    ),
+                    selectinload(StoryArcModel.route),
+                )
+            )
+            if arc is None or arc.route.content_status != "published":
+                return None
+            narration = self._narration_context(session, arc)
+            fragments = [self._offline_fragment(item, session, narration) for item in arc.fragments]
+            if any(
+                not item["audio"].get("checksum_sha256")
+                or any(
+                    not track.get("checksum_sha256") for track in item["narration_tracks"].values()
+                )
+                for item in fragments
+            ):
+                return None
+            manifest["fragments"] = fragments
+            return manifest
 
     def initialize_journey(self, journey_id: str, route_id: str) -> None:
         if not self.enabled:
@@ -748,6 +788,23 @@ class FragmentTourService:
         )
         return asset.canonical_url if asset and asset.canonical_url else value
 
+    def _asset_checksum(self, session: Session, value: str) -> str | None:
+        asset = session.scalar(
+            select(MediaAssetModel).where(
+                (MediaAssetModel.storage_path == value)
+                | (MediaAssetModel.object_key == value)
+                | (MediaAssetModel.key == value)
+            )
+        )
+        if asset and asset.checksum_sha256:
+            return asset.checksum_sha256
+        if value.startswith(("http://", "https://")):
+            return None
+        path = self.media_root / value
+        if not path.is_file():
+            return None
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
     def _asset_exists(self, session: Session, value: str) -> bool:
         if value.startswith(("http://", "https://")):
             return True
@@ -799,6 +856,7 @@ class FragmentTourService:
                 "mime_type": fragment.audio_mime_type,
                 "size_bytes": fragment.audio_size_bytes,
                 "script_version": fragment.script_version,
+                "checksum_sha256": self._asset_checksum(session, fragment.audio_path),
             },
             "narration_tracks": narration["tracks_by_fragment"].get(fragment.id, {}),
             "mission_preview": {"required": mission.required, "audit_state": mission.audit_state}
@@ -884,6 +942,23 @@ class FragmentTourService:
         )
         return data
 
+    def _offline_fragment(
+        self,
+        fragment: StoryFragmentModel,
+        session: Session,
+        narration: dict,
+    ) -> dict:
+        state = SimpleNamespace(
+            state="undiscovered",
+            trigger_method=None,
+            playback_progress=0.0,
+            triggered_at=None,
+            playback_completed_at=None,
+            collected_at=None,
+            evidence_id=None,
+        )
+        return self._revealed_fragment(session, fragment, state, narration)
+
     def _narration_context(self, session: Session, arc: StoryArcModel) -> dict:
         fragments = list(arc.fragments)
         fragment_ids = [item.id for item in fragments]
@@ -955,6 +1030,8 @@ class FragmentTourService:
                     "size_bytes": track.size_bytes,
                     "transcript_hash": track.transcript_hash,
                     "script_version": track.script_version,
+                    "checksum_sha256": track.checksum_sha256
+                    or self._asset_checksum(session, track.media_path),
                 }
         default_profile = next(
             (item for item in complete_profiles if item.is_default),

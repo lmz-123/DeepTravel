@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/features/experience/data/prepared_route_service.dart';
+import 'package:jiandi/features/experience/data/route_offline_package_service.dart';
 import 'package:jiandi/features/experience/data/user_preferences_repository.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
+import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
@@ -20,6 +22,7 @@ void main() {
     final preferences = UserPreferencesRepository();
     final location = _LocationStore();
     final cache = _CacheService();
+    final offlineCache = _OfflineCacheService();
     final player = _Player();
     await tester.pumpWidget(ProviderScope(
       overrides: [
@@ -40,6 +43,7 @@ void main() {
         ),
         appVersionProvider.overrideWith((ref) async => '0.3.2+6'),
         preparedRouteServiceProvider.overrideWithValue(cache),
+        routeOfflinePackageServiceProvider.overrideWithValue(offlineCache),
         narrationPlayerProvider.overrideWithValue(player),
       ],
       child: const MaterialApp(home: SettingsPage()),
@@ -80,6 +84,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(location.mode, TourLocationMode.simulated);
 
+    await tester.scrollUntilVisible(
+      find.text('离线缓存'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('离线缓存'));
+    await tester.pumpAndSettle();
+    expect(find.text('测试景点'), findsOneWidget);
+    expect(find.text('测试城 · 版本 v1 · 2 段音频'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('remove-offline-package-route-a')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('清除测试景点离线缓存？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '清除'));
+    await tester.pumpAndSettle();
+    expect(offlineCache.removedSlug, 'route-a');
+    expect(find.text('暂无离线景点包'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('清除已下载音频'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('清除已下载音频'));
     await tester.pumpAndSettle();
     expect(find.text('清除音频缓存？'), findsOneWidget);
@@ -89,6 +119,59 @@ void main() {
     expect(find.textContaining('已清除 3 条音频缓存'), findsOneWidget);
   });
 }
+
+class _OfflineCacheService extends RouteOfflinePackageService {
+  _OfflineCacheService()
+      : super(Dio(), _Store(), PreparedRouteService(Dio(), _Store()));
+
+  String? removedSlug;
+
+  @override
+  Future<List<InstalledRoutePackage>> installedPackages() async =>
+      removedSlug == null ? const [_installedPackage] : const [];
+
+  @override
+  Future<PreparedAudioClearResult> remove(String slug) async {
+    removedSlug = slug;
+    return const PreparedAudioClearResult(
+      removedCount: 2,
+      failedPaths: [],
+    );
+  }
+}
+
+const _installedPackage = InstalledRoutePackage(
+  city: CityExperience(
+    id: 'city-a',
+    slug: 'city-a',
+    name: '测试城',
+    subtitle: '测试',
+    heroImage: '',
+  ),
+  route: RouteExperience(
+    id: 'route-a',
+    slug: 'route-a',
+    title: '测试景点',
+    subtitle: '测试',
+    description: '测试景点',
+    durationMinutes: 20,
+    distanceKm: 1.2,
+    difficulty: '轻松',
+    theme: '历史',
+    heroImage: '',
+    contentStatus: 'published',
+    stops: [],
+  ),
+  version: 'v1',
+  checksumSha256:
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  narrationProfileId: null,
+  preparedPaths: {
+    'fragment-a': '/cache/a.m4a',
+    'fragment-b': '/cache/b.m4a',
+  },
+  raw: {},
+);
 
 class _CacheService extends PreparedRouteService {
   _CacheService() : super(Dio(), _Store());

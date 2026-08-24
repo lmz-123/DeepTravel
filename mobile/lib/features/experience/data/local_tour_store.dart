@@ -33,7 +33,11 @@ class SqliteTourStore implements TourStore {
   Future<void> clearPrivateData() async {
     final db = await _db;
     await db.transaction((transaction) async {
-      await transaction.delete('snapshots');
+      await transaction.delete(
+        'snapshots',
+        where: 'key NOT LIKE ?',
+        whereArgs: ['offline_package_%'],
+      );
       await transaction.delete('outbox');
     });
   }

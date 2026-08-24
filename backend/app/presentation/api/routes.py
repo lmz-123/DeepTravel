@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 
 from flask import Blueprint, abort, current_app, g, jsonify, request, send_file
 from sqlalchemy import text
 
 from app.domain.errors import ValidationError
-from app.domain.models import JourneyStatus
+from app.domain.models import ContentStatus, JourneyStatus
 from app.presentation.api.auth import require_user
 from app.presentation.api.media import send_media_asset
 from app.presentation.api.serializers import (
@@ -237,6 +239,37 @@ def list_city_stories(city_slug: str):
 def get_route(route_slug: str):
     route = _services()["catalog"].get_route(route_slug)
     return jsonify({"data": _route_payload(route)})
+
+
+@api.get("/routes/<route_slug>/offline-package")
+def get_route_offline_package(route_slug: str):
+    route = _services()["catalog"].get_route(route_slug)
+    if route.content_status is not ContentStatus.PUBLISHED:
+        abort(404)
+    manifest = _services()["fragment_tours"].offline_manifest(route.id)
+    if manifest is None:
+        abort(404)
+    city = next(
+        (item for item in _services()["catalog"].list_cities() if item.id == route.city_id),
+        None,
+    )
+    if city is None:
+        abort(404)
+    route_payload = _route_payload(route)
+    route_payload["audio_tour"] = manifest
+    package = {
+        "package_version": manifest["script_version"],
+        "city": city_to_dict(city),
+        "route": route_payload,
+    }
+    canonical = json.dumps(
+        package,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    package["package_checksum_sha256"] = hashlib.sha256(canonical).hexdigest()
+    return jsonify({"data": package})
 
 
 @api.get("/stories/random")
@@ -890,9 +923,7 @@ def reconstruct_story(journey_id: str):
     )
 
 
-def _route_payload(
-    route, *, include_stops: bool = True, include_center: bool = False
-) -> dict:
+def _route_payload(route, *, include_stops: bool = True, include_center: bool = False) -> dict:
     payload = route_to_dict(route, include_stops=include_stops)
     tour = _services()["fragment_tours"].public_manifest(route.id)
     if tour is not None:

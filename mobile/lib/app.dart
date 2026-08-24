@@ -48,6 +48,7 @@ class _JiandiAppState extends ConsumerState<JiandiApp> {
   Widget build(BuildContext context) {
     ref.watch(privateExperienceLifecycleProvider);
     ref.watch(activeTourAuthLifecycleProvider);
+    ref.watch(tourOutboxSyncLifecycleProvider);
     final usesRemoteApi =
         ref.watch(experienceRepositoryProvider) is ApiExperienceRepository;
     return MaterialApp.router(

@@ -5,12 +5,15 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
+import '../data/prepared_route_service.dart';
+import '../data/route_offline_package_service.dart';
 import '../data/user_preferences_repository.dart';
 import '../domain/fragment_models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'location_mode_controller.dart';
+import 'offline_package_controller.dart';
 
 final playbackSpeedPreferenceProvider = FutureProvider.family<double, String>(
     (ref, userId) =>
@@ -20,6 +23,10 @@ final downloadPolicyPreferenceProvider =
     FutureProvider.family<DownloadPolicy, String>((ref, userId) => ref
         .watch(userPreferencesRepositoryProvider)
         .readDownloadPolicy(userId));
+
+final offlineCachePackagesProvider =
+    FutureProvider<List<InstalledRoutePackage>>((ref) =>
+        ref.watch(routeOfflinePackageServiceProvider).installedPackages());
 
 final appVersionProvider = FutureProvider<String>((ref) async {
   try {
@@ -63,6 +70,7 @@ class SettingsPage extends ConsumerWidget {
                     children: [
                       const _LocationModeTile(),
                       _DownloadPolicyTile(userId: userId),
+                      const _OfflineCacheTile(),
                       const _ClearAudioCacheTile(),
                     ],
                   ),
@@ -246,6 +254,114 @@ class _ClearAudioCacheTile extends ConsumerWidget {
               .showSnackBar(SnackBar(content: Text(message)));
         },
       );
+}
+
+class _OfflineCacheTile extends ConsumerWidget {
+  const _OfflineCacheTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final packages = ref.watch(offlineCachePackagesProvider);
+    return ExpansionTile(
+      leading: const Icon(Icons.offline_pin_outlined),
+      title: const Text('离线缓存'),
+      subtitle: Text(packages.when(
+        loading: () => '正在读取',
+        error: (_, __) => '暂时无法读取',
+        data: (items) => items.isEmpty ? '暂无离线景点包' : '已缓存 ${items.length} 个景点',
+      )),
+      children: packages.when(
+        loading: () => const [
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(),
+          ),
+        ],
+        error: (_, __) => [
+          ListTile(
+            title: const Text('离线缓存读取失败'),
+            trailing: TextButton(
+              onPressed: () => ref.invalidate(offlineCachePackagesProvider),
+              child: const Text('重试'),
+            ),
+          ),
+        ],
+        data: (items) => items.isEmpty
+            ? const [
+                ListTile(
+                  title: Text('还没有下载离线景点包'),
+                  subtitle: Text('可在首页景点卡片左下角下载。'),
+                ),
+              ]
+            : items
+                .map((package) => ListTile(
+                      title: Text(package.route.title),
+                      subtitle: Text(
+                        '${package.city.name} · 版本 ${package.version} · ${package.preparedPaths.length} 段音频',
+                      ),
+                      trailing: IconButton(
+                        key: ValueKey(
+                          'remove-offline-package-${package.route.slug}',
+                        ),
+                        tooltip: '清除${package.route.title}离线缓存',
+                        onPressed: () => _remove(context, ref, package),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                      ),
+                    ))
+                .toList(growable: false),
+      ),
+    );
+  }
+
+  Future<void> _remove(
+    BuildContext context,
+    WidgetRef ref,
+    InstalledRoutePackage package,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('清除${package.route.title}离线缓存？'),
+        content: const Text('该景点之后需要联网使用，也可以重新下载。其他景点的离线缓存不会受影响。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    PreparedAudioClearResult result;
+    try {
+      result = await ref
+          .read(routeOfflinePackageServiceProvider)
+          .remove(package.route.slug);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('离线缓存清除失败，请重试')),
+        );
+      }
+      return;
+    }
+    ref.invalidate(offlineCachePackagesProvider);
+    ref.invalidate(offlinePackageControllerProvider(OfflinePackageKey(
+      package.route.slug,
+      package.route.audioTour?.scriptVersion,
+    )));
+    ref.invalidate(offlineAwareRouteProvider(package.route.slug));
+    if (!context.mounted) return;
+    final message = result.isComplete
+        ? '已清除${package.route.title}离线缓存'
+        : '离线包已移除，${result.failedPaths.length} 个文件暂时无法删除';
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
 }
 
 class _EvidencePolicyTile extends ConsumerWidget {

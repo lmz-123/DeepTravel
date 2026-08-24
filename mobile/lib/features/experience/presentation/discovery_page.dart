@@ -7,12 +7,12 @@ import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/fade_slide_in.dart';
 import '../domain/discovery_location.dart';
-import '../domain/footprint_models.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
 import 'active_tour_controller.dart';
 import 'discovery_controller.dart';
 import 'experience_providers.dart';
+import 'offline_package_controller.dart';
 import 'traveler_shell.dart';
 import 'widgets/rotating_tour_orb.dart';
 import 'widgets/favorite_button.dart';
@@ -77,7 +77,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   Widget build(BuildContext context) {
     final discovery = ref.watch(discoveryControllerProvider);
     final archivedJourneys = ref.watch(archivedActiveJourneysProvider);
-    final footprintResume = ref.watch(currentFootprintResumeProvider);
     return Scaffold(
       body: Stack(
         children: [
@@ -86,7 +85,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
             child: RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(archivedActiveJourneysProvider);
-                ref.invalidate(currentFootprintResumeProvider);
                 await ref
                     .read(discoveryControllerProvider.notifier)
                     .refreshDiscovery();
@@ -126,28 +124,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    sliver: SliverToBoxAdapter(
-                      child: footprintResume.maybeWhen(
-                        data: (item) => item == null
-                            ? const SizedBox.shrink()
-                            : _ResumeFootprintCard(entry: item),
-                        orElse: () => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: discovery.maybeWhen(
-                      data: (state) => _CityStoryModules(
-                        home: state.storyHome,
-                        onSwitchCity: (slug) => ref
-                            .read(discoveryControllerProvider.notifier)
-                            .switchCity(slug),
-                      ),
-                      orElse: () => const SizedBox.shrink(),
-                    ),
-                  ),
-                  SliverPadding(
+                    key: const ValueKey('route-selection-section'),
                     padding: const EdgeInsets.symmetric(horizontal: 0),
                     sliver: SliverToBoxAdapter(
                       child: discovery.when(
@@ -200,6 +177,18 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                           );
                         },
                       ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    key: const ValueKey('city-story-section'),
+                    child: discovery.maybeWhen(
+                      data: (state) => _CityStoryModules(
+                        home: state.storyHome,
+                        onSwitchCity: (slug) => ref
+                            .read(discoveryControllerProvider.notifier)
+                            .switchCity(slug),
+                      ),
+                      orElse: () => const SizedBox.shrink(),
                     ),
                   ),
                   const SliverPadding(
@@ -434,51 +423,6 @@ class _ArchivedJourneyCard extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _ResumeFootprintCard extends StatelessWidget {
-  const _ResumeFootprintCard({required this.entry});
-  final FootprintEntry entry;
-
-  @override
-  Widget build(BuildContext context) => FadeSlideIn(
-        child: Material(
-          color: AppColors.ink,
-          borderRadius: BorderRadius.circular(22),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(22),
-            onTap: () => context.push('/footprints/${entry.id}'),
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(children: [
-                const Icon(Icons.edit_note_rounded, color: AppColors.gold),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('继续我的足迹',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(color: AppColors.gold)),
-                      const SizedBox(height: 3),
-                      Text('${entry.cityName} · ${entry.storyTitle}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(color: AppColors.white)),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_rounded, color: AppColors.white),
-              ]),
-            ),
-          ),
-        ),
-      );
 }
 
 class _HeaderPlaceholder extends StatelessWidget {
@@ -963,15 +907,22 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   }
 }
 
-class _RouteCard extends StatelessWidget {
+class _RouteCard extends ConsumerWidget {
   const _RouteCard({required this.card, required this.onTap});
 
   final ScenicAreaCard card;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final route = card.route;
+    final packageKey = OfflinePackageKey(
+      route.slug,
+      route.audioTour?.scriptVersion,
+    );
+    final packageStatus =
+        ref.watch(offlinePackageControllerProvider(packageKey)).asData?.value ??
+            const OfflinePackageStatus.idle();
     return Semantics(
       button: true,
       label: '查看景区 ${route.title}',
@@ -1054,9 +1005,18 @@ class _RouteCard extends StatelessWidget {
                     const SizedBox(height: 20),
                     Row(
                       children: [
+                        _OfflinePackageButton(
+                          route: route,
+                          status: packageStatus,
+                          onPressed: () => ref
+                              .read(offlinePackageControllerProvider(packageKey)
+                                  .notifier)
+                              .download(route),
+                        ),
+                        const Spacer(),
                         Text('打开城市手册',
                             style: Theme.of(context).textTheme.labelLarge),
-                        const Spacer(),
+                        const SizedBox(width: 10),
                         const CircleAvatar(
                           radius: 20,
                           backgroundColor: AppColors.ink,
@@ -1070,6 +1030,70 @@ class _RouteCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflinePackageButton extends StatelessWidget {
+  const _OfflinePackageButton({
+    required this.route,
+    required this.status,
+    required this.onPressed,
+  });
+
+  final RouteExperience route;
+  final OfflinePackageStatus status;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final downloading = status.phase == OfflinePackagePhase.downloading;
+    final tooltip = switch (status.phase) {
+      OfflinePackagePhase.idle => '下载离线包',
+      OfflinePackagePhase.downloading => status.total > 0
+          ? '正在下载离线包 ${status.complete}/${status.total}'
+          : '正在下载离线包',
+      OfflinePackagePhase.complete => '离线包已下载 · ${status.message ?? '完整性校验通过'}',
+      OfflinePackagePhase.stale => '离线包有新版本，点击更新',
+      OfflinePackagePhase.failed => status.message ?? '下载失败，点击重试',
+    };
+    final icon = switch (status.phase) {
+      OfflinePackagePhase.idle => Icons.download_outlined,
+      OfflinePackagePhase.complete => Icons.download_done_rounded,
+      OfflinePackagePhase.stale => Icons.system_update_alt_rounded,
+      OfflinePackagePhase.failed => Icons.error_outline_rounded,
+      OfflinePackagePhase.downloading => null,
+    };
+    return Semantics(
+      label: tooltip,
+      button: true,
+      child: SizedBox.square(
+        dimension: 48,
+        child: IconButton(
+          key: ValueKey('offline-package-${route.slug}'),
+          tooltip: tooltip,
+          onPressed: downloading ? null : onPressed,
+          iconSize: 20,
+          icon: downloading
+              ? SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    value: status.total > 0
+                        ? (status.complete / status.total)
+                            .clamp(0.0, 1.0)
+                            .toDouble()
+                        : null,
+                  ),
+                )
+              : Icon(
+                  icon,
+                  color: status.phase == OfflinePackagePhase.failed
+                      ? Theme.of(context).colorScheme.error
+                      : AppColors.ink,
+                ),
         ),
       ),
     );
