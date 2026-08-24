@@ -2,7 +2,7 @@
 
 See `proposal.md` for motivation. The main repository currently exposes route-scoped `RoutePretripGuidance`, city-story catalog projections, legacy `HomeStoryPublication`, stop/fragment `experience_tags`, local/OSS storage adapters, and an idempotent `migrate-media` command. Flutter renders pre-trip as a large section below route metadata, uses separate home-story and on-site playback controllers, and lets only on-site playback drive the floating orb. The discovery page currently places city-story modules before a route carousel whose card/list containers use fixed heights.
 
-The public production payload observed during planning resolves covers and narration under `http://115.29.221.190:5001/api/v1/assets/...`. That is the legacy local-compatible path, not an OSS/CDN URL. SSH credentials were unavailable for a configuration-file audit, so implementation must perform a server-side provider audit before mutation; the externally visible URLs already establish that production public media migration is incomplete.
+The public production payload observed during planning resolves covers and narration under `http://115.29.221.190:5001/api/v1/assets/...`. That is the legacy local-compatible path, not an OSS/CDN URL. SSH credentials were unavailable for a configuration-file audit, so implementation must perform a server-side provider audit before mutation; the externally visible URLs already establish that production public media migration is incomplete. This change supersedes the earlier optional local-fallback target: the confirmed product decision is OSS-only persistence for every runtime, with production and test sharing one canonical resource set.
 
 The independent `Travel-Admin` repository shares MySQL but owns no DDL. Its same-named companion change consumes the contracts defined here.
 
@@ -14,12 +14,14 @@ The independent `Travel-Admin` repository shares MySQL but owns no DDL. Its same
 - Unify playback state without putting audio adapters or UI navigation into domain models.
 - Reuse canonical city-story and narration identities during migration.
 - Derive media ownership from actual references and make production storage truth machine-checkable.
+- Require one completely shared public/private OSS canonical object set for production/test, public CDN delivery, and private authorized delivery without runtime filesystem fallback.
 
 **Non-Goals:**
 
 - Re-key existing routes, stops, fragments, journeys, or media assets.
 - Make the admin service a schema owner or introduce another content microservice.
-- Remove local storage support from development/tests or delete legacy objects during the initial migration.
+- Let automated unit tests mutate shared OSS; they use an in-memory fake, while credentialed integration tests are isolated to an OSS test prefix.
+- Put private user/evidence objects on the public CDN or expose permanent private URLs.
 
 ## Decisions
 
@@ -47,13 +49,17 @@ An idempotent migration/application command keys each legacy publication by cano
 
 Alternative considered: keep both tables editable and merge only in Flutter. Rejected because publication state and track selection would continue to drift.
 
-### 5. Derive media hierarchy from reverse references
+### 5. Derive media hierarchy over an OSS-only shared resource set
 
-The backend/admin projection joins `media_assets` to city covers, route covers, stops, fragments, narration tracks, story variants, pre-departure tracks, and other public editorial references. It returns one asset with a list of typed usages and derived city/route scopes. Multiple scopes mark the asset shared; zero usages mark it unassigned. This avoids adding a false single-owner foreign key to reusable assets.
+The backend/admin projection joins `media_assets` and private media/evidence records to city covers, route covers, stops, fragments, narration tracks, story variants, pre-departure tracks, community content, footprints, and user evidence. It returns one asset with a list of typed usages and derived city/route/user scopes appropriate to the caller. Multiple content scopes mark a public asset shared; zero usages mark it unassigned. This avoids adding a false single-owner foreign key to reusable assets and never exposes private ownership to unauthorized callers.
 
-The provider audit reports configured public provider, canonical base host (never credentials), counts by provider, published local references, missing metadata, and a bounded representative URL check. Production readiness fails for new public publication while local references remain. Existing published local content stays readable during migration but is reported as a release blocker.
+Remove the runtime local/OSS provider branch and require complete public/private OSS plus CDN configuration at startup for API, CMS, development, test, and production runtimes. Production and test use exactly the same public and private buckets, canonical object keys, media references, public CDN base, and private-access behavior; no business media is copied, renamed, prefixed, or isolated by runtime environment. Integration-test fixture writes use a reserved temporary prefix with lifecycle cleanup and cannot overwrite/delete canonical keys. Unit tests inject an in-memory fake rather than real OSS.
+
+Public editorial objects serialize only CDN URLs. Private photos, evidence, private community objects, and TTS previews stay in the private bucket and are accessed through an authenticated proxy or short-lived signed URL. The audit reports safe bucket identity hashes/names as authorized, CDN host, public/private counts, environment agreement, local references/mounts, missing metadata, and bounded representative checks, never credentials or permanent private URLs. Any missing OSS configuration or local persistence/read is a readiness blocker in every runtime.
 
 Alternative considered: move files into city/route directory keys to imply ownership. Rejected because object paths are storage details, shared media would be duplicated, and renaming a city would force object moves.
+
+Alternative considered: keep local storage for developer convenience or give test full write access to shared canonical keys. Rejected because local mode recreates environment drift, while unrestricted test writes could corrupt live media. An in-memory fake and reserved OSS test prefix preserve testability without a second canonical asset set.
 
 ### 6. Make discovery layout intrinsic and ordered
 
@@ -65,17 +71,19 @@ Alternative considered: add a larger fixed top/bottom offset. Rejected because i
 
 - Catalog application: pre-departure eligibility and unified city-story projection.
 - Journey/audio application: active audio arbitration and return context, without content mutation.
-- Media application: reverse-reference inventory and provider readiness.
+- Media application: reverse-reference inventory, public/private authorization, shared-resource agreement, and OSS-only readiness.
 - Presentation API: additive projections and compatibility shapes; no credentials or filesystem roots.
 - Flutter data/domain: typed additive parsing with absent-field fallback for rolling deployment.
 
-If pre-departure fails, the manual remains readable. If story compatibility migration finds an ambiguous source/track, it records a blocker and leaves the old publication readable until resolved. If OSS audit cannot verify a URL, it fails readiness without deleting or rewriting the asset.
+If pre-departure fails, the manual remains readable. If story compatibility migration finds an ambiguous source/track, it records a blocker and leaves the old publication readable until resolved. If OSS audit cannot verify configuration, scope, authorization, or an object, it fails readiness without deleting or rewriting the asset; there is no local runtime fallback.
 
 ## Risks / Trade-offs
 
 - [A shared audio coordinator touches mature playback paths] → Add state-machine and rapid-switch tests first, retain adapter contract tests, and roll out pre-departure after city-story/on-site parity passes.
 - [Legacy home story metadata may not satisfy catalog publication rules] → Dry-run classifies ready, conflicted, and blocked records with field-level remediation; do not invent missing facts or sources.
-- [Production contains mixed local/OSS records] → Keep reads compatible, block new local publication, migrate by checksum in batches, and verify references before disabling any local path.
+- [Production contains mixed local/OSS records] → Freeze media mutation, migrate every public/private category by checksum in batches, verify references/ownership, redirect compatible public legacy URLs to CDN, then disable local reads and mounts.
+- [Production and test completely share objects] → Keep public/private bucket identities, canonical keys, references, CDN, and private-access behavior identical; confine disposable automated-test writes to an expiring prefix and continuously audit key/checksum agreement.
+- [OSS/CDN outage affects every runtime] → Fail readiness and media mutation explicitly, keep database references unchanged, use OSS/CDN durability/monitoring, and never silently write to local disk.
 - [Intrinsic cards can grow excessively with malformed copy] → Enforce backend length bounds and use accessible truncation/expansion rules tested at large text scale.
 - [Derived media inventory queries become expensive] → Return paginated summaries/counts and load resource details per selected city/scenic area with indexed reference lookups.
 
@@ -85,8 +93,9 @@ If pre-departure fails, the manual remains readable. If story compatibility migr
 2. Add the audio coordinator and migrate existing city-story/on-site state behind tests, then add pre-departure UI, tags, and intrinsic discovery layout.
 3. Dry-run legacy home-story-to-catalog mapping, resolve blockers, apply idempotently, switch public and CMS reads, and leave legacy reads delegating during observation.
 4. Deploy the CMS companion after the main migration/API is compatible.
-5. On production, audit both services' provider settings without printing secrets; configure matching OSS values, run `migrate-media --dry-run`, review missing/orphan/conflict output, then run the migration.
-6. Verify every published city/scenic sample and all narration roles return OSS/CDN URLs with correct MIME/range/checksum; retain local files as rollback copies during burn-in.
-7. Release the Flutter APK only after API compatibility, unified story projection, tag display, responsive layout, and OSS readiness checks pass.
+5. Provision one public bucket/CDN and one private bucket that production and test use identically, with the same canonical object keys and access behavior plus a bounded prefix only for disposable automated-test fixtures; configure API and CMS with the same resource values in both runtimes without printing secrets.
+6. Freeze media mutation, run expanded public/private migration dry-runs, review missing/orphan/ownership/conflict output, then migrate editorial media, narration, previews, community media, user photos, footprints, and evidence by checksum.
+7. Verify database/object counts, every reference, public CDN MIME/range/checksum, private authorization/signing, and production/test canonical key agreement; change legacy public asset reads to CDN redirects, disable local file reads, and remove media host mounts.
+8. Release the Flutter APK only after API compatibility, unified story projection, tag display, responsive layout, and OSS-only readiness checks pass.
 
-Rollback disables the new Flutter surfaces via compatible absence/empty projections, restores legacy story reads, and leaves local asset serving in place. It never deletes migrated OSS objects, local rollback copies, or database columns during the first rollback window.
+Rollback disables the new Flutter surfaces via compatible absence/empty projections, restores legacy story reads, and deploys the previous OSS-capable application version against the same verified OSS objects. Rollback MUST NOT re-enable local media persistence or disk serving. It never deletes migrated OSS objects, offline migration source backups, or database columns during the first rollback window.
