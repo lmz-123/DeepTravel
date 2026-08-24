@@ -63,7 +63,7 @@ class DemoExperienceRepository implements ExperienceRepository {
       modules: [
         CityStoryModule(
           key: 'today_city_story',
-          title: '今天听一段城市故事',
+          title: '城市故事',
           primary: true,
           items: [card],
         ),

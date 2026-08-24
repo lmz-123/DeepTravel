@@ -1107,7 +1107,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     final session = state.session;
     if (route == null || session == null) return;
     final ownership = ref.read(audioOwnershipProvider.notifier).acquire(
-          kind: AudioOwnerKind.route,
+          kind: AudioOwnerKind.onSite,
           destination: '/journey/${session.id}',
           title: fragment.title ?? '第 ${fragment.position} 条线索',
           subtitle: route.title,

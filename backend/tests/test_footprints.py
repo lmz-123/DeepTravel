@@ -413,7 +413,7 @@ def test_staged_footprint_photo_is_removed_when_database_commit_fails(
     _start_and_trigger(client, guest_headers)
     item = client.get("/api/v1/footprints", headers=guest_headers).get_json()["data"]["items"][0]
     storage = app.extensions["services"]["footprints"].photo_storage.object_storage
-    before = set(storage.root.rglob("*"))
+    before = set(storage._objects)
 
     def fail_commit(_session):
         raise RuntimeError("database unavailable")
@@ -429,8 +429,8 @@ def test_staged_footprint_photo_is_removed_when_database_commit_fails(
         content_type="multipart/form-data",
     )
     assert response.status_code == 500
-    after = set(storage.root.rglob("*"))
-    assert {path for path in after - before if path.is_file()} == set()
+    after = set(storage._objects)
+    assert after - before == set()
 
 
 def test_backfill_restores_revealed_story_and_copies_one_durable_photo(

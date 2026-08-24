@@ -16,6 +16,9 @@ def test_health_and_catalog(client):
     health = client.get("/api/v1/health")
     assert health.status_code == 200
     assert health.get_json()["data"]["database"] == "up"
+    readiness = health.get_json()["data"]["media_readiness"]
+    assert readiness["provider"] == "memory"
+    assert "access_key" not in str(readiness).lower()
 
     cities = client.get("/api/v1/cities")
     assert cities.status_code == 200
@@ -29,13 +32,13 @@ def test_health_and_catalog(client):
     detail = client.get("/api/v1/routes/wukang-urban-slices")
     route = detail.get_json()["data"]
     assert route["content_status"] == "published"
-    assert route["hero_image"].startswith("http://localhost/api/v1/assets/")
+    assert route["hero_image"].startswith("https://cdn.test.invalid/")
     assert [stop["position"] for stop in route["stops"]] == [1, 2, 3, 4, 5]
     assert "correct_option" not in route["stops"][0]["challenge"]
 
     media = client.get("/api/v1/assets/images/route_wukang.png")
-    assert media.status_code == 200
-    assert media.content_type == "image/png"
+    assert media.status_code == 308
+    assert media.headers["Location"] == "https://cdn.test.invalid/images/route_wukang.png"
     assert client.get("/api/v1/assets/../requirements.txt").status_code == 404
 
 
@@ -51,11 +54,11 @@ def test_shenzhen_featured_route_and_media(client):
     route = detail.get_json()["data"]
     assert route["content_status"] == "published"
     assert [stop["position"] for stop in route["stops"]] == [1, 2, 3, 4, 5]
-    assert route["hero_image"].endswith("/assets/images/route_shenzhen.png")
+    assert route["hero_image"].endswith("/images/route_shenzhen.png")
 
     media = client.get("/api/v1/assets/images/route_shenzhen.png")
-    assert media.status_code == 200
-    assert media.content_type == "image/png"
+    assert media.status_code == 308
+    assert media.headers["Location"] == "https://cdn.test.invalid/images/route_shenzhen.png"
 
 
 def test_city_discovery_returns_one_managed_scenic_area_with_derived_center(app, client):
@@ -78,9 +81,10 @@ def test_city_discovery_returns_one_managed_scenic_area_with_derived_center(app,
     assert "scenic_spots" not in payload
     route_payload = next(item for item in payload["routes"] if item["id"] == route.id)
     fragments = route_payload["audio_tour"]["fragments"]
-    assert next(item for item in fragments if item["id"] == fragment.id)[
-        "experience_tags"
-    ] == ["安静", "未来新标签"]
+    assert next(item for item in fragments if item["id"] == fragment.id)["experience_tags"] == [
+        "安静",
+        "未来新标签",
+    ]
     latitudes = [item["trigger_region"]["latitude"] for item in fragments]
     longitudes = [item["trigger_region"]["longitude"] for item in fragments]
     assert route_payload["center"] == {
@@ -197,9 +201,7 @@ def test_legacy_city_discovery_derives_route_center_and_excludes_drafts(app, cli
     payload = response.get_json()["data"]
     published_route_ids = {route["id"] for route in payload["routes"]}
     assert "scenic_spots" not in payload
-    legacy = next(
-        route for route in payload["routes"] if route["id"] == "published-legacy-route"
-    )
+    legacy = next(route for route in payload["routes"] if route["id"] == "published-legacy-route")
     assert legacy["center"] == {"latitude": 31.1, "longitude": 121.2}
     assert legacy["stop_count"] == 2
     assert "draft-discovery-route" not in published_route_ids
@@ -217,9 +219,7 @@ def test_journey_requires_guest(client):
     assert response.get_json()["error"]["code"] == "unauthorized"
 
 
-def test_evidence_policy_is_runtime_driven_authenticated_and_secret_free(
-    app, client, user_headers
-):
+def test_evidence_policy_is_runtime_driven_authenticated_and_secret_free(app, client, user_headers):
     assert client.get("/api/v1/policies/evidence").status_code == 401
     response = client.get("/api/v1/policies/evidence", headers=user_headers)
     assert response.status_code == 200
@@ -317,9 +317,7 @@ def test_completed_route_start_revisits_same_owned_journey(app, client, user_hea
         )
         client.post(f"/api/v1/journeys/{journey['id']}/advance", headers=user_headers)
 
-    revisit = client.post(
-        "/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers
-    )
+    revisit = client.post("/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers)
     assert revisit.status_code == 201
     assert revisit.get_json()["data"]["id"] == journey["id"]
     assert revisit.get_json()["data"]["status"] == "completed"
@@ -328,17 +326,12 @@ def test_completed_route_start_revisits_same_owned_journey(app, client, user_hea
     session = database.session_factory()
     owner = session.query(UserModel).filter_by(username="traveler-one").one()
     assert (
-        session.query(JourneyModel)
-        .filter_by(user_id=owner.id, route_id=route["id"])
-        .count()
-        == 1
+        session.query(JourneyModel).filter_by(user_id=owner.id, route_id=route["id"]).count() == 1
     )
     session.close()
 
     other_headers = _register_test_user(client, "completed-other-user")
-    other = client.post(
-        "/api/v1/journeys", json={"route_id": route["id"]}, headers=other_headers
-    )
+    other = client.post("/api/v1/journeys", json={"route_id": route["id"]}, headers=other_headers)
     assert other.status_code == 201
     assert other.get_json()["data"]["id"] != journey["id"]
 
@@ -437,9 +430,7 @@ def test_archived_route_rejects_new_start_but_existing_owner_continues(app, clie
     session.close()
 
     assert client.get("/api/v1/routes/wukang-urban-slices").status_code == 404
-    resumed = client.post(
-        "/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers
-    )
+    resumed = client.post("/api/v1/journeys", json={"route_id": route["id"]}, headers=user_headers)
     assert resumed.status_code == 201
     assert resumed.get_json()["data"]["id"] == journey["id"]
     other = _register_test_user(client, "archived-new-user")
@@ -489,24 +480,17 @@ def test_journey_library_filters_orders_and_isolates_accounts(app, client, user_
     assert {item["journey"]["id"] for item in rows} == {completed["id"], active["id"]}
     assert {item["journey_kind"] for item in rows} == {"legacy", "fragmented"}
     assert all("stops" not in item["route"] for item in rows)
-    assert all(
-        {"collected_count", "total_count", "evidence_count"} <= set(item)
-        for item in rows
-    )
+    assert all({"collected_count", "total_count", "evidence_count"} <= set(item) for item in rows)
 
     completed_rows = client.get(
         "/api/v1/journeys?status=completed", headers=user_headers
     ).get_json()["data"]
     assert [item["journey"]["id"] for item in completed_rows] == [completed["id"]]
-    assert client.get(
-        "/api/v1/journeys?status=unknown", headers=user_headers
-    ).status_code == 422
+    assert client.get("/api/v1/journeys?status=unknown", headers=user_headers).status_code == 422
 
     active_rows = client.get("/api/v1/journeys/active", headers=user_headers)
     assert active_rows.status_code == 200
-    assert [item["journey"]["id"] for item in active_rows.get_json()["data"]] == [
-        active["id"]
-    ]
+    assert [item["journey"]["id"] for item in active_rows.get_json()["data"]] == [active["id"]]
     other_headers = _register_test_user(client, "library-other-user")
     assert client.get("/api/v1/journeys", headers=other_headers).get_json()["data"] == []
 
@@ -525,9 +509,7 @@ def test_owner_context_recovers_archived_fragment_route_and_hides_from_others(
     session.close()
 
     assert client.get("/api/v1/routes/nantou-time-layers").status_code == 404
-    context = client.get(
-        f"/api/v1/journeys/{journey['id']}/context", headers=user_headers
-    )
+    context = client.get(f"/api/v1/journeys/{journey['id']}/context", headers=user_headers)
     assert context.status_code == 200
     payload = context.get_json()["data"]
     assert payload["journey"]["id"] == journey["id"]
@@ -537,9 +519,7 @@ def test_owner_context_recovers_archived_fragment_route_and_hides_from_others(
     assert payload["ledger"]["journey_id"] == journey["id"]
 
     other_headers = _register_test_user(client, "context-other-user")
-    hidden = client.get(
-        f"/api/v1/journeys/{journey['id']}/context", headers=other_headers
-    )
+    hidden = client.get(f"/api/v1/journeys/{journey['id']}/context", headers=other_headers)
     assert hidden.status_code == 404
 
 

@@ -9,6 +9,7 @@ from app.infrastructure.persistence.models import (
     RouteModel,
     StoryArcModel,
     StoryNarrationTrackModel,
+    StoryPlacementModel,
 )
 
 
@@ -60,7 +61,9 @@ def _publish_story(app, *, identity: str, title: str, weight: int = 1):
         )
         session.add(publication)
         session.commit()
-        return publication.id, track.id
+        result = (publication.id, track.id)
+    app.extensions["services"]["city_story_migration"].migrate()
+    return result
 
 
 def _publish_additional_story(app, *, identity: str, title: str, weight: int = 1):
@@ -137,7 +140,9 @@ def _publish_additional_story(app, *, identity: str, title: str, weight: int = 1
         )
         session.add(publication)
         session.commit()
-        return publication.id
+        result = publication.id
+    app.extensions["services"]["city_story_migration"].migrate()
+    return result
 
 
 def test_random_story_returns_only_safe_published_metadata(app, client):
@@ -181,20 +186,16 @@ def test_random_story_honors_exclusion_weights_and_zero_weight(app, client):
         return [population[-1]]
 
     service.chooser = choose
-    response = client.get(
-        f"/api/v1/stories/random?city_slug=shenzhen&exclude_id={first_id}"
-    )
+    response = client.get(f"/api/v1/stories/random?city_slug=shenzhen&exclude_id={first_id}")
     assert response.status_code == 200
     assert response.get_json()["data"]["id"] == second_id
     assert observed == {"weights": [7], "k": 1}
 
     database = app.extensions["database"]
     with database.session_factory() as session:
-        second = session.get(HomeStoryPublicationModel, second_id)
-        second.selection_weight = 0
+        second = session.query(StoryPlacementModel).filter_by(catalog_item_id=second_id).one()
+        second.weight = 0
         session.commit()
-    response = client.get(
-        f"/api/v1/stories/random?city_slug=shenzhen&exclude_id={first_id}"
-    )
+    response = client.get(f"/api/v1/stories/random?city_slug=shenzhen&exclude_id={first_id}")
     assert response.status_code == 200
     assert response.get_json()["data"]["id"] == first_id

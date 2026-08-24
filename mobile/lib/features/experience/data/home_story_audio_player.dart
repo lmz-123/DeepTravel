@@ -40,7 +40,7 @@ class HomeStoryAudioPlayer {
         Uri.parse(story.audioUrl),
         tag: MediaItem(
           id: story.id,
-          album: '见地 · 听一个短故事',
+          album: '见地 · 城市故事',
           title: story.title,
           artist: '${story.cityName} · ${story.narratorName}',
           artUri:

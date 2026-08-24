@@ -125,10 +125,12 @@ class PretripExperience {
     required this.offlineResources,
     required this.version,
     this.themeStory,
+    this.predeparture,
   });
 
   final bool available;
   final CityStoryCard? themeStory;
+  final PredepartureIntroduction? predeparture;
   final List<PretripStoryDirection> storyDirections;
   final List<String> companionTags;
   final PretripTips tips;
@@ -141,6 +143,11 @@ class PretripExperience {
         themeStory: json['theme_story'] is Map
             ? CityStoryCard.fromJson(
                 Map<String, dynamic>.from(json['theme_story'] as Map),
+              )
+            : null,
+        predeparture: json['predeparture'] is Map
+            ? PredepartureIntroduction.fromJson(
+                Map<String, dynamic>.from(json['predeparture'] as Map),
               )
             : null,
         storyDirections:
@@ -164,6 +171,68 @@ class PretripExperience {
                     ))
                 .toList(growable: false),
         version: _integer(json['version']),
+      );
+}
+
+class PredepartureIntroduction {
+  const PredepartureIntroduction({
+    required this.text,
+    required this.scriptVersion,
+    required this.transcriptHash,
+    required this.audio,
+    required this.narratorName,
+  });
+
+  final String text;
+  final String scriptVersion;
+  final String transcriptHash;
+  final PredepartureAudio audio;
+  final String narratorName;
+
+  bool get available => text.isNotEmpty && audio.url.isNotEmpty;
+
+  factory PredepartureIntroduction.fromJson(Map<String, dynamic> json) {
+    final audio = json['audio'] is Map
+        ? Map<String, dynamic>.from(json['audio'] as Map)
+        : const <String, dynamic>{};
+    final profile = json['narration_profile'] is Map
+        ? Map<String, dynamic>.from(json['narration_profile'] as Map)
+        : const <String, dynamic>{};
+    return PredepartureIntroduction(
+      text: _text(json['text']),
+      scriptVersion: _text(json['script_version']),
+      transcriptHash: _text(json['transcript_hash']),
+      audio: PredepartureAudio.fromJson(audio),
+      narratorName: _text(profile['display_name'], '见地讲述者'),
+    );
+  }
+}
+
+class PredepartureAudio {
+  const PredepartureAudio({
+    required this.trackId,
+    required this.url,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.duration,
+    this.checksumSha256,
+  });
+
+  final String trackId;
+  final String url;
+  final String mimeType;
+  final int sizeBytes;
+  final Duration duration;
+  final String? checksumSha256;
+
+  factory PredepartureAudio.fromJson(Map<String, dynamic> json) =>
+      PredepartureAudio(
+        trackId: _text(json['track_id']),
+        url: _text(json['url']),
+        mimeType: _text(json['mime_type']),
+        sizeBytes: _integer(json['size_bytes']),
+        duration: Duration(milliseconds: _integer(json['duration_ms'])),
+        checksumSha256: json['checksum_sha256'] as String?,
       );
 }
 

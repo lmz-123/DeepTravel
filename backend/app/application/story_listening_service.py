@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import random
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 
 from app.domain.errors import CityNotFoundError, FragmentOperationError
 from app.infrastructure.persistence.models import (
@@ -12,7 +12,10 @@ from app.infrastructure.persistence.models import (
     NarrationVoiceProfileModel,
     RouteModel,
     StoryArcModel,
+    StoryCatalogItemModel,
+    StoryCatalogVariantModel,
     StoryNarrationTrackModel,
+    StoryPlacementModel,
 )
 
 
@@ -41,7 +44,7 @@ class StoryListeningService:
                 )
             selected = self.chooser(
                 candidates,
-                weights=[row[0].selection_weight for row in candidates],
+                weights=[row[2].weight for row in candidates],
                 k=1,
             )[0]
             return self._payload(*selected)
@@ -50,9 +53,7 @@ class StoryListeningService:
         with self.session_factory() as session:
             rows = self._eligible(session, publication_id=publication_id)
             if not rows:
-                raise FragmentOperationError(
-                    "story_not_found", "故事不存在", status_code=404
-                )
+                raise FragmentOperationError("story_not_found", "故事不存在", status_code=404)
             return self._payload(*rows[0])
 
     def _eligible(
@@ -65,6 +66,9 @@ class StoryListeningService:
         query = (
             select(
                 HomeStoryPublicationModel,
+                StoryCatalogItemModel,
+                StoryPlacementModel,
+                StoryCatalogVariantModel,
                 StoryNarrationTrackModel,
                 StoryArcModel,
                 RouteModel,
@@ -72,20 +76,44 @@ class StoryListeningService:
                 NarrationVoiceProfileModel,
             )
             .join(StoryArcModel, StoryArcModel.id == HomeStoryPublicationModel.arc_id)
+            .join(
+                StoryCatalogItemModel,
+                and_(
+                    StoryCatalogItemModel.source_kind == "story_arc",
+                    StoryCatalogItemModel.source_id == StoryArcModel.id,
+                ),
+            )
+            .join(
+                StoryPlacementModel,
+                StoryPlacementModel.catalog_item_id == StoryCatalogItemModel.id,
+            )
+            .join(
+                StoryCatalogVariantModel,
+                and_(
+                    StoryCatalogVariantModel.catalog_item_id == StoryCatalogItemModel.id,
+                    StoryCatalogVariantModel.role == StoryPlacementModel.variant_role,
+                ),
+            )
             .join(RouteModel, RouteModel.id == StoryArcModel.route_id)
             .join(CityModel, CityModel.id == RouteModel.city_id)
             .join(
                 StoryNarrationTrackModel,
-                StoryNarrationTrackModel.id == HomeStoryPublicationModel.selected_track_id,
+                StoryNarrationTrackModel.id == StoryCatalogVariantModel.track_id,
             )
             .join(
                 NarrationVoiceProfileModel,
                 NarrationVoiceProfileModel.id == StoryNarrationTrackModel.profile_id,
             )
             .where(
-                HomeStoryPublicationModel.status == "published",
-                HomeStoryPublicationModel.published_at.is_not(None),
-                HomeStoryPublicationModel.selection_weight > 0,
+                StoryCatalogItemModel.status == "published",
+                StoryCatalogItemModel.published_at.is_not(None),
+                StoryPlacementModel.channel == "home",
+                StoryPlacementModel.module_key == "today_city_story",
+                StoryPlacementModel.status == "published",
+                StoryPlacementModel.published_at.is_not(None),
+                StoryPlacementModel.weight > 0,
+                StoryCatalogVariantModel.status == "published",
+                StoryCatalogVariantModel.published_at.is_not(None),
                 StoryNarrationTrackModel.status == "published",
                 StoryNarrationTrackModel.published_at.is_not(None),
                 StoryNarrationTrackModel.size_bytes > 0,
@@ -103,19 +131,25 @@ class StoryListeningService:
         return [
             row
             for row in rows
-            if row[1].transcript_hash
-            == hashlib.sha256(row[2].complete_story.strip().encode()).hexdigest()
-            and row[1].script_version == row[2].script_version
-            and bool(row[1].media_path.strip())
+            if row[4].transcript_hash
+            == row[3].transcript_hash
+            == row[1].canonical_revision
+            == hashlib.sha256(row[5].complete_story.strip().encode()).hexdigest()
+            and row[4].script_version == row[3].script_version == row[5].script_version
+            and bool(row[4].media_path.strip())
         ]
 
-    def _payload(self, publication, track, arc, route, city, profile) -> dict:
+    def _payload(
+        self, publication, item, placement, variant, track, arc, route, city, profile
+    ) -> dict:
+        del placement, variant
         return {
             "id": publication.id,
+            "catalog_id": item.id,
             "story_arc_id": arc.id,
-            "title": publication.title,
-            "introduction": publication.introduction,
-            "cover_image": self.asset_url_builder(publication.cover_image),
+            "title": item.title,
+            "introduction": item.summary,
+            "cover_image": self.asset_url_builder(item.cover_image),
             "duration_ms": track.duration_ms,
             "transcript": arc.complete_story,
             "audio_url": self.asset_url_builder(track.media_path),

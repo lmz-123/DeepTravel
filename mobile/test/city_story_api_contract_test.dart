@@ -5,12 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jiandi/features/auth/data/auth_repository.dart';
 import 'package:jiandi/features/experience/data/api_experience_repository.dart';
+import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/domain/city_story.dart';
 import 'package:jiandi/features/experience/domain/home_story.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
+import 'package:jiandi/features/experience/presentation/route_detail_page.dart';
 
 void main() {
   test('home modules preserve backend labels and actionable empty metadata',
@@ -22,7 +24,7 @@ void main() {
             'modules': [
               {
                 'key': 'today_city_story',
-                'title': '今天听一段城市故事',
+                'title': '城市故事',
                 'primary': true,
                 'items': [_story],
               },
@@ -127,7 +129,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('今天听一段城市故事'), findsOneWidget);
+    expect(find.text('城市故事'), findsOneWidget);
     expect(find.text('继续我的足迹'), findsNothing);
     final scrollView = tester.widget<CustomScrollView>(
       find.byType(CustomScrollView),
@@ -152,6 +154,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('story:catalog-a'), findsOneWidget);
   });
+
+  testWidgets(
+      'manual starts with compact predeparture and renders server tags at large text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        experienceRepositoryProvider.overrideWithValue(
+          _PredepartureRepository(),
+        ),
+      ],
+      child: const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(2)),
+          child: RouteDetailPage(slug: 'route-predeparture'),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('predeparture-surface')), findsOneWidget);
+    expect(find.byKey(const ValueKey('predeparture-play-pause')), findsOneWidget);
+    expect(find.byType(Slider), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('老建筑'),
+      360,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('老建筑'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('适合一个人'),
+      360,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('适合一个人'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _PredepartureRepository extends DemoExperienceRepository {
+  _PredepartureRepository() : super(latency: Duration.zero);
+
+  @override
+  Future<RouteExperience> routeBySlug(String slug) async =>
+      RouteExperience.fromJson(_routeWithPredeparture);
 }
 
 class _StoryDiscoveryController extends DiscoveryController {
@@ -181,7 +232,7 @@ class _StoryDiscoveryController extends DiscoveryController {
           modules: [
             CityStoryModule(
               key: 'today_city_story',
-              title: '今天听一段城市故事',
+              title: '城市故事',
               primary: true,
               items: [
                 CityStoryCard(
@@ -265,4 +316,49 @@ const _route = {
   'content_status': 'published',
   'is_featured': true,
   'stops': [],
+};
+
+const _routeWithPredeparture = {
+  'id': 'route-predeparture',
+  'slug': 'route-predeparture',
+  'title': '测试路线',
+  'subtitle': '测试',
+  'description': '测试路线',
+  'duration_minutes': 30,
+  'distance_km': 1.2,
+  'difficulty': '轻松',
+  'theme': '城市历史',
+  'hero_image': '',
+  'content_status': 'published',
+  'is_featured': true,
+  'predeparture': {
+    'text': '出发前，先简单认识这座城市和眼前这处景点。',
+    'script_version': 'v1',
+    'transcript_hash': 'hash-a',
+    'audio': {
+      'track_id': 'track-a',
+      'url': 'https://cdn.example.test/predeparture.mp3',
+      'mime_type': 'audio/mpeg',
+      'size_bytes': 100,
+      'duration_ms': 9000,
+    },
+    'narration_profile': {'display_name': '见地讲述者'},
+  },
+  'stops': [
+    {
+      'id': 'stop-a',
+      'position': 1,
+      'title': '城墙转角',
+      'kicker': '第一站',
+      'address': '测试地址',
+      'latitude': 22.5,
+      'longitude': 114.0,
+      'story_title': '旧砖故事',
+      'story_body': '正文',
+      'image': '',
+      'insight': '观察灰缝',
+      'experience_tags': ['老建筑', '适合一个人'],
+      'challenge': null,
+    }
+  ],
 };

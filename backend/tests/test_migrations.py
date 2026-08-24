@@ -71,7 +71,7 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0014"
+    assert version == "20260825_0015"
 
 
 def test_city_story_catalog_migration_round_trips(tmp_path):
@@ -90,6 +90,7 @@ def test_city_story_catalog_migration_round_trips(tmp_path):
         "traveler_favorites",
         "content_import_previews",
         "content_import_batches",
+        "route_predeparture_tracks",
     }
     assert expected <= set(inspect(engine).get_table_names())
     favorite_unique = {
@@ -100,6 +101,15 @@ def test_city_story_catalog_migration_round_trips(tmp_path):
         item["name"] for item in inspect(engine).get_unique_constraints("content_import_batches")
     }
     assert "uq_content_import_package_version" in import_unique
+    predeparture_columns = {
+        column["name"] for column in inspect(engine).get_columns("route_pretrip_guidance")
+    }
+    assert {
+        "introduction_text",
+        "introduction_transcript_hash",
+        "introduction_script_version",
+        "selected_intro_track_id",
+    } <= predeparture_columns
 
     command.downgrade(config, "20260823_0012")
     assert expected.isdisjoint(inspect(engine).get_table_names())
@@ -363,7 +373,7 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert version == "20260823_0014"
+        assert version == "20260825_0015"
 
 
 def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
@@ -393,7 +403,7 @@ def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260823_0014"
+    assert version == "20260825_0015"
 
 
 def test_private_footprint_migration_has_no_location_or_voice_columns(tmp_path):

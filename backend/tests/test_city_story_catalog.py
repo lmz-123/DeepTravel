@@ -7,6 +7,7 @@ from app.application.city_story_service import HOME_MODULES
 from app.infrastructure.persistence.models import (
     NarrationVoiceProfileModel,
     RouteModel,
+    RoutePredepartureTrackModel,
     RoutePretripGuidanceModel,
     StoryArcModel,
     StoryCatalogItemModel,
@@ -107,23 +108,52 @@ def _publish_catalog(app):
                     updated_at=now,
                 )
             )
-        session.add(
-            RoutePretripGuidanceModel(
-                route_id=route.id,
-                theme_story_catalog_id=item.id,
-                story_directions_json=[{"catalog_id": item.id, "title": "城墙的时间", "order": 2}],
-                companion_tags_json=["适合一个人", "适合朋友同行"],
-                safety_tips_json=["在人行区域停留"],
-                rest_tips_json=["入口处可以休息"],
-                accessibility_tips_json=["主要路面较平整"],
-                weather_tips_json=["雨天注意石板湿滑"],
-                offline_roles_json=["short_preview"],
-                status="published",
-                version=1,
-                reviewed_at=now,
-                published_at=now,
-                updated_at=now,
-            )
+        predeparture_text = "出发前，先认识城墙转角里叠在一起的时间。"
+        predeparture_hash = hashlib.sha256(predeparture_text.encode()).hexdigest()
+        intro_track = RoutePredepartureTrackModel(
+            id="predeparture-track",
+            route_id=route.id,
+            profile_id=profile.id,
+            transcript_hash=predeparture_hash,
+            script_version="predeparture-v1",
+            media_path="public/predeparture/catalog.mp3",
+            mime_type="audio/mpeg",
+            size_bytes=2048,
+            duration_ms=12000,
+            checksum_sha256="c" * 64,
+            generation_metadata_json={"source": "test"},
+            status="published",
+            reviewed_at=now,
+            published_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add_all(
+            [
+                intro_track,
+                RoutePretripGuidanceModel(
+                    route_id=route.id,
+                    theme_story_catalog_id=item.id,
+                    story_directions_json=[
+                        {"catalog_id": item.id, "title": "城墙的时间", "order": 2}
+                    ],
+                    companion_tags_json=["适合一个人", "适合朋友同行"],
+                    safety_tips_json=["在人行区域停留"],
+                    rest_tips_json=["入口处可以休息"],
+                    accessibility_tips_json=["主要路面较平整"],
+                    weather_tips_json=["雨天注意石板湿滑"],
+                    offline_roles_json=["short_preview"],
+                    introduction_text=predeparture_text,
+                    introduction_transcript_hash=predeparture_hash,
+                    introduction_script_version="predeparture-v1",
+                    selected_intro_track_id=intro_track.id,
+                    status="published",
+                    version=1,
+                    reviewed_at=now,
+                    published_at=now,
+                    updated_at=now,
+                ),
+            ]
         )
         session.commit()
         return route.slug, arc.id
@@ -172,8 +202,13 @@ def test_pretrip_is_available_without_journey_and_has_no_exam(app, client):
     assert data["requires_arrival"] is False
     assert data["advisory_order"] is True
     assert data["quiz"] is None
+    assert data["predeparture"]["text"].startswith("出发前")
+    assert data["predeparture"]["audio"]["url"].startswith("https://cdn.test.invalid/")
     assert data["companion_tags"] == ["适合一个人", "适合朋友同行"]
     assert {item["kind"] for item in data["offline_resources"]} == {"audio", "transcript"}
+
+    route = client.get(f"/api/v1/routes/{route_slug}").get_json()["data"]
+    assert route["predeparture"] == data["predeparture"]
 
 
 def test_favorites_are_authenticated_idempotent_and_isolated(app, client, user_headers):

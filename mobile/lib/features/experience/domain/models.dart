@@ -78,6 +78,7 @@ class ExperienceStop {
     required this.image,
     required this.insight,
     required this.challenge,
+    this.experienceTags = const [],
   });
 
   final String id;
@@ -92,6 +93,7 @@ class ExperienceStop {
   final String image;
   final String insight;
   final Challenge challenge;
+  final List<String> experienceTags;
 
   factory ExperienceStop.fromJson(Map<String, dynamic> json) => ExperienceStop(
         id: json['id'] as String,
@@ -108,6 +110,11 @@ class ExperienceStop {
         challenge: json['challenge'] is Map<String, dynamic>
             ? Challenge.fromJson(json['challenge'] as Map<String, dynamic>)
             : const Challenge(id: '', prompt: '', hint: '', options: []),
+        experienceTags: (json['experience_tags'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toList(growable: false),
       );
 }
 
@@ -129,6 +136,7 @@ class RouteExperience {
     this.stopCount,
     this.audioTour,
     this.pretrip,
+    this.predeparture,
     this.centerLatitude,
     this.centerLongitude,
   });
@@ -149,6 +157,7 @@ class RouteExperience {
   final int? stopCount;
   final AudioTourManifest? audioTour;
   final PretripExperience? pretrip;
+  final PredepartureIntroduction? predeparture;
   final double? centerLatitude;
   final double? centerLongitude;
 
@@ -195,6 +204,18 @@ class RouteExperience {
                 json['pretrip'] as Map<String, dynamic>,
               )
             : null,
+        predeparture: json['predeparture'] is Map
+            ? PredepartureIntroduction.fromJson(
+                Map<String, dynamic>.from(json['predeparture'] as Map),
+              )
+            : json['pretrip'] is Map &&
+                    (json['pretrip'] as Map)['predeparture'] is Map
+                ? PredepartureIntroduction.fromJson(
+                    Map<String, dynamic>.from(
+                      (json['pretrip'] as Map)['predeparture'] as Map,
+                    ),
+                  )
+                : null,
       );
 }
 

@@ -11,6 +11,7 @@ import '../domain/models.dart';
 import '../domain/fragment_models.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
+import 'home_story_controller.dart';
 import 'location_mode_controller.dart';
 import 'offline_package_controller.dart';
 import 'widgets/route_canvas.dart';
@@ -118,6 +119,10 @@ class _RouteDetail extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
             sliver: SliverList.list(
               children: [
+                if (route.predeparture?.available ?? false) ...[
+                  _PredepartureSurface(route: route),
+                  const SizedBox(height: 26),
+                ],
                 _Metrics(route: route),
                 if (route.audioTour != null) ...[
                   const SizedBox(height: 26),
@@ -201,6 +206,83 @@ class _RouteDetail extends ConsumerWidget {
       'created_at': now.toIso8601String(),
     });
     return controller.resume(package.route, session);
+  }
+}
+
+class _PredepartureSurface extends ConsumerWidget {
+  const _PredepartureSurface({required this.route});
+
+  final RouteExperience route;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final introduction = route.predeparture!;
+    final playback = ref.watch(homeStoryPlaybackControllerProvider);
+    final expectedPrefix = 'predeparture:${route.id}:';
+    final ownsPlayback = playback.source == ListeningSource.predeparture &&
+        (playback.story?.id.startsWith(expectedPrefix) ?? false);
+    final phase = ownsPlayback ? playback.phase : HomeStoryPhase.ready;
+    final icon = switch (phase) {
+      HomeStoryPhase.playing => Icons.pause_rounded,
+      HomeStoryPhase.ended => Icons.replay_rounded,
+      HomeStoryPhase.error => Icons.refresh_rounded,
+      _ => Icons.play_arrow_rounded,
+    };
+    final label = switch (phase) {
+      HomeStoryPhase.playing => '暂停出发前讲述',
+      HomeStoryPhase.ended => '重新播放出发前讲述',
+      HomeStoryPhase.error => '重试出发前讲述',
+      _ => '播放出发前讲述',
+    };
+    return Container(
+      key: const ValueKey('predeparture-surface'),
+      padding: const EdgeInsets.fromLTRB(20, 18, 14, 18),
+      decoration: BoxDecoration(
+        color: AppColors.paperDeep,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('出发前', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(
+                  introduction.text,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                if (ownsPlayback && playback.message != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    playback.message!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('predeparture-play-pause'),
+            tooltip: label,
+            onPressed: () async {
+              final controller =
+                  ref.read(homeStoryPlaybackControllerProvider.notifier);
+              if (!ownsPlayback) {
+                await controller.loadPredeparture(route);
+                await controller.play();
+              } else {
+                await controller.toggle();
+              }
+            },
+            icon: Icon(icon),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -399,6 +481,10 @@ class _FragmentPreviewRow extends StatelessWidget {
                     children: [
                       Text(fragment.safePreview,
                           style: Theme.of(context).textTheme.titleMedium),
+                      if (fragment.experienceTags.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _ExperienceTags(tags: fragment.experienceTags),
+                      ],
                       const SizedBox(height: 5),
                       Text(
                           fragment.interactionType == 'photo'
@@ -456,6 +542,10 @@ class _StopRow extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(stop.kicker,
                       style: Theme.of(context).textTheme.bodyMedium),
+                  if (stop.experienceTags.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _ExperienceTags(tags: stop.experienceTags),
+                  ],
                 ],
               ),
             ),
@@ -464,6 +554,30 @@ class _StopRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ExperienceTags extends StatelessWidget {
+  const _ExperienceTags({required this.tags});
+
+  final List<String> tags;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        spacing: 7,
+        runSpacing: 6,
+        children: tags
+            .map(
+              (tag) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.moss.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(tag, style: Theme.of(context).textTheme.labelSmall),
+              ),
+            )
+            .toList(growable: false),
+      );
 }
 
 class _EditorialNotice extends StatelessWidget {

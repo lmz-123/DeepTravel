@@ -8,6 +8,48 @@ from urllib.parse import quote
 from app.domain.object_storage import StoredObject
 
 
+class InMemoryObjectStorage:
+    """Non-persistent storage fake used only by unit tests."""
+
+    provider = "memory"
+
+    def __init__(self, bucket: str, public_base_url: str = ""):
+        self.bucket = bucket
+        self.public_base_url = public_base_url.rstrip("/")
+        self._objects: dict[str, tuple[bytes, str]] = {}
+
+    def put(self, object_key: str, payload: bytes, mime_type: str) -> StoredObject:
+        if object_key in self._objects:
+            raise FileExistsError(object_key)
+        self._objects[object_key] = (bytes(payload), mime_type)
+        return StoredObject(
+            provider=self.provider,
+            object_key=object_key,
+            canonical_reference=f"memory://{self.bucket}/{object_key}",
+            public_url=self.public_url(object_key) if self.public_base_url else None,
+        )
+
+    def open(self, object_key: str):
+        return BytesIO(self._objects[object_key][0])
+
+    def exists(self, object_key: str) -> bool:
+        return object_key in self._objects
+
+    def delete(self, object_key: str) -> None:
+        self._objects.pop(object_key, None)
+
+    def public_url(self, object_key: str) -> str:
+        if not self.public_base_url:
+            raise ValueError("public base URL is not configured")
+        return f"{self.public_base_url}/{quote(object_key, safe='/')}"
+
+    def sign_get(self, object_key: str, expires_seconds: int) -> str:
+        del expires_seconds
+        if object_key not in self._objects:
+            raise FileNotFoundError(object_key)
+        return f"https://signed.test.invalid/{quote(object_key, safe='/')}"
+
+
 class LocalObjectStorage:
     provider = "local"
 

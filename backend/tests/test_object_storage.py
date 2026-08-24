@@ -35,6 +35,31 @@ def test_local_object_storage_contract(tmp_path):
         storage.put("../escape", b"bad", "application/octet-stream")
 
 
+def test_runtime_fails_closed_without_complete_oss_configuration():
+    from app import create_app
+
+    with pytest.raises(RuntimeError, match="Missing OSS configuration"):
+        create_app(
+            {
+                "TESTING": False,
+                "OBJECT_STORAGE_PROVIDER": "oss",
+                "OSS_REGION": "",
+                "OSS_PUBLIC_BUCKET": "",
+                "OSS_PRIVATE_BUCKET": "",
+                "OSS_PUBLIC_BASE_URL": "",
+                "OSS_ACCESS_KEY_ID": "",
+                "OSS_ACCESS_KEY_SECRET": "",
+            }
+        )
+
+
+def test_runtime_rejects_local_persistent_provider():
+    from app import create_app
+
+    with pytest.raises(RuntimeError, match="must be oss"):
+        create_app({"TESTING": False, "OBJECT_STORAGE_PROVIDER": "local"})
+
+
 def test_evidence_is_normalized_and_user_scoped(tmp_path):
     storage = LocalObjectStorage(str(tmp_path))
     evidence = EvidenceStorage(storage, 2_000_000, 256, "private/evidence")

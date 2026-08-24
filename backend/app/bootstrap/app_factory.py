@@ -7,12 +7,14 @@ import click
 from flask import Flask
 from flask_cors import CORS
 
+from app.application.city_story_migration import CityStoryMigrationService
 from app.application.city_story_service import CityStoryService
 from app.application.community_service import CommunityService
 from app.application.footprint_service import FootprintService
 from app.application.fragment_services import FragmentTourService
 from app.application.historical_content_service import HistoricalContentService
 from app.application.media_migration import MediaMigrationService
+from app.application.media_readiness import MediaReadinessService
 from app.application.services import (
     AuthenticationService,
     CatalogService,
@@ -22,8 +24,8 @@ from app.application.services import (
 from app.application.story_listening_service import StoryListeningService
 from app.bootstrap.config import Config
 from app.infrastructure.community_media_storage import CommunityMediaStorage
-from app.infrastructure.evidence_storage import EvidenceStorage, LocalEvidenceStorage
-from app.infrastructure.object_storage import AlibabaOssObjectStorage, LocalObjectStorage
+from app.infrastructure.evidence_storage import EvidenceStorage
+from app.infrastructure.object_storage import AlibabaOssObjectStorage, InMemoryObjectStorage
 from app.infrastructure.persistence.database import Database
 from app.infrastructure.persistence.repositories import SqlAlchemyUnitOfWork
 from app.infrastructure.persistence.seed import seed_database
@@ -40,13 +42,23 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
         app.config.update(test_config)
     if app.config["ENVIRONMENT"] == "production" and app.config["TEST_AUTH_ENABLED"]:
         raise RuntimeError("TEST_AUTH_ENABLED must be false in production")
-    if app.config["OBJECT_STORAGE_PROVIDER"] not in {"local", "oss"}:
-        raise RuntimeError("OBJECT_STORAGE_PROVIDER must be local or oss")
-    if app.config["OBJECT_STORAGE_PROVIDER"] == "oss":
-        required = ("OSS_REGION", "OSS_PUBLIC_BUCKET", "OSS_PRIVATE_BUCKET")
+    testing = bool(app.config.get("TESTING"))
+    if not testing and app.config["OBJECT_STORAGE_PROVIDER"] != "oss":
+        raise RuntimeError("OBJECT_STORAGE_PROVIDER must be oss for runtime persistence")
+    if not testing:
+        required = (
+            "OSS_REGION",
+            "OSS_PUBLIC_BUCKET",
+            "OSS_PRIVATE_BUCKET",
+            "OSS_PUBLIC_BASE_URL",
+            "OSS_ACCESS_KEY_ID",
+            "OSS_ACCESS_KEY_SECRET",
+        )
         missing = [name for name in required if not app.config[name]]
         if missing:
             raise RuntimeError(f"Missing OSS configuration: {', '.join(missing)}")
+    elif not app.config["OSS_PUBLIC_BASE_URL"]:
+        app.config["OSS_PUBLIC_BASE_URL"] = "https://cdn.test.invalid"
     app.logger.setLevel(logging.INFO)
 
     database = Database(str(app.config["DATABASE_URL"]))
@@ -56,7 +68,18 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
         return SqlAlchemyUnitOfWork(database.session_factory)
 
     token_codec = JwtTokenCodec(str(app.config["SECRET_KEY"]))
-    if app.config["OBJECT_STORAGE_PROVIDER"] == "oss":
+    if testing:
+        public_storage = InMemoryObjectStorage(
+            "shared-public-test", str(app.config["OSS_PUBLIC_BASE_URL"])
+        )
+        private_storage = InMemoryObjectStorage("shared-private-test")
+        evidence_storage = EvidenceStorage(
+            private_storage,
+            int(app.config["EVIDENCE_MAX_BYTES"]),
+            int(app.config["EVIDENCE_MAX_EDGE"]),
+            prefix="private/evidence",
+        )
+    else:
         public_storage = AlibabaOssObjectStorage(
             region=str(app.config["OSS_REGION"]),
             endpoint=str(app.config["OSS_ENDPOINT"]),
@@ -78,18 +101,6 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
             int(app.config["EVIDENCE_MAX_EDGE"]),
             prefix="private/evidence",
         )
-    else:
-        public_base = str(app.config["PUBLIC_BASE_URL"]).rstrip("/")
-        public_storage = LocalObjectStorage(
-            str(app.config["MEDIA_ROOT"]),
-            f"{public_base}/api/v1/assets" if public_base else "",
-        )
-        private_storage = LocalObjectStorage(str(app.config["EVIDENCE_ROOT"]))
-        evidence_storage = LocalEvidenceStorage(
-            str(app.config["EVIDENCE_ROOT"]),
-            int(app.config["EVIDENCE_MAX_BYTES"]),
-            int(app.config["EVIDENCE_MAX_EDGE"]),
-        )
     footprint_photo_storage = EvidenceStorage(
         private_storage,
         int(app.config["EVIDENCE_MAX_BYTES"]),
@@ -101,8 +112,14 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
         "private": private_storage,
     }
     media_migration = MediaMigrationService(
-        database.session_factory, public_storage, str(app.config["MEDIA_ROOT"])
+        database.session_factory,
+        public_storage,
+        str(app.config["MEDIA_ROOT"]),
+        private_storage=private_storage,
+        private_roots=[str(app.config["EVIDENCE_ROOT"])],
     )
+    city_story_migration = CityStoryMigrationService(database.session_factory)
+    media_readiness = MediaReadinessService(database.session_factory, app.config)
     community_media_storage = CommunityMediaStorage(
         private_storage,
         int(app.config["COMMUNITY_MEDIA_MAX_BYTES"]),
@@ -142,6 +159,8 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
         "historical_content": HistoricalContentService(database.session_factory),
         "story_listening": StoryListeningService(database.session_factory, asset_url),
         "city_stories": CityStoryService(database.session_factory, asset_url),
+        "city_story_migration": city_story_migration,
+        "media_readiness": media_readiness,
         "community": CommunityService(
             database.session_factory,
             community_media_storage,
@@ -190,6 +209,24 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
         )
         for missing in report["missing"]:
             click.echo(f"missing: {missing}")
+
+    @app.cli.command("unify-city-stories")
+    @click.option("--dry-run", is_flag=True, help="Report mappings without writing.")
+    def unify_city_stories_command(dry_run: bool) -> None:
+        report = city_story_migration.migrate(dry_run=dry_run)
+        counts = report["counts"]
+        click.echo(
+            " ".join(
+                f"{key}={counts[key]}"
+                for key in ("ready", "created", "reused", "blocked", "conflicted")
+            )
+        )
+        for state in ("blocked", "conflicted"):
+            for item in report[state]:
+                click.echo(
+                    f"{state}: publication={item['publication_id']} "
+                    f"reasons={','.join(item['reasons'])}"
+                )
 
     @app.cli.command("backfill-footprints")
     @click.option("--dry-run", is_flag=True, help="Report changes without writing.")

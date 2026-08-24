@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum AudioOwnerKind { none, route, story }
+enum AudioOwnerKind { none, predeparture, cityStory, onSite }
 
 class AudioOwnershipState {
   const AudioOwnershipState({

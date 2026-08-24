@@ -51,7 +51,7 @@ def test_public_fragment_manifest_is_spoiler_safe_and_in_review(client):
     assert tour["fragments"][0]["display_theme"] == "定位音频 · 碎片叙事"
     assert tour["fragments"][0]["expected_duration_seconds"] > 0
     audio = client.get("/api/v1/assets/audio/nantou-fragment-1-nantou-2026.08-conversational.3.m4a")
-    assert audio.status_code == 404
+    assert audio.status_code == 308
 
 
 def test_offline_package_is_hidden_when_published_audio_has_no_checksum(client):
@@ -177,7 +177,7 @@ def test_public_voice_profiles_require_complete_current_coverage_and_preserve_de
     first_fragment = tour["fragments"][0]
     assert set(first_fragment["narration_tracks"]) == set(profile_ids)
     assert all(
-        item["audio_url"].startswith("http://localhost/")
+        item["audio_url"].startswith("https://cdn.test.invalid/")
         for item in first_fragment["narration_tracks"].values()
     )
     assert (

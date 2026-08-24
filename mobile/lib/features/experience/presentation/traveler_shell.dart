@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../auth/presentation/auth_provider.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
+import 'home_story_controller.dart';
 
 class TravelerShell extends ConsumerStatefulWidget {
   const TravelerShell({required this.child, super.key});
@@ -155,6 +156,9 @@ class _TravelerDrawer extends ConsumerWidget {
   }
 
   Future<void> _clearPrivatePresentation(WidgetRef ref) async {
+    await ref
+        .read(homeStoryPlaybackControllerProvider.notifier)
+        .clearForAccountExit();
     await ref.read(activeTourControllerProvider.notifier).clearForAccountExit();
     await ref.read(tourStoreProvider).clearPrivateData();
     ref.invalidate(journeyControllerProvider);

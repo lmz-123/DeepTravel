@@ -29,6 +29,7 @@ void main() {
           'story_body': '正文',
           'image': 'https://example.test/cover.png',
           'insight': '洞见',
+          'experience_tags': [' 老建筑 ', '适合一个人'],
           'challenge': null,
         }
       ],
@@ -48,6 +49,41 @@ void main() {
 
     expect(route.audioTour, isNotNull);
     expect(route.stops.single.challenge.options, isEmpty);
+    expect(route.stops.single.experienceTags, ['老建筑', '适合一个人']);
+  });
+
+  test('route parses published predeparture without requiring legacy pretrip', () {
+    final route = RouteExperience.fromJson({
+      'id': 'route-predeparture',
+      'slug': 'route-predeparture',
+      'title': '出发前测试',
+      'subtitle': '测试',
+      'description': '测试',
+      'duration_minutes': 20,
+      'distance_km': 1,
+      'difficulty': '轻松',
+      'theme': '城市故事',
+      'hero_image': 'https://cdn.example.test/cover.jpg',
+      'content_status': 'published',
+      'stops': const [],
+      'predeparture': {
+        'text': '先认识这座城市，再慢慢走进去。',
+        'script_version': 'v2',
+        'transcript_hash': 'hash-a',
+        'audio': {
+          'track_id': 'track-a',
+          'url': 'https://cdn.example.test/predeparture.mp3',
+          'mime_type': 'audio/mpeg',
+          'size_bytes': 100,
+          'duration_ms': 9000,
+        },
+        'narration_profile': {'display_name': '见地讲述者'},
+      },
+    });
+
+    expect(route.predeparture?.available, isTrue);
+    expect(route.predeparture?.audio.duration, const Duration(seconds: 9));
+    expect(route.predeparture?.text, contains('这座城市'));
   });
 
   test('catalog summary keeps backend featuring and stop count', () {

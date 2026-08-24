@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/api_experience_repository.dart';
 import '../data/home_story_audio_player.dart';
 import '../domain/home_story.dart';
+import '../domain/models.dart';
 import 'active_tour_controller.dart';
 import 'audio_ownership_controller.dart';
 import 'experience_providers.dart';
@@ -20,6 +21,8 @@ enum HomeStoryPhase {
   error
 }
 
+enum ListeningSource { cityStory, predeparture }
+
 class HomeStoryPlaybackState {
   const HomeStoryPlaybackState({
     this.phase = HomeStoryPhase.idle,
@@ -28,6 +31,7 @@ class HomeStoryPlaybackState {
     this.duration,
     this.message,
     this.citySlug,
+    this.source = ListeningSource.cityStory,
   });
 
   final HomeStoryPhase phase;
@@ -36,6 +40,7 @@ class HomeStoryPlaybackState {
   final Duration? duration;
   final String? message;
   final String? citySlug;
+  final ListeningSource source;
 
   bool get isPlaying => phase == HomeStoryPhase.playing;
 
@@ -47,6 +52,7 @@ class HomeStoryPlaybackState {
     String? message,
     bool clearMessage = false,
     String? citySlug,
+    ListeningSource? source,
   }) =>
       HomeStoryPlaybackState(
         phase: phase ?? this.phase,
@@ -55,6 +61,7 @@ class HomeStoryPlaybackState {
         duration: duration ?? this.duration,
         message: clearMessage ? null : message ?? this.message,
         citySlug: citySlug ?? this.citySlug,
+        source: source ?? this.source,
       );
 }
 
@@ -104,6 +111,7 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
         story: story,
         duration: story.duration,
         citySlug: citySlug,
+        source: ListeningSource.cityStory,
       );
     } catch (error) {
       if (generation != _generation) return;
@@ -136,6 +144,7 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
         story: story,
         duration: story.duration,
         citySlug: story.citySlug,
+        source: ListeningSource.cityStory,
       );
     } catch (_) {
       if (generation != _generation) return;
@@ -144,6 +153,46 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
         message: '故事暂时没有加载出来，请稍后重试。',
       );
     }
+  }
+
+  Future<void> loadPredeparture(RouteExperience route) async {
+    final introduction = route.predeparture;
+    if (introduction == null || !introduction.available) return;
+    final story = HomeStory(
+      id: 'predeparture:${route.id}:${introduction.scriptVersion}',
+      arcId: route.id,
+      title: '出发前 · ${route.title}',
+      introduction: introduction.text,
+      coverImage: route.heroImage,
+      duration: introduction.audio.duration,
+      transcript: introduction.text,
+      audioUrl: introduction.audio.url,
+      cityName: '',
+      citySlug: '',
+      routeTitle: route.title,
+      routeSlug: route.slug,
+      narratorName: introduction.narratorName,
+      contentType: '出发前',
+    );
+    if (state.story?.id == story.id &&
+        state.source == ListeningSource.predeparture) {
+      return;
+    }
+    ++_generation;
+    await _player.stop();
+    await _cancelBindings();
+    final ownership = _ownershipGeneration;
+    if (ownership != null) {
+      ref.read(audioOwnershipProvider.notifier).clear(ownership);
+      _ownershipGeneration = null;
+    }
+    _preparedStoryId = null;
+    state = HomeStoryPlaybackState(
+      phase: HomeStoryPhase.ready,
+      story: story,
+      duration: story.duration,
+      source: ListeningSource.predeparture,
+    );
   }
 
   Future<void> play() async {
@@ -166,8 +215,12 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
       }
       await _bind(generation);
       final token = ref.read(audioOwnershipProvider.notifier).acquire(
-            kind: AudioOwnerKind.story,
-            destination: '/story',
+            kind: state.source == ListeningSource.predeparture
+                ? AudioOwnerKind.predeparture
+                : AudioOwnerKind.cityStory,
+            destination: state.source == ListeningSource.predeparture
+                ? '/route/${story.routeSlug}'
+                : '/story/${story.id}',
             title: story.title,
             subtitle: '${story.cityName} · ${story.routeTitle}',
             artwork: story.coverImage,
@@ -211,8 +264,12 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
     if (story == null) return;
     if (_preparedStoryId != story.id) return play();
     final token = ref.read(audioOwnershipProvider.notifier).acquire(
-          kind: AudioOwnerKind.story,
-          destination: '/story',
+          kind: state.source == ListeningSource.predeparture
+              ? AudioOwnerKind.predeparture
+              : AudioOwnerKind.cityStory,
+          destination: state.source == ListeningSource.predeparture
+              ? '/route/${story.routeSlug}'
+              : '/story/${story.id}',
           title: story.title,
           subtitle: '${story.cityName} · ${story.routeTitle}',
           artwork: story.coverImage,
@@ -277,6 +334,19 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
     _duration = null;
     _playing = null;
     _completed = null;
+  }
+
+  Future<void> clearForAccountExit() async {
+    ++_generation;
+    await _player.stop();
+    await _cancelBindings();
+    final ownership = _ownershipGeneration;
+    if (ownership != null) {
+      ref.read(audioOwnershipProvider.notifier).clear(ownership);
+    }
+    _ownershipGeneration = null;
+    _preparedStoryId = null;
+    state = const HomeStoryPlaybackState();
   }
 }
 

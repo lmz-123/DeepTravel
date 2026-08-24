@@ -181,14 +181,17 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                   ),
                   SliverToBoxAdapter(
                     key: const ValueKey('city-story-section'),
-                    child: discovery.maybeWhen(
-                      data: (state) => _CityStoryModules(
-                        home: state.storyHome,
-                        onSwitchCity: (slug) => ref
-                            .read(discoveryControllerProvider.notifier)
-                            .switchCity(slug),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 22),
+                      child: discovery.maybeWhen(
+                        data: (state) => _CityStoryModules(
+                          home: state.storyHome,
+                          onSwitchCity: (slug) => ref
+                              .read(discoveryControllerProvider.notifier)
+                              .switchCity(slug),
+                        ),
+                        orElse: () => const SizedBox.shrink(),
                       ),
-                      orElse: () => const SizedBox.shrink(),
                     ),
                   ),
                   const SliverPadding(
@@ -792,57 +795,68 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
       delay: const Duration(milliseconds: 80),
       child: Column(
         children: [
-          SizedBox(
-            height: 505,
-            child: PageView.builder(
-              key: const ValueKey('route-carousel'),
-              controller: _controller,
-              physics: const BouncingScrollPhysics(),
-              itemCount: widget.cards.length,
-              onPageChanged: (index) => setState(() => _selectedIndex = index),
-              itemBuilder: (context, index) => AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  final page = _controller.hasClients &&
-                          _controller.position.hasContentDimensions
-                      ? _controller.page ?? _selectedIndex.toDouble()
-                      : _selectedIndex.toDouble();
-                  final distance = (page - index).abs().clamp(0.0, 1.0);
-                  final scale = 1 - distance * .045;
-                  return Transform.translate(
-                    offset: Offset(0, distance * 12),
-                    child: Transform.scale(
-                      scale: scale,
-                      alignment: Alignment.center,
-                      child: Opacity(
-                        opacity: 1 - distance * .22,
-                        child: child,
-                      ),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: _RouteCard(
-                    card: widget.cards[index],
-                    onTap: () {
-                      if (_selectedIndex != index) {
-                        _controller.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 420),
-                          curve: Curves.easeOutCubic,
-                        );
-                        return;
-                      }
-                      _openRoute(
-                        widget.cards[index].route,
-                        journeyIndex[widget.cards[index].route.id],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final textScale =
+                  MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+              final cardWidth = constraints.maxWidth * .88;
+              final imageHeight = cardWidth / 2.24;
+              final contentHeight = cardWidth * .29 * textScale;
+              final carouselHeight = imageHeight + contentHeight;
+              return SizedBox(
+                height: carouselHeight,
+                child: PageView.builder(
+                  key: const ValueKey('route-carousel'),
+                  controller: _controller,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: widget.cards.length,
+                  onPageChanged: (index) =>
+                      setState(() => _selectedIndex = index),
+                  itemBuilder: (context, index) => AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, child) {
+                      final page = _controller.hasClients &&
+                              _controller.position.hasContentDimensions
+                          ? _controller.page ?? _selectedIndex.toDouble()
+                          : _selectedIndex.toDouble();
+                      final distance = (page - index).abs().clamp(0.0, 1.0);
+                      final scale = 1 - distance * .045;
+                      return Transform.translate(
+                        offset: Offset(0, distance * 12),
+                        child: Transform.scale(
+                          scale: scale,
+                          alignment: Alignment.center,
+                          child: Opacity(
+                            opacity: 1 - distance * .22,
+                            child: child,
+                          ),
+                        ),
                       );
                     },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: _RouteCard(
+                        card: widget.cards[index],
+                        onTap: () {
+                          if (_selectedIndex != index) {
+                            _controller.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 420),
+                              curve: Curves.easeOutCubic,
+                            );
+                            return;
+                          }
+                          _openRoute(
+                            widget.cards[index].route,
+                            journeyIndex[widget.cards[index].route.id],
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           const SizedBox(height: 14),
           Semantics(
@@ -934,43 +948,45 @@ class _RouteCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              EditorialImage(
-                source: route.heroImage,
-                height: 276,
-                heroTag: 'route-${route.slug}',
-                child: Padding(
-                  padding: const EdgeInsets.all(22),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _GlassPill(
-                            label: card.distanceMeters == null
-                                ? route.isFeatured
-                                    ? '本周精选'
-                                    : '城市景区'
-                                : _formatDistance(card.distanceMeters!),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      Text(
-                        route.theme,
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: AppColors.gold,
-                                ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        route.title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(color: AppColors.white),
-                      ),
-                    ],
+              AspectRatio(
+                aspectRatio: 2.24,
+                child: EditorialImage(
+                  source: route.heroImage,
+                  heroTag: 'route-${route.slug}',
+                  child: Padding(
+                    padding: const EdgeInsets.all(22),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            _GlassPill(
+                              label: card.distanceMeters == null
+                                  ? route.isFeatured
+                                      ? '本周精选'
+                                      : '城市景区'
+                                  : _formatDistance(card.distanceMeters!),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Text(
+                          route.theme,
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AppColors.gold,
+                                  ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          route.title,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(color: AppColors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

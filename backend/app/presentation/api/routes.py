@@ -60,6 +60,7 @@ def health():
     database = current_app.extensions["database"]
     database.session_factory().execute(text("SELECT 1"))
     fragment_health = _services()["fragment_tours"].health()
+    media_readiness = _services()["media_readiness"].audit()
     status = (
         "healthy"
         if all(
@@ -69,7 +70,18 @@ def health():
         )
         else "degraded"
     )
-    return jsonify({"data": {"status": status, "database": "up", **fragment_health}})
+    if media_readiness["status"] != "ready":
+        status = "degraded"
+    return jsonify(
+        {
+            "data": {
+                "status": status,
+                "database": "up",
+                **fragment_health,
+                "media_readiness": media_readiness,
+            }
+        }
+    )
 
 
 @api.get("/assets/<path:asset_path>")
@@ -935,6 +947,7 @@ def _route_payload(route, *, include_stops: bool = True, include_center: bool = 
         payload["center"] = _route_center(route, tour)
     if route.content_status.value == "published":
         payload["pretrip"] = _services()["city_stories"].pretrip(route.slug)
+        payload["predeparture"] = payload["pretrip"].get("predeparture")
         payload["companion_tags"] = payload["pretrip"]["companion_tags"]
     return payload
 

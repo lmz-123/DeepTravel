@@ -17,6 +17,7 @@ from app.infrastructure.persistence.models import (
     FragmentNarrationTrackModel,
     NarrationVoiceProfileModel,
     RouteModel,
+    RoutePredepartureTrackModel,
     RoutePretripGuidanceModel,
     StopModel,
     StoryArcModel,
@@ -28,7 +29,7 @@ from app.infrastructure.persistence.models import (
 )
 
 HOME_MODULES = (
-    ("today_city_story", "今天听一段城市故事", True),
+    ("today_city_story", "城市故事", True),
     ("street_corner_3min", "3 分钟了解一个街角", False),
     ("city_small_thing", "一座城市的一件小事", False),
     ("overlooked_detail", "你路过但没注意的细节", False),
@@ -138,6 +139,7 @@ class CityStoryService:
             guidance = session.get(RoutePretripGuidanceModel, route.id)
             if guidance is None or guidance.status != "published" or guidance.published_at is None:
                 return self._empty_pretrip(route)
+            predeparture = self._predeparture_payload(session, guidance)
             theme_story = None
             if guidance.theme_story_catalog_id:
                 item = session.get(StoryCatalogItemModel, guidance.theme_story_catalog_id)
@@ -172,7 +174,8 @@ class CityStoryService:
                 (item["kind"], item["id"], item["version"]): item for item in resources
             }
             return {
-                "available": bool(theme_story or directions),
+                "available": bool(predeparture or theme_story or directions),
+                "predeparture": predeparture,
                 "route": {
                     "id": route.id,
                     "slug": route.slug,
@@ -435,6 +438,7 @@ class CityStoryService:
     def _empty_pretrip(self, route) -> dict:
         return {
             "available": False,
+            "predeparture": None,
             "route": {
                 "id": route.id,
                 "slug": route.slug,
@@ -451,6 +455,51 @@ class CityStoryService:
             "requires_arrival": False,
             "quiz": None,
             "version": 0,
+        }
+
+    def _predeparture_payload(self, session, guidance) -> dict | None:
+        text = str(guidance.introduction_text or "").strip()
+        track_id = str(guidance.selected_intro_track_id or "").strip()
+        script_version = str(guidance.introduction_script_version or "").strip()
+        transcript_hash = str(guidance.introduction_transcript_hash or "").strip()
+        if not text or len(text) > 1200 or not track_id or not script_version:
+            return None
+        expected_hash = _hash(text)
+        if transcript_hash != expected_hash:
+            return None
+        track = session.get(RoutePredepartureTrackModel, track_id)
+        if (
+            track is None
+            or track.route_id != guidance.route_id
+            or track.transcript_hash != expected_hash
+            or track.script_version != script_version
+            or track.status != "published"
+            or track.published_at is None
+            or not track.mime_type.startswith("audio/")
+            or track.size_bytes <= 0
+            or track.duration_ms <= 0
+            or not track.media_path.strip()
+        ):
+            return None
+        profile = session.get(NarrationVoiceProfileModel, track.profile_id)
+        if profile is None or profile.status != "published":
+            return None
+        return {
+            "text": text,
+            "script_version": script_version,
+            "transcript_hash": expected_hash,
+            "audio": {
+                "track_id": track.id,
+                "url": self.asset_url_builder(track.media_path),
+                "mime_type": track.mime_type,
+                "size_bytes": track.size_bytes,
+                "duration_ms": track.duration_ms,
+                "checksum_sha256": track.checksum_sha256,
+            },
+            "narration_profile": {
+                "id": profile.id,
+                "display_name": profile.display_name,
+            },
         }
 
     def _offline_resources(self, story: dict, roles: list[str] | None) -> list[dict]:

@@ -50,7 +50,7 @@ class _HomeStoryPageState extends ConsumerState<HomeStoryPage> {
           onPressed: () => context.pop(),
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: const Text('听一个短故事'),
+        title: const Text('城市故事'),
         centerTitle: true,
       ),
       body: switch (state.phase) {
