@@ -704,7 +704,7 @@ void main() {
     expect(container.read(activeTourControllerProvider).playbackMode,
         TourPlaybackMode.liveReplay);
 
-    final time = DateTime.utc(2026, 8, 23, 12);
+    final time = DateTime.now().toUtc();
     location.emit(LocationSample(
       latitude: _region.latitude,
       longitude: _region.longitude,

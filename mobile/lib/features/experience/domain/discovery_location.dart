@@ -25,12 +25,20 @@ class DiscoveryLocationSample {
     required this.longitude,
     required this.recordedAt,
     this.locality,
+    this.localityCandidates = const [],
+    this.accuracyMeters,
+    this.providerStrategy = 'unknown',
+    this.isCached = false,
   });
 
   final double latitude;
   final double longitude;
   final DateTime recordedAt;
   final String? locality;
+  final List<String> localityCandidates;
+  final double? accuracyMeters;
+  final String providerStrategy;
+  final bool isCached;
 }
 
 abstract interface class CurrentLocationSource {

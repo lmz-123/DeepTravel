@@ -25,8 +25,20 @@ import 'audio_ownership_controller.dart';
 import '../../auth/presentation/auth_provider.dart';
 
 final tourStoreProvider = Provider<TourStore>((ref) => SqliteTourStore());
-final locationTrackerProvider =
-    Provider<LocationTracker>((ref) => GeolocatorTracker());
+final locationTrackerProvider = Provider<LocationTracker>((ref) {
+  final reporter = ref.watch(runtimeLogReporterProvider);
+  final tracker = GeolocatorTracker(
+    onDiagnostic: (level, message, context) {
+      if (level == 'warning') {
+        unawaited(reporter?.warning('location', message, context: context));
+      } else {
+        unawaited(reporter?.info('location', message, context: context));
+      }
+    },
+  );
+  ref.onDispose(() => unawaited(tracker.stop()));
+  return tracker;
+});
 final cameraCaptureProvider =
     Provider<CameraCapture>((ref) => ImagePickerCamera());
 final narrationPlayerProvider = Provider<NarrationPlayer>((ref) {

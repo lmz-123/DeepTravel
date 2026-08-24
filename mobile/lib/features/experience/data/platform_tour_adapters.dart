@@ -11,9 +11,33 @@ import 'package:just_audio/just_audio.dart';
 import '../domain/fragment_models.dart';
 import '../domain/tour_runtime.dart';
 
+typedef TourLocationDiagnosticCallback = void Function(
+  String level,
+  String message,
+  Map<String, Object?> context,
+);
+
+typedef PositionStreamFactory = Stream<Position> Function(
+  LocationSettings settings,
+);
+
 class GeolocatorTracker implements LocationTracker {
+  GeolocatorTracker({
+    this.onDiagnostic,
+    PositionStreamFactory? positionStreamFactory,
+  }) : _positionStreamFactory = positionStreamFactory ??
+            ((settings) => Geolocator.getPositionStream(
+                  locationSettings: settings,
+                ));
+
+  static const _androidUpdateTimeout = Duration(seconds: 12);
+
+  final TourLocationDiagnosticCallback? onDiagnostic;
+  final PositionStreamFactory _positionStreamFactory;
   StreamSubscription<Position>? _subscription;
   StreamController<LocationSample>? _controller;
+  var _generation = 0;
+  var _starting = false;
 
   @override
   Future<TourLocationPermission> requestPermission() async {
@@ -36,24 +60,74 @@ class GeolocatorTracker implements LocationTracker {
   @override
   Stream<LocationSample> samples() {
     _controller ??= StreamController<LocationSample>.broadcast(onCancel: stop);
-    _subscription ??=
-        Geolocator.getPositionStream(locationSettings: _settings()).listen(
-      (position) => _controller?.add(LocationSample(
-          latitude: position.latitude,
-          longitude: position.longitude,
-          accuracyM: position.accuracy,
-          recordedAt: position.timestamp)),
-      onError: _controller?.addError,
-    );
+    if (_subscription == null && !_starting) {
+      unawaited(_startStream());
+    }
     return _controller!.stream;
+  }
+
+  Future<void> _startStream() async {
+    final generation = ++_generation;
+    _starting = true;
+    await _subscription?.cancel();
+    _subscription = null;
+    if (generation != _generation) return;
+    final strategy = defaultTargetPlatform == TargetPlatform.android
+        ? 'android_location_manager'
+        : 'platform_default';
+    try {
+      _subscription = _positionStreamFactory(
+        _settings(),
+      ).listen(
+        (position) {
+          if (generation != _generation) return;
+          _diagnostic('info', 'journey_location_sample_received', {
+            'provider_strategy': strategy,
+            'accuracy_bucket': _accuracyBucket(position.accuracy),
+          });
+          _controller?.add(LocationSample(
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracyM: position.accuracy,
+            recordedAt: position.timestamp,
+          ));
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (generation != _generation) return;
+          _subscription = null;
+          _diagnostic('warning', 'journey_location_stream_failed', {
+            'provider_strategy': strategy,
+            'failure_type': _failureType(error),
+          });
+          _controller?.addError(error, stackTrace);
+        },
+        onDone: () {
+          if (generation == _generation) _subscription = null;
+        },
+      );
+      _diagnostic('info', 'journey_location_stream_started', {
+        'provider_strategy': strategy,
+      });
+    } catch (error, stackTrace) {
+      if (generation != _generation) return;
+      _diagnostic('warning', 'journey_location_stream_failed', {
+        'provider_strategy': strategy,
+        'failure_type': _failureType(error),
+      });
+      _controller?.addError(error, stackTrace);
+    } finally {
+      if (generation == _generation) _starting = false;
+    }
   }
 
   LocationSettings _settings() {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 8,
-        intervalDuration: const Duration(seconds: 5),
+        distanceFilter: 3,
+        intervalDuration: const Duration(seconds: 3),
+        forceLocationManager: true,
+        timeLimit: _androidUpdateTimeout,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: '见地正在陪你行走',
           notificationText: '靠近线索时会自动播放故事，点按可回到旅程。',
@@ -75,10 +149,35 @@ class GeolocatorTracker implements LocationTracker {
         accuracy: LocationAccuracy.high, distanceFilter: 8);
   }
 
+  void _diagnostic(
+    String level,
+    String message,
+    Map<String, Object?> context,
+  ) =>
+      onDiagnostic?.call(level, message, context);
+
+  String _failureType(Object error) => switch (error) {
+        TimeoutException() => 'timeout',
+        LocationServiceDisabledException() => 'service_disabled',
+        PermissionDeniedException() => 'permission_denied',
+        PositionUpdateException() => 'position_update',
+        _ => error.runtimeType.toString(),
+      };
+
+  String _accuracyBucket(double accuracy) => switch (accuracy) {
+        <= 10 => 'lte_10m',
+        <= 25 => 'lte_25m',
+        <= 50 => 'lte_50m',
+        <= 100 => 'lte_100m',
+        _ => 'gt_100m',
+      };
+
   @override
   Future<void> stop() async {
+    ++_generation;
     await _subscription?.cancel();
     _subscription = null;
+    _starting = false;
   }
 }
 

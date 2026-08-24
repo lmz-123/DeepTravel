@@ -30,8 +30,137 @@ void main() {
     ];
 
     expect(matchDiscoveryCity(' 上海市 ', cities)?.slug, 'shanghai');
+    expect(
+      matchDiscoveryCityCandidates(
+        ['南山区', '深圳市', '广东省'],
+        cities,
+      )?.slug,
+      'shenzhen',
+    );
+    expect(
+      matchDiscoveryCityCandidates(['Shenzhen City'], cities)?.slug,
+      'shenzhen',
+    );
+    expect(
+      matchDiscoveryCityCandidates(['广东省深圳市南山区'], cities)?.slug,
+      'shenzhen',
+    );
     expect(matchDiscoveryCity('广州市', cities), isNull);
     expect(normalizeDiscoveryLocality('香港特别行政区'), '香港');
+  });
+
+  test('route centers identify a supported city without geocoder text', () {
+    const shenzhen = CityExperience(
+      id: 'sz',
+      slug: 'shenzhen',
+      name: '深圳',
+      subtitle: '',
+      heroImage: '',
+    );
+    const shanghai = CityExperience(
+      id: 'sh',
+      slug: 'shanghai',
+      name: '上海',
+      subtitle: '',
+      heroImage: '',
+    );
+    const shenzhenRoute = RouteExperience(
+      id: 'sz-route',
+      slug: 'sz-route',
+      title: '深圳景区',
+      subtitle: '',
+      description: '',
+      durationMinutes: 1,
+      distanceKm: 1,
+      difficulty: '',
+      theme: '',
+      heroImage: '',
+      contentStatus: 'published',
+      stops: [],
+      centerLatitude: 22.54,
+      centerLongitude: 114.06,
+    );
+    const shanghaiRoute = RouteExperience(
+      id: 'sh-route',
+      slug: 'sh-route',
+      title: '上海景区',
+      subtitle: '',
+      description: '',
+      durationMinutes: 1,
+      distanceKm: 1,
+      difficulty: '',
+      theme: '',
+      heroImage: '',
+      contentStatus: 'published',
+      stops: [],
+      centerLatitude: 31.23,
+      centerLongitude: 121.47,
+    );
+    final sample = DiscoveryLocationSample(
+      latitude: 22.541,
+      longitude: 114.061,
+      recordedAt: DateTime.now(),
+    );
+
+    final nearest = nearestDiscoveryCity(
+      sample,
+      const [
+        (
+          city: shanghai,
+          catalog: CityDiscoveryCatalog(routes: [shanghaiRoute]),
+        ),
+        (
+          city: shenzhen,
+          catalog: CityDiscoveryCatalog(routes: [shenzhenRoute]),
+        ),
+      ],
+      maximumDistanceMeters: 100000,
+    );
+
+    expect(nearest?.city.slug, 'shenzhen');
+    expect(nearest?.distanceMeters, lessThan(1000));
+  });
+
+  test('unsupported coordinates do not fabricate a supported city', () {
+    const city = CityExperience(
+      id: 'sz',
+      slug: 'shenzhen',
+      name: '深圳',
+      subtitle: '',
+      heroImage: '',
+    );
+    const route = RouteExperience(
+      id: 'sz-route',
+      slug: 'sz-route',
+      title: '深圳景区',
+      subtitle: '',
+      description: '',
+      durationMinutes: 1,
+      distanceKm: 1,
+      difficulty: '',
+      theme: '',
+      heroImage: '',
+      contentStatus: 'published',
+      stops: [],
+      centerLatitude: 22.54,
+      centerLongitude: 114.06,
+    );
+    final sample = DiscoveryLocationSample(
+      latitude: 0,
+      longitude: 0,
+      recordedAt: DateTime.now(),
+    );
+
+    expect(
+      nearestDiscoveryCity(
+        sample,
+        const [
+          (city: city, catalog: CityDiscoveryCatalog(routes: [route])),
+        ],
+        maximumDistanceMeters: 100000,
+      ),
+      isNull,
+    );
   });
 
   test('Haversine ranks scenic areas by center and keeps nodes contained', () {
@@ -128,8 +257,7 @@ void main() {
     expect(location.requests, [false]);
   });
 
-  test(
-      'unmatched locality and matched city without points fall back to Shenzhen',
+  test('unmatched locality and empty matched city use supported route centers',
       () async {
     for (final locality in ['不存在的城市', '上海市']) {
       final location = _LocationSource(samples: [_sample(locality: locality)]);
@@ -144,7 +272,8 @@ void main() {
       final state = await container.read(discoveryControllerProvider.future);
 
       expect(state.city?.slug, 'shenzhen');
-      expect(state.cards.every((item) => item.distanceMeters == null), isTrue);
+      expect(state.cards.first.distanceMeters, isNotNull);
+      expect(state.locationFailure, isNull);
       container.dispose();
     }
   });
@@ -303,6 +432,7 @@ class _ShanghaiWithoutPointsRepository extends DemoExperienceRepository {
 
 DiscoveryLocationSample _sample({
   String? locality,
+  List<String> localityCandidates = const [],
   DateTime? recordedAt,
 }) =>
     DiscoveryLocationSample(
@@ -310,6 +440,7 @@ DiscoveryLocationSample _sample({
       longitude: demoRoute.stops.first.longitude,
       recordedAt: recordedAt ?? DateTime.now(),
       locality: locality,
+      localityCandidates: localityCandidates,
     );
 
 class _LocationSource implements CurrentLocationSource {

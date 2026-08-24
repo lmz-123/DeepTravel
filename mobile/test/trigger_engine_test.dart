@@ -38,9 +38,11 @@ StoryFragment _fragment({
 
 void main() {
   test('requires two accurate samples and acknowledges only once', () {
-    final engine = StableTriggerEngine();
-    final fragment = _fragment();
     final time = DateTime.utc(2026, 8, 22, 10);
+    final engine = StableTriggerEngine(
+      now: () => time.add(const Duration(seconds: 10)),
+    );
+    final fragment = _fragment();
     final inaccurate = LocationSample(
       latitude: 22.5381,
       longitude: 113.9227,
@@ -68,9 +70,11 @@ void main() {
   });
 
   test('real location can reveal a later fragment before dependencies', () {
-    final engine = StableTriggerEngine();
-    final fragment = _fragment(position: 4, dependencies: ['previous']);
     final time = DateTime.utc(2026, 8, 22, 10);
+    final engine = StableTriggerEngine(
+      now: () => time.add(const Duration(seconds: 10)),
+    );
+    final fragment = _fragment(position: 4, dependencies: ['previous']);
     for (var index = 0; index < 2; index++) {
       final sample = LocationSample(
         latitude: 22.5381,
@@ -88,7 +92,10 @@ void main() {
   });
 
   test('chooses the nearest qualified region, then the authored position', () {
-    final engine = StableTriggerEngine();
+    final time = DateTime.utc(2026, 8, 22, 10);
+    final engine = StableTriggerEngine(
+      now: () => time.add(const Duration(seconds: 10)),
+    );
     final farther = _fragment(
       id: 'farther',
       position: 1,
@@ -100,7 +107,6 @@ void main() {
       latitude: 22.53818,
       dependencies: ['farther'],
     );
-    final time = DateTime.utc(2026, 8, 22, 10);
     for (var index = 0; index < 2; index++) {
       final result = engine.process(
         LocationSample(
@@ -117,6 +123,26 @@ void main() {
       } else {
         expect(result?.fragment.id, 'nearer');
       }
+    }
+  });
+
+  test('stale and future samples cannot advance a trigger', () {
+    final now = DateTime.utc(2026, 8, 24, 12);
+    final engine = StableTriggerEngine(now: () => now);
+    final fragment = _fragment();
+
+    for (final recordedAt in [
+      now.subtract(const Duration(seconds: 16)),
+      now.add(const Duration(seconds: 6)),
+    ]) {
+      final sample = LocationSample(
+        latitude: 22.5381,
+        longitude: 113.9227,
+        accuracyM: 10,
+        recordedAt: recordedAt,
+      );
+      expect(engine.process(sample, [fragment], {}), isNull);
+      expect(engine.stateOf(fragment.id), RegionPresence.outside);
     }
   });
 }

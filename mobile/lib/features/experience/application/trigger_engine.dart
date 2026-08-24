@@ -12,11 +12,20 @@ class TriggerCandidate {
 }
 
 class StableTriggerEngine {
+  StableTriggerEngine({DateTime Function()? now})
+      : _now = now ?? (() => DateTime.now().toUtc());
+
+  static const maximumSampleAge = Duration(seconds: 15);
+  static const maximumFutureSkew = Duration(seconds: 5);
+
+  final DateTime Function() _now;
   final Map<String, RegionPresence> _presence = {};
   final Map<String, List<DateTime>> _qualifying = {};
 
   TriggerCandidate? process(LocationSample sample,
       List<StoryFragment> fragments, Set<String> revealedIds) {
+    final age = _now().toUtc().difference(sample.recordedAt.toUtc());
+    if (age > maximumSampleAge || age < -maximumFutureSkew) return null;
     final qualified = <({StoryFragment fragment, double distance})>[];
     for (final fragment in fragments) {
       if (_presence[fragment.id] == RegionPresence.acknowledged ||

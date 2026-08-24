@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/platform_discovery_location.dart';
 import '../domain/discovery_location.dart';
 import '../domain/city_story.dart';
@@ -60,7 +62,16 @@ class DiscoveryState {
 }
 
 final currentLocationSourceProvider = Provider<CurrentLocationSource>(
-  (ref) => PlatformCurrentLocationSource(),
+  (ref) => PlatformCurrentLocationSource(
+    onDiagnostic: (level, message, context) {
+      final reporter = ref.read(runtimeLogReporterProvider);
+      if (level == 'warning') {
+        unawaited(reporter?.warning('location', message, context: context));
+      } else {
+        unawaited(reporter?.info('location', message, context: context));
+      }
+    },
+  ),
 );
 
 final discoveryControllerProvider =
@@ -69,7 +80,8 @@ final discoveryControllerProvider =
 );
 
 class DiscoveryController extends AsyncNotifier<DiscoveryState> {
-  static const maximumSampleAge = Duration(minutes: 2);
+  static const maximumSampleAge = Duration(seconds: 30);
+  static const cityRecognitionRadiusMeters = 100000.0;
 
   ExperienceRepository get _repository =>
       ref.read(experienceRepositoryProvider);
@@ -215,22 +227,61 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     try {
       final sample = await _currentSample(requestPermission);
       if (!_isCurrent(token)) return;
-      final matched = matchDiscoveryCity(sample.locality, current.cities);
+      var matched = matchDiscoveryCityCandidates(
+        [
+          ...sample.localityCandidates,
+          if (sample.locality != null) sample.locality!,
+        ],
+        current.cities,
+      );
+      CityDiscoveryCatalog? matchedCatalog;
+      var matchStrategy = matched == null ? 'none' : 'locality';
       if (matched == null) {
-        await _restoreFallback(token, current);
+        final nearest = await _nearestSupportedCity(sample, current);
+        if (!_isCurrent(token)) return;
+        matched = nearest?.city;
+        matchedCatalog = nearest?.catalog;
+        if (nearest != null) matchStrategy = 'route_center';
+      }
+      if (matched == null) {
+        _locationDiagnostic('discovery_city_unmatched', {
+          'provider_strategy': sample.providerStrategy,
+          'cached': sample.isCached,
+          'candidate_count': sample.localityCandidates.length,
+        });
+        await _restoreFallback(
+          token,
+          current,
+          locationFailure: null,
+        );
         return;
       }
-      final catalog = matched.slug == current.city?.slug
-          ? current.catalog
-          : await _repository.discoveryForCity(matched.slug);
+      var catalog = matchedCatalog ??
+          (matched.slug == current.city?.slug
+              ? current.catalog
+              : await _repository.discoveryForCity(matched.slug));
+      if (!_isCurrent(token)) return;
+      if (catalog.routes.isEmpty) {
+        final nearest = await _nearestSupportedCity(sample, current);
+        if (!_isCurrent(token)) return;
+        if (nearest == null) {
+          await _restoreFallback(token, current, locationFailure: null);
+          return;
+        }
+        matched = nearest.city;
+        catalog = nearest.catalog;
+        matchStrategy = 'route_center_after_empty_locality';
+      }
       final storyHome = matched.slug == current.city?.slug
           ? current.storyHome
           : await _loadStoryHome(matched.slug);
       if (!_isCurrent(token)) return;
-      if (catalog.routes.isEmpty) {
-        await _restoreFallback(token, current);
-        return;
-      }
+      _locationDiagnostic('discovery_city_matched', {
+        'match_strategy': matchStrategy,
+        'provider_strategy': sample.providerStrategy,
+        'cached': sample.isCached,
+        'accuracy_bucket': discoveryAccuracyBucket(sample.accuracyMeters),
+      });
       state = AsyncData(current.copyWith(
         city: matched,
         catalog: catalog,
@@ -241,11 +292,24 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
         clearLocationFailure: true,
       ));
     } on DiscoveryLocationFailure catch (failure) {
-      if (_isCurrent(token)) _setFailure(failure.reason);
+      if (_isCurrent(token)) {
+        _locationDiagnostic(
+            'discovery_location_failed',
+            {
+              'failure_type': failure.reason.name,
+            },
+            warning: true);
+        _setFailure(failure.reason);
+      }
     }
   }
 
-  Future<void> _restoreFallback(int token, DiscoveryState current) async {
+  Future<void> _restoreFallback(
+    int token,
+    DiscoveryState current, {
+    DiscoveryLocationFailureReason? locationFailure =
+        DiscoveryLocationFailureReason.unavailable,
+  }) async {
     final fallback = fallbackDiscoveryCity(current.cities);
     final catalog = fallback == null
         ? const CityDiscoveryCatalog(routes: [])
@@ -265,8 +329,41 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
       storyHome: storyHome,
       revision: current.revision + 1,
       isLocating: false,
-      locationFailure: DiscoveryLocationFailureReason.unavailable,
+      locationFailure: locationFailure,
+      clearLocationFailure: locationFailure == null,
     ));
+  }
+
+  Future<
+      ({
+        CityExperience city,
+        CityDiscoveryCatalog catalog,
+        double distanceMeters,
+      })?> _nearestSupportedCity(
+    DiscoveryLocationSample sample,
+    DiscoveryState current,
+  ) async {
+    final resolved = await Future.wait(current.cities.map((city) async {
+      try {
+        final catalog = city.slug == current.city?.slug
+            ? current.catalog
+            : await _repository.discoveryForCity(city.slug);
+        return catalog.routes.isEmpty ? null : (city: city, catalog: catalog);
+      } catch (_) {
+        // One unavailable city catalog must not erase other supported cities.
+        return null;
+      }
+    }));
+    final candidates = resolved.whereType<
+        ({
+          CityExperience city,
+          CityDiscoveryCatalog catalog,
+        })>();
+    return nearestDiscoveryCity(
+      sample,
+      candidates,
+      maximumDistanceMeters: cityRecognitionRadiusMeters,
+    );
   }
 
   Future<void> _locateForActive(
@@ -328,6 +425,19 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     ));
   }
 
+  void _locationDiagnostic(
+    String message,
+    Map<String, Object?> context, {
+    bool warning = false,
+  }) {
+    final reporter = ref.read(runtimeLogReporterProvider);
+    if (warning) {
+      unawaited(reporter?.warning('location', message, context: context));
+    } else {
+      unawaited(reporter?.info('location', message, context: context));
+    }
+  }
+
   int _beginEvent() => ++_eventToken;
 
   bool _isCurrent(int token) => token == _eventToken;
@@ -344,23 +454,45 @@ CityExperience? fallbackDiscoveryCity(List<CityExperience> cities) {
 CityExperience? matchDiscoveryCity(
   String? locality,
   List<CityExperience> cities,
+) =>
+    matchDiscoveryCityCandidates(
+      [if (locality != null) locality],
+      cities,
+    );
+
+CityExperience? matchDiscoveryCityCandidates(
+  Iterable<String> localities,
+  List<CityExperience> cities,
 ) {
-  final normalized = normalizeDiscoveryLocality(locality ?? '');
-  if (normalized.isEmpty) return null;
-  for (final city in cities) {
-    if (normalizeDiscoveryLocality(city.name) == normalized) return city;
+  for (final locality in localities) {
+    final normalized = normalizeDiscoveryLocality(locality);
+    if (normalized.isEmpty) continue;
+    final matches = <CityExperience>[];
+    for (final city in cities) {
+      final names = {
+        normalizeDiscoveryLocality(city.name),
+        normalizeDiscoveryLocality(city.slug),
+      }..removeWhere((value) => value.length < 2);
+      if (names
+          .any((name) => normalized == name || normalized.contains(name))) {
+        matches.add(city);
+      }
+    }
+    if (matches.length == 1) return matches.single;
   }
   return null;
 }
 
 String normalizeDiscoveryLocality(String value) {
-  var normalized = value.trim().toLowerCase().replaceAll(RegExp(r'[\s·・]'), '');
+  var normalized =
+      value.trim().toLowerCase().replaceAll(RegExp(r'[\s·・_\-]'), '');
   for (final suffix in const [
     '特别行政区',
     '自治州',
     '地区',
     '市',
     '盟',
+    'city',
   ]) {
     if (normalized.endsWith(suffix)) {
       normalized = normalized.substring(0, normalized.length - suffix.length);
@@ -369,6 +501,55 @@ String normalizeDiscoveryLocality(String value) {
   }
   return normalized;
 }
+
+({
+  CityExperience city,
+  CityDiscoveryCatalog catalog,
+  double distanceMeters,
+})? nearestDiscoveryCity(
+  DiscoveryLocationSample sample,
+  Iterable<({CityExperience city, CityDiscoveryCatalog catalog})> candidates, {
+  required double maximumDistanceMeters,
+}) {
+  ({
+    CityExperience city,
+    CityDiscoveryCatalog catalog,
+    double distanceMeters,
+  })? nearest;
+  for (final candidate in candidates) {
+    for (final route in candidate.catalog.routes) {
+      final latitude = route.centerLatitude;
+      final longitude = route.centerLongitude;
+      if (latitude == null || longitude == null) continue;
+      final distance = discoveryDistanceMeters(
+        sample.latitude,
+        sample.longitude,
+        latitude,
+        longitude,
+      );
+      if (nearest == null || distance < nearest.distanceMeters) {
+        nearest = (
+          city: candidate.city,
+          catalog: candidate.catalog,
+          distanceMeters: distance,
+        );
+      }
+    }
+  }
+  if (nearest == null || nearest.distanceMeters > maximumDistanceMeters) {
+    return null;
+  }
+  return nearest;
+}
+
+String discoveryAccuracyBucket(double? accuracy) => switch (accuracy) {
+      null => 'unknown',
+      <= 10 => 'lte_10m',
+      <= 25 => 'lte_25m',
+      <= 50 => 'lte_50m',
+      <= 100 => 'lte_100m',
+      _ => 'gt_100m',
+    };
 
 List<ScenicAreaCard> scenicAreaCards(
   CityDiscoveryCatalog catalog, {
