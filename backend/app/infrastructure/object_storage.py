@@ -8,6 +8,18 @@ from urllib.parse import quote
 from app.domain.object_storage import StoredObject
 
 
+def _error_has_status(error: BaseException, expected_status: int) -> bool:
+    """Inspect SDK wrapper exceptions without hiding unrelated OSS failures."""
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if getattr(current, "status_code", None) == expected_status:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 class InMemoryObjectStorage:
     """Non-persistent storage fake used only by unit tests."""
 
@@ -157,8 +169,7 @@ class AlibabaOssObjectStorage:
             self.client.head_object(self.oss.HeadObjectRequest(bucket=self.bucket, key=object_key))
             return True
         except Exception as error:
-            status = getattr(error, "status_code", None)
-            if status == 404:
+            if _error_has_status(error, 404):
                 return False
             raise
 

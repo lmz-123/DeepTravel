@@ -12,7 +12,7 @@ from app.infrastructure.community_media_storage import (
     CommunityMediaStorage,
 )
 from app.infrastructure.evidence_storage import EvidenceInvalidError, EvidenceStorage
-from app.infrastructure.object_storage import LocalObjectStorage
+from app.infrastructure.object_storage import LocalObjectStorage, _error_has_status
 from app.infrastructure.persistence.models import CityModel, MediaAssetModel
 
 
@@ -58,6 +58,22 @@ def test_runtime_rejects_local_persistent_provider():
 
     with pytest.raises(RuntimeError, match="must be oss"):
         create_app({"TESTING": False, "OBJECT_STORAGE_PROVIDER": "local"})
+
+
+def test_nested_oss_404_is_recognized_without_hiding_other_errors():
+    class ServiceError(Exception):
+        def __init__(self, status_code: int):
+            super().__init__(f"status={status_code}")
+            self.status_code = status_code
+
+    try:
+        try:
+            raise ServiceError(404)
+        except ServiceError as cause:
+            raise RuntimeError("operation error") from cause
+    except RuntimeError as wrapped:
+        assert _error_has_status(wrapped, 404)
+        assert not _error_has_status(wrapped, 403)
 
 
 def test_evidence_is_normalized_and_user_scoped(tmp_path):
