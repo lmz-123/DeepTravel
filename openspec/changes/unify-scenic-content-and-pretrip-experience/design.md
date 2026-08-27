@@ -51,6 +51,8 @@ Alternative considered: keep both tables editable and merge only in Flutter. Rej
 
 The minimal city-story editor may generate narration, but that command writes a `StoryNarrationTrack` for the existing canonical arc and updates the catalog variant reference; it does not add transcript columns or duplicate the story body. Catalog verification approves the matching current track, and publication promotes the same track and variant together.
 
+The minimal editor includes one cover field because cover is traveler-visible business content rather than compatibility metadata. Uploading that field uses the shared public media endpoint and writes only a canonical OSS media reference to the catalog item; it does not affect transcript revision or narration eligibility.
+
 ### 5. Derive media hierarchy over an OSS-only shared resource set
 
 The backend/admin projection joins `media_assets` and private media/evidence records to city covers, route covers, stops, fragments, narration tracks, story variants, pre-departure tracks, community content, footprints, and user evidence. It returns one asset with a list of typed usages and derived city/route/user scopes appropriate to the caller. Multiple content scopes mark a public asset shared; zero usages mark it unassigned. This avoids adding a false single-owner foreign key to reusable assets and never exposes private ownership to unauthorized callers.
@@ -60,6 +62,8 @@ Remove the runtime local/OSS provider branch and require complete public/private
 Public editorial objects serialize only CDN URLs. Private photos, evidence, private community objects, and TTS previews stay in the private bucket and are accessed through an authenticated proxy or short-lived signed URL. The audit reports safe bucket identity hashes/names as authorized, CDN host, public/private counts, environment agreement, local references/mounts, missing metadata, and bounded representative checks, never credentials or permanent private URLs. Any missing OSS configuration or local persistence/read is a readiness blocker in every runtime.
 
 Alternative considered: move files into city/route directory keys to imply ownership. Rejected because object paths are storage details, shared media would be duplicated, and renaming a city would force object moves.
+
+Public editorial image ingestion normalizes PNG/JPEG inputs to JPEG quality 85 before computing their canonical checksum and `.jpg` object key. Existing PNG editorial assets are converted into new immutable objects and their `media_assets`, city, route, stop, story publication, and catalog cover references are updated together; original OSS keys remain untouched for rollback observation. Audio and private evidence are explicitly excluded from this transformation.
 
 Alternative considered: keep local storage for developer convenience or give test full write access to shared canonical keys. Rejected because local mode recreates environment drift, while unrestricted test writes could corrupt live media. An in-memory fake and reserved OSS test prefix preserve testability without a second canonical asset set.
 

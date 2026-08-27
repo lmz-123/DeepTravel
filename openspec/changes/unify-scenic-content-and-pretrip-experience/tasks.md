@@ -19,6 +19,7 @@
 - [x] 3.3 Switch city-story collection/detail and random selection to the unified eligible catalog projection while preserving documented legacy read response shapes; make legacy writes delegate or reject as read-only and add compatibility tests.
 - [x] 3.4 Update seed/demo/package fixtures to expose one “城市故事” source and remove duplicate client-facing home-listening placement without hardcoded production story IDs; test empty/fallback city behavior.
 - [x] 3.5 Through the companion Admin API, generate and bind canonical city-story narration from the minimal editor, approve/publish the matching track with catalog lifecycle, and add one reviewed educational Shenzhen story without duplicate transcript or media identity.
+- [ ] 3.6 Preserve one operator-managed public cover on unified city-story collection/detail projections and verify cover-only changes do not revise transcript or narration identity.
 
 ## 4. Media hierarchy and OSS readiness
 
@@ -27,6 +28,7 @@
 - [ ] 4.3 Define production/test completely shared public/private buckets, identical canonical object keys, media references, CDN base, and private-access behavior, plus a least-privilege expiring prefix only for disposable integration-test fixtures; add fake/policy integration tests proving no environment-specific business-media copies exist and fixtures cannot overwrite or delete canonical objects.
 - [ ] 4.4 Add a sanitized OSS-readiness audit reporting environment label, safe public/private resource identity, CDN host, public/private counts, production/test public/private key-checksum agreement, local references/reads/mounts, missing metadata, bounded public/private access checks, and audit time; prove credentials, permanent private URLs, and filesystem roots cannot appear.
 - [ ] 4.5 Expand `migrate-media --dry-run`/apply to every public and private persistent category, migrate by checksum with ownership/scope preservation, reconcile database/object counts and orphans, redirect compatible legacy public asset URLs to CDN, then disable local reads/mounts; verify idempotency, authorization, rollback-before-commit, and OSS-only cutover.
+- [ ] 4.6 Normalize public editorial image uploads to JPEG quality 85 and migrate all currently referenced public PNG city/scenic/stop/story covers to new immutable JPEG objects with transactional reference reconciliation and rollback-object retention.
 
 ## 5. Global Flutter audio session
 

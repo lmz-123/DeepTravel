@@ -43,3 +43,10 @@ Generating narration from the unified city-story editor SHALL synthesize the cur
 #### Scenario: Story narration is regenerated after an edit
 - **WHEN** an operator saves changed city-story content and generates narration
 - **THEN** the variant points to the matching new transcript revision and the former track is no longer eligible for that story
+
+### Requirement: Unified city stories retain one public cover
+Each unified city-story catalog item SHALL retain one operator-managed public cover image reference in addition to its canonical title/body/audio identity. The public collection and detail projections SHALL return that cover through the configured public OSS/CDN URL, and changing the cover MUST NOT copy or revise the story transcript or narration track.
+
+#### Scenario: Operator assigns a generated cover
+- **WHEN** an authorized operator uploads and selects a cover for an existing published city story
+- **THEN** the same catalog identity publishes the new public cover while its canonical transcript and narration track remain unchanged

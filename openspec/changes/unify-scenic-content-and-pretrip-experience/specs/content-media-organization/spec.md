@@ -60,6 +60,13 @@ Public editorial images and audio SHALL resolve only to the configured CDN base 
 - **WHEN** a supported old client requests `/api/v1/assets/<key>` after that key has been migrated
 - **THEN** the endpoint redirects to the canonical CDN URL and does not read a local media file
 
+### Requirement: Public editorial photographs use normalized JPEG objects
+Accepted public editorial images SHALL be decoded and stored as JPEG quality 85 before their checksum, immutable object key, MIME, and canonical URL are committed. Existing PNG city, scenic, stop, and city-story cover references SHALL be migrated to new JPEG objects and reconciled without deleting the prior OSS objects during rollback observation. Audio and private evidence bytes SHALL not be transformed by this rule.
+
+#### Scenario: Existing cover PNG is migrated
+- **WHEN** the reviewed migration processes an existing referenced public PNG cover
+- **THEN** it uploads one JPEG quality-85 object, updates the media row and every known content reference transactionally, and public APIs resolve the new `image/jpeg` URL
+
 ### Requirement: Full local-to-OSS migration is idempotent and terminal
 The system SHALL provide dry-run-capable checksum migration for every existing public and private persistent media category, SHALL update canonical references without changing content or ownership identity, and SHALL reconcile database rows, object counts, checksums, MIME, authorization scope, and orphan/missing reports. After the verified cutover, services MUST run without media host mounts or local media reads.
 
