@@ -18,6 +18,7 @@
 - [ ] 3.2 Apply the mapping transactionally with stable IDs and optimistic revision checks, retain audit output, and test repeat, partial-retry, stale-track, missing-source, and rollback cases.
 - [x] 3.3 Switch city-story collection/detail and random selection to the unified eligible catalog projection while preserving documented legacy read response shapes; make legacy writes delegate or reject as read-only and add compatibility tests.
 - [x] 3.4 Update seed/demo/package fixtures to expose one “城市故事” source and remove duplicate client-facing home-listening placement without hardcoded production story IDs; test empty/fallback city behavior.
+- [x] 3.5 Through the companion Admin API, generate and bind canonical city-story narration from the minimal editor, approve/publish the matching track with catalog lifecycle, and add one reviewed educational Shenzhen story without duplicate transcript or media identity.
 
 ## 4. Media hierarchy and OSS readiness
 
@@ -40,6 +41,7 @@
 - [x] 6.2 Render ordered free-form `experience_tags` for both legacy stops and managed fragments with a shared wrapping component, unknown-value support, and no empty placeholder; add model and widget tests proving tags do not affect home-card granularity/order.
 - [ ] 6.3 Place the scenic/manual carousel and its indicator before city stories, preserve the established 505/276 default scenic-card visual baseline while allowing measured accessibility growth, remove device-specific overall section offsets, and use normal sliver spacing; add regression tests for the default baseline, minimum supported phone, long bounded copy, safe areas, orientation, and 200% text scale.
 - [x] 6.4 Remove or redirect any separate client-facing “首页听故事” entry so current city-story cards reuse the unified detail/player, while preserving older deep links through compatibility routing; add navigation and semantics tests.
+- [x] 6.5 Include configured pre-departure narration in the same scenic coverage and generate-missing/regenerate-all batch as later story nodes; verify combined counts and current/stale matching.
 
 ## 7. Cross-repository verification and production delivery
 

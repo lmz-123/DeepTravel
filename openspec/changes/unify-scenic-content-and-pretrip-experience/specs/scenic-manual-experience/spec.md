@@ -30,6 +30,13 @@ The pre-departure surface SHALL expose one accessible play/pause/replay icon for
 - **WHEN** the approved narration is temporarily unavailable
 - **THEN** the text remains readable and the icon exposes a recoverable error/retry state without a false playing state
 
+### Requirement: Scenic narration batches include pre-departure
+When a scenic area has pre-departure text, administration coverage and batch narration generation SHALL treat that introduction and all later story nodes as one scenic content set using the selected voice profile. Regenerate-all MUST refresh both the introduction and every node; missing-only generation MUST include a missing or stale introduction without a separate generation command.
+
+#### Scenario: Regenerate all scenic narration
+- **WHEN** an operator regenerates all narration for a scenic area with pre-departure text and story nodes
+- **THEN** matching tracks are generated for the introduction and all nodes in one batch result
+
 ### Requirement: One global audio session includes pre-departure
 Pre-departure narration, city-story narration, and on-site narration SHALL participate in one global active-audio session. Starting one source SHALL stop the previously active source atomically; leaving the source page SHALL preserve eligible playback, and the existing floating orb SHALL reflect and restore the active source.
 

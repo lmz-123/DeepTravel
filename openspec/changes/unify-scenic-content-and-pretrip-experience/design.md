@@ -49,6 +49,8 @@ An idempotent migration/application command keys each legacy publication by cano
 
 Alternative considered: keep both tables editable and merge only in Flutter. Rejected because publication state and track selection would continue to drift.
 
+The minimal city-story editor may generate narration, but that command writes a `StoryNarrationTrack` for the existing canonical arc and updates the catalog variant reference; it does not add transcript columns or duplicate the story body. Catalog verification approves the matching current track, and publication promotes the same track and variant together.
+
 ### 5. Derive media hierarchy over an OSS-only shared resource set
 
 The backend/admin projection joins `media_assets` and private media/evidence records to city covers, route covers, stops, fragments, narration tracks, story variants, pre-departure tracks, community content, footprints, and user evidence. It returns one asset with a list of typed usages and derived city/route/user scopes appropriate to the caller. Multiple content scopes mark a public asset shared; zero usages mark it unassigned. This avoids adding a false single-owner foreign key to reusable assets and never exposes private ownership to unauthorized callers.

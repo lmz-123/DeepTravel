@@ -36,3 +36,10 @@ Legacy public home-story read endpoints MAY remain during a measured compatibili
 #### Scenario: Unified story becomes ineligible
 - **WHEN** its canonical story or approved track is withdrawn or becomes stale
 - **THEN** both the unified entry and compatibility read exclude it consistently
+
+### Requirement: Administration-generated narration stays canonical
+Generating narration from the unified city-story editor SHALL synthesize the current canonical story transcript, store one public OSS track for its transcript revision and voice profile, and bind the catalog variant to that track. The operation MUST NOT copy the story body or create a second city-story identity.
+
+#### Scenario: Story narration is regenerated after an edit
+- **WHEN** an operator saves changed city-story content and generates narration
+- **THEN** the variant points to the matching new transcript revision and the former track is no longer eligible for that story
