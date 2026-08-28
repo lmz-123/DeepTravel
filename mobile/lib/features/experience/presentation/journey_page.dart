@@ -112,24 +112,6 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
         if (!didPop) context.go('/');
       },
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: AppColors.ink,
-          foregroundColor: AppColors.white,
-          leading: IconButton(
-              tooltip: '返回首页',
-              onPressed: () => context.go('/'),
-              icon: const Icon(Icons.arrow_back_rounded)),
-          title: const Text('行走中的故事'),
-          actions: [
-            IconButton(
-                tooltip: '故事线索簿',
-                onPressed: ledger == null ? null : () => _showLedger(ledger),
-                icon: Badge(
-                    label: Text('${ledger?.collectedCount ?? 0}'),
-                    child: const Icon(Icons.auto_stories_outlined))),
-            const SizedBox(width: 8)
-          ],
-        ),
         bottomNavigationBar: TravelerBottomNavigation(
           active: TravelerSection.journey,
           journeyId: widget.journeyId,
@@ -137,82 +119,123 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
         body: SafeArea(
           top: false,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+            padding: EdgeInsets.zero,
             children: [
               _JourneyMapHeader(
                 routeTitle: state.route!.title,
                 pointCount: manifest.fragments.length,
                 collectedCount: ledger?.collectedCount ?? 0,
+                onBack: () => context.go('/'),
+                onLedger: ledger == null ? null : () => _showLedger(ledger),
               ),
-              const SizedBox(height: 18),
-              _StatusPanel(state: state),
-              const SizedBox(height: 20),
-              Text(manifest.centralQuestion,
-                  style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 18),
-              _FragmentRail(manifest: manifest, ledger: ledger),
-              const SizedBox(height: 14),
-              _SelectedNodeDetail(
-                manifest: manifest,
-                ledger: ledger,
-                selectedFragmentId: selectedFragmentId,
-                points: state.nearbyStoryPoints,
-                isLoading: state.isBusy || ledger == null,
-              ),
-              const SizedBox(height: 22),
-              AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 380),
-                  child: state.current == null
-                      ? _ListeningCard(
-                          key: const ValueKey('listening'), state: state)
-                      : _NarrationCard(
-                          key: ValueKey(state.current!.id), state: state)),
-              if (ledger != null) ...[
-                if (selectedFragment?.mission != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 18),
-                    child:
-                        _MissionCard(fragment: selectedFragment!, state: state),
+              Transform.translate(
+                offset: const Offset(0, -16),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 44),
+                  decoration: const BoxDecoration(
+                    color: AppColors.paper,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(28)),
                   ),
-              ],
-              if (state.locationMode == TourLocationMode.simulated) ...[
-                const SizedBox(height: 18),
-                OutlinedButton.icon(
-                    onPressed: state.isBusy || state.status != 'simulated'
-                        ? null
-                        : () => ref
-                            .read(activeTourControllerProvider.notifier)
-                            .triggerNextDemo(),
-                    icon: state.isBusy
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.my_location_rounded),
-                    label: Text(state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）')),
-              ],
-              if (state.playbackMode == TourPlaybackMode.liveReplay &&
-                  state.liveFragmentId != null) ...[
-                const SizedBox(height: 10),
-                TextButton.icon(
-                  onPressed: () => ref
-                      .read(activeTourControllerProvider.notifier)
-                      .returnToLive(),
-                  icon: const Icon(Icons.directions_walk_rounded),
-                  label: const Text('回到当前行走进度'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '空间上自由 · 故事上有序',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.terracotta,
+                              letterSpacing: 1.1,
+                            ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        manifest.centralQuestion,
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 18),
+                      _FragmentRail(manifest: manifest, ledger: ledger),
+                      const SizedBox(height: 14),
+                      _SelectedNodeDetail(
+                        manifest: manifest,
+                        ledger: ledger,
+                        selectedFragmentId: selectedFragmentId,
+                        points: state.nearbyStoryPoints,
+                        isLoading: state.isBusy || ledger == null,
+                      ),
+                      const SizedBox(height: 18),
+                      _StatusPanel(state: state),
+                      const SizedBox(height: 14),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 380),
+                        child: state.current == null
+                            ? _ListeningCard(
+                                key: const ValueKey('listening'), state: state)
+                            : _NarrationCard(
+                                key: ValueKey(state.current!.id), state: state),
+                      ),
+                      if (ledger != null && selectedFragment?.mission != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 18),
+                          child: _MissionCard(
+                            fragment: selectedFragment!,
+                            state: state,
+                          ),
+                        ),
+                      if (state.locationMode == TourLocationMode.simulated) ...[
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: state.isBusy ||
+                                    state.status != 'simulated'
+                                ? null
+                                : () => ref
+                                    .read(activeTourControllerProvider.notifier)
+                                    .triggerNextDemo(),
+                            icon: state.isBusy
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.my_location_rounded),
+                            label:
+                                Text(state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）'),
+                          ),
+                        ),
+                      ],
+                      if (state.playbackMode == TourPlaybackMode.liveReplay &&
+                          state.liveFragmentId != null) ...[
+                        const SizedBox(height: 10),
+                        TextButton.icon(
+                          onPressed: () => ref
+                              .read(activeTourControllerProvider.notifier)
+                              .returnToLive(),
+                          icon: const Icon(Icons.directions_walk_rounded),
+                          label: const Text('回到当前行走进度'),
+                        ),
+                      ],
+                      if (state.errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: Text(
+                            state.errorMessage!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      if (userId != null && selectedFragment != null)
+                        NodeCommunitySection(
+                          userId: userId,
+                          journeyId: widget.journeyId,
+                          fragment: selectedFragment,
+                        ),
+                    ],
+                  ),
                 ),
-              ],
-              if (state.errorMessage != null)
-                Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: Text(state.errorMessage!,
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.error))),
-              if (userId != null && selectedFragment != null)
-                NodeCommunitySection(
-                  userId: userId,
-                  journeyId: widget.journeyId,
-                  fragment: selectedFragment,
-                ),
+              ),
             ],
           ),
         ),
@@ -461,33 +484,77 @@ class _JourneyMapHeader extends StatelessWidget {
     required this.routeTitle,
     required this.pointCount,
     required this.collectedCount,
+    required this.onBack,
+    required this.onLedger,
   });
 
   final String routeTitle;
   final int pointCount;
   final int collectedCount;
+  final VoidCallback onBack;
+  final VoidCallback? onLedger;
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 190,
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 15),
-        decoration: const BoxDecoration(
-          color: AppColors.ink,
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+        height: 286 + MediaQuery.paddingOf(context).top,
+        padding: EdgeInsets.fromLTRB(
+          16,
+          MediaQuery.paddingOf(context).top + 10,
+          16,
+          30,
         ),
+        color: AppColors.ink,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              routeTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.gold,
-                    letterSpacing: 1,
+            Row(
+              children: [
+                IconButton.filledTonal(
+                  tooltip: '返回首页',
+                  onPressed: onBack,
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.white.withValues(alpha: .1),
+                    foregroundColor: AppColors.white,
                   ),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        '行走中的故事',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.gold,
+                              letterSpacing: 1.2,
+                            ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        routeTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(color: AppColors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.filledTonal(
+                  tooltip: '故事线索簿',
+                  onPressed: onLedger,
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.white.withValues(alpha: .1),
+                    foregroundColor: AppColors.white,
+                  ),
+                  icon: Badge(
+                    label: Text('$collectedCount'),
+                    child: const Icon(Icons.auto_stories_outlined),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 9),
             Expanded(
               child: CustomPaint(
                 painter: _JourneyRoutePainter(
@@ -497,36 +564,33 @@ class _JourneyMapHeader extends StatelessWidget {
                 child: const SizedBox.expand(),
               ),
             ),
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.white.withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox.square(
+                    dimension: 7,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
                         color: AppColors.gold,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '正在寻找附近的历史线索',
-                      style: TextStyle(
-                        color: AppColors.white.withValues(alpha: .82),
-                        fontSize: 11,
-                      ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '正在寻找附近的历史线索',
+                    style: TextStyle(
+                      color: AppColors.white.withValues(alpha: .82),
+                      fontSize: 11,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -869,7 +933,25 @@ class _FragmentRail extends ConsumerWidget {
           ),
         ));
       }
-      final rail = Row(mainAxisSize: MainAxisSize.min, children: nodes);
+      final railWidth = nodeExtent * count + spacing * math.max(0, count - 1);
+      final rail = SizedBox(
+        width: railWidth,
+        child: Stack(
+          children: [
+            if (count > 1)
+              Positioned(
+                left: nodeExtent / 2,
+                right: nodeExtent / 2,
+                top: nodeExtent / 2 - .5,
+                child: Container(
+                  height: 1,
+                  color: AppColors.ink.withValues(alpha: .18),
+                ),
+              ),
+            Row(mainAxisSize: MainAxisSize.min, children: nodes),
+          ],
+        ),
+      );
       if (scrollable) {
         return SingleChildScrollView(
           key: const ValueKey('fragment-node-rail-scroll'),

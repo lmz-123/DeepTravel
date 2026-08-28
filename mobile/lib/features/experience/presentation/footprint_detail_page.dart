@@ -100,7 +100,8 @@ class _FootprintEditorState extends ConsumerState<_FootprintEditor> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 44),
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            height: 270,
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: AppColors.ink,
               borderRadius: BorderRadius.circular(26),
@@ -112,39 +113,61 @@ class _FootprintEditorState extends ConsumerState<_FootprintEditor> {
                 ),
               ],
             ),
-            child: Row(children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${entry.cityName} · ${entry.sceneTitle}',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: AppColors.gold,
-                            letterSpacing: 1,
-                          ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (entry.photo != null)
+                  _PrivateFootprintPhoto(entry: entry, fill: true),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x22142B33), Color(0xEE142B33)],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      entry.storyTitle,
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(color: AppColors.white),
+                  ),
+                ),
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: IconButton.filledTonal(
+                    tooltip: '生成分享卡',
+                    onPressed: _busy ? null : () => _share(entry),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.white.withValues(alpha: .14),
+                      foregroundColor: AppColors.white,
                     ),
-                  ],
+                    icon: const Icon(Icons.ios_share_rounded),
+                  ),
                 ),
-              ),
-              IconButton.filledTonal(
-                tooltip: '生成分享卡',
-                onPressed: _busy ? null : () => _share(entry),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.white.withValues(alpha: .12),
-                  foregroundColor: AppColors.white,
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 21,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${entry.cityName} · ${entry.sceneTitle}',
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: AppColors.gold,
+                                  letterSpacing: 1,
+                                ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        entry.storyTitle,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(color: AppColors.white),
+                      ),
+                    ],
+                  ),
                 ),
-                icon: const Icon(Icons.ios_share_rounded),
-              ),
-            ]),
+              ],
+            ),
           ),
           if (entry.isPartialJourney) ...[
             const SizedBox(height: 12),
@@ -432,8 +455,9 @@ class _Section extends StatelessWidget {
 }
 
 class _PrivateFootprintPhoto extends ConsumerWidget {
-  const _PrivateFootprintPhoto({required this.entry});
+  const _PrivateFootprintPhoto({required this.entry, this.fill = false});
   final FootprintEntry entry;
+  final bool fill;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserIdProvider);
@@ -441,19 +465,18 @@ class _PrivateFootprintPhoto extends ConsumerWidget {
     if (userId == null || photo == null) return const SizedBox.shrink();
     final bytes = ref.watch(footprintPhotoBytesProvider(
         FootprintPhotoBytesKey(userId, entry.id, photo)));
+    final image = bytes.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const ColoredBox(
+        color: AppColors.paperDeep,
+        child: Center(child: Text('私人照片暂时无法读取')),
+      ),
+      data: (value) => Image.memory(value, fit: BoxFit.cover),
+    );
+    if (fill) return SizedBox.expand(child: image);
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: AspectRatio(
-        aspectRatio: 4 / 3,
-        child: bytes.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const ColoredBox(
-            color: AppColors.paperDeep,
-            child: Center(child: Text('私人照片暂时无法读取')),
-          ),
-          data: (value) => Image.memory(value, fit: BoxFit.cover),
-        ),
-      ),
+      child: AspectRatio(aspectRatio: 4 / 3, child: image),
     );
   }
 }
@@ -472,16 +495,60 @@ class _RelatedContent extends ConsumerWidget {
           : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('还可以读读这座城市', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 10),
-              for (final item in items)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.auto_stories_outlined),
-                    title: Text(item.title),
-                    subtitle: Text(item.summary,
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
-                    onTap: () => context.push('/story/${item.id}'),
-                  ),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: .92,
                 ),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return Material(
+                    color: index.isEven ? AppColors.ink : AppColors.moss,
+                    borderRadius: BorderRadius.circular(22),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => context.push('/story/${item.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.auto_stories_outlined,
+                              color: AppColors.gold,
+                            ),
+                            const Spacer(),
+                            Text(
+                              item.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(color: AppColors.white),
+                            ),
+                            const SizedBox(height: 7),
+                            Text(
+                              item.summary,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppColors.white.withValues(alpha: .68),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ]),
     );
   }

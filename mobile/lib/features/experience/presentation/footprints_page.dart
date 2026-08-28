@@ -329,55 +329,17 @@ class _FootprintCard extends StatelessWidget {
           child: InkWell(
             onTap: () => context.push('/footprints/${item.id}'),
             child: SizedBox(
-              height: 150,
+              height: 126,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    width: 112,
-                    child: DecoratedBox(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [AppColors.moss, AppColors.inkSoft],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            item.photo == null
-                                ? Icons.auto_stories_outlined
-                                : Icons.photo_outlined,
-                            color: AppColors.gold,
-                            size: 27,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            item.cityName,
-                            style: const TextStyle(
-                              color: AppColors.white,
-                              fontSize: 11,
-                            ),
-                          ),
-                          if (item.isPartialJourney) ...[
-                            const SizedBox(height: 5),
-                            const Text(
-                              '漫游未完成',
-                              style: TextStyle(
-                                color: AppColors.white,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                    width: 120,
+                    child: _FootprintThumbnail(item: item),
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(15, 14, 12, 13),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 11, 11),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -395,21 +357,33 @@ class _FootprintCard extends StatelessWidget {
                                 ),
                               ),
                               if (item.isPartialJourney)
-                                const Icon(
-                                  Icons.directions_walk_rounded,
-                                  size: 16,
-                                  color: AppColors.moss,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.paperDeep,
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                  child: const Text(
+                                    '漫游未完成',
+                                    style: TextStyle(
+                                      color: AppColors.moss,
+                                      fontSize: 9,
+                                    ),
+                                  ),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             item.storyTitle,
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             item.selectedSummaryText ?? item.editorialSummary,
                             maxLines: 2,
@@ -444,6 +418,109 @@ class _FootprintCard extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _FootprintThumbnail extends ConsumerWidget {
+  const _FootprintThumbnail({required this.item});
+
+  final FootprintEntry item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userId = ref.watch(currentUserIdProvider);
+    final photo = item.photo;
+    if (userId != null && photo != null) {
+      final bytes = ref.watch(
+        footprintPhotoBytesProvider(
+          FootprintPhotoBytesKey(userId, item.id, photo),
+        ),
+      );
+      return bytes.when(
+        data: (value) => Image.memory(
+          value,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => _FootprintPlaceholder(item: item),
+        ),
+        loading: () => const ColoredBox(
+          color: AppColors.paperDeep,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        error: (_, __) => _FootprintPlaceholder(item: item),
+      );
+    }
+    return _FootprintPlaceholder(item: item);
+  }
+}
+
+class _FootprintPlaceholder extends StatelessWidget {
+  const _FootprintPlaceholder({required this.item});
+
+  final FootprintEntry item;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: const BoxDecoration(color: AppColors.ink),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CustomPaint(painter: _FootprintTexturePainter()),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Icon(
+                    Icons.auto_stories_outlined,
+                    color: AppColors.gold,
+                    size: 22,
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    item.cityName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _FootprintTexturePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.gold.withValues(alpha: .18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    final path = Path()
+      ..moveTo(-10, size.height * .72)
+      ..cubicTo(
+        size.width * .2,
+        size.height * .2,
+        size.width * .55,
+        size.height * .95,
+        size.width + 8,
+        size.height * .28,
+      );
+    canvas.drawPath(path, paint);
+    canvas.drawCircle(
+      Offset(size.width * .72, size.height * .28),
+      19,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 String _date(DateTime value) {

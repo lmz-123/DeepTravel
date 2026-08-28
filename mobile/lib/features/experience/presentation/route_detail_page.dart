@@ -49,7 +49,7 @@ class _RouteDetail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final journey = ref.watch(journeyControllerProvider);
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final heroHeight = 360.0 + ((textScale - 1).clamp(0.0, 1.0) * 110.0);
+    final heroHeight = 330.0 + ((textScale - 1).clamp(0.0, 1.0) * 110.0);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -131,56 +131,60 @@ class _RouteDetail extends ConsumerWidget {
               ),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-            sliver: SliverList.list(
-              children: [
-                const _ManualTabs(),
-                const SizedBox(height: 20),
-                if (route.predeparture?.available ?? false) ...[
-                  _PredepartureSurface(route: route),
-                  const SizedBox(height: 18),
-                ],
-                _Metrics(route: route),
-                if (route.audioTour != null) ...[
-                  const SizedBox(height: 26),
-                  _AudioTourBrief(manifest: route.audioTour!),
-                ],
-                if (route.pretrip?.available ?? false) ...[
-                  const SizedBox(height: 26),
-                  _PretripSection(pretrip: route.pretrip!),
-                ],
-                const SizedBox(height: 28),
-                Text(route.audioTour == null ? '这一路，你会看见什么' : '这一路，你会追问什么',
-                    style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 12),
-                Text(route.description,
-                    style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: 28),
-                RouteCanvas(stops: route.stops),
-                const SizedBox(height: 30),
-                Text(route.audioTour == null ? '五次停留' : '五段不剧透的线索',
-                    style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 18),
-                if (route.audioTour == null)
-                  ...route.stops.map((stop) =>
-                      _StopRow(stop: stop, isLast: stop == route.stops.last))
-                else
-                  ...route.audioTour!.fragments.map((fragment) =>
-                      _FragmentPreviewRow(
-                          fragment: fragment,
-                          isLast: fragment == route.audioTour!.fragments.last)),
-                if (!route.isPublished) ...[
-                  const SizedBox(height: 22),
-                  const _EditorialNotice(),
-                ],
-                if (journey.errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Text(journey.errorMessage!,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error)),
-                ],
-              ],
+          SliverToBoxAdapter(
+            child: Transform.translate(
+              offset: const Offset(0, -16),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 25, 20, 40),
+                decoration: const BoxDecoration(
+                  color: AppColors.paper,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _ManualTabs(),
+                    const SizedBox(height: 22),
+                    if (route.predeparture?.available ?? false) ...[
+                      _PredepartureSurface(route: route),
+                      const SizedBox(height: 18),
+                    ],
+                    _Metrics(route: route),
+                    const SizedBox(height: 25),
+                    _HowToWalkCard(route: route),
+                    const SizedBox(height: 16),
+                    _PreparationCard(route: route),
+                    const SizedBox(height: 16),
+                    _RouteStoryCard(route: route),
+                    if (route.pretrip?.available ?? false) ...[
+                      const SizedBox(height: 16),
+                      _PretripSection(pretrip: route.pretrip!),
+                    ],
+                    const SizedBox(height: 28),
+                    Text(
+                      route.audioTour == null ? '这一路，你会看见什么' : '故事方向',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    _ClueSurface(route: route),
+                    const SizedBox(height: 20),
+                    _AboutManualCard(route: route),
+                    if (!route.isPublished) ...[
+                      const SizedBox(height: 18),
+                      const _EditorialNotice(),
+                    ],
+                    if (journey.errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        journey.errorMessage!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -439,6 +443,7 @@ class _Metrics extends StatelessWidget {
         Icons.headphones_rounded,
         '${route.audioTour?.fragments.length ?? route.stops.length} ${route.audioTour == null ? '站停留' : '段讲述'}'
       ),
+      (Icons.alt_route_rounded, '自由顺序'),
     ];
     return Wrap(
       runSpacing: 10,
@@ -462,53 +467,314 @@ class _Metrics extends StatelessWidget {
   }
 }
 
-class _AudioTourBrief extends ConsumerWidget {
-  const _AudioTourBrief({required this.manifest});
-  final AudioTourManifest manifest;
+class _HowToWalkCard extends ConsumerWidget {
+  const _HowToWalkCard({required this.route});
+
+  final RouteExperience route;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final size = (manifest.downloadSizeBytes / 1024 / 1024).toStringAsFixed(1);
-    final modeState = ref.watch(locationModeControllerProvider);
-    final mode = modeState.asData?.value ?? TourLocationMode.real;
-    final isSimulated = mode == TourLocationMode.simulated;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-          color: AppColors.ink, borderRadius: BorderRadius.circular(22)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
-          Icon(Icons.headphones_rounded, color: AppColors.gold),
-          SizedBox(width: 10),
-          Text('耳机优先的定位导览',
-              style: TextStyle(
-                  color: AppColors.white, fontWeight: FontWeight.w700))
-        ]),
-        const SizedBox(height: 14),
-        Text(manifest.centralQuestion,
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(color: AppColors.white)),
-        const SizedBox(height: 14),
-        Text(
-            isSimulated
-                ? '开始后将准备约 $size MB 音频。模拟定位不会读取真实位置，也不会申请定位权限；你可以手动推进线索。'
-                : '开始后将准备约 $size MB 音频，并申请行走期间的位置、通知与拍照权限。锁屏时系统仍可能限制定位，应用会如实显示暂停状态。',
-            style: TextStyle(
-                color: AppColors.white.withValues(alpha: .78), height: 1.55)),
-        const SizedBox(height: 12),
-        Text(
-          isSimulated ? '当前使用设置中的模拟定位模式' : '当前使用设置中的真实定位模式',
-          style: TextStyle(
-              color: AppColors.white.withValues(alpha: .68), fontSize: 12),
-        ),
-        const SizedBox(height: 8),
-        Text(manifest.demoLabel ?? '内容已完成审核',
-            style: const TextStyle(color: AppColors.gold)),
-      ]),
+    final mode = ref.watch(locationModeControllerProvider).asData?.value ??
+        TourLocationMode.real;
+    return _ManualCard(
+      eyebrow: '行走方式',
+      title: '这一路，你会怎样行走',
+      child: Column(
+        children: [
+          _InstructionRow(
+            icon: Icons.alt_route_rounded,
+            title: '没有必须照走的固定路线',
+            body: '从任意景点开始都可以，故事会保留自己的阅读顺序。',
+          ),
+          _InstructionRow(
+            icon: Icons.headphones_rounded,
+            title: '走近景点，听见讲述',
+            body: route.audioTour == null
+                ? '抵达每一次停留后，打开对应的城市故事。'
+                : '真实定位模式会在接近节点时准备讲述，也可以随时手动打开。',
+          ),
+          const _InstructionRow(
+            icon: Icons.visibility_outlined,
+            title: '观察与拍照都由你决定',
+            body: '现场任务只是邀请，不完成也不会阻断后面的内容。',
+            last: true,
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              mode == TourLocationMode.simulated
+                  ? '当前使用设置中的模拟定位模式'
+                  : '当前使用设置中的真实定位模式',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.moss,
+                  ),
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
+
+class _PreparationCard extends ConsumerWidget {
+  const _PreparationCard({required this.route});
+
+  final RouteExperience route;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key = OfflinePackageKey(route.slug, route.audioTour?.scriptVersion);
+    final status = ref.watch(offlinePackageControllerProvider(key));
+    final package = status.asData?.value ?? const OfflinePackageStatus.idle();
+    final downloading = package.phase == OfflinePackagePhase.downloading;
+    final label = switch (package.phase) {
+      OfflinePackagePhase.idle => '下载离线内容',
+      OfflinePackagePhase.downloading => package.total > 0
+          ? '正在准备 ${package.complete}/${package.total}'
+          : '正在准备…',
+      OfflinePackagePhase.complete => '离线内容已准备',
+      OfflinePackagePhase.stale => '更新离线内容',
+      OfflinePackagePhase.failed => '重试下载',
+    };
+    final tags = route.pretrip?.companionTags ?? const <String>[];
+    return _ManualCard(
+      eyebrow: '出发前准备',
+      title: '轻装出发，也留一点余量',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: (tags.isEmpty
+                    ? const ['建议佩戴耳机', '穿适合步行的鞋', '留意天气']
+                    : tags.take(4))
+                .map((tag) => Chip(label: Text(tag)))
+                .toList(growable: false),
+          ),
+          const SizedBox(height: 13),
+          const Text('提前下载后，网络不稳定时仍可继续听讲述；位置触发是否可用取决于系统定位状态。'),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed:
+                  route.audioTour == null || downloading || package.isUsable
+                      ? null
+                      : () => ref
+                          .read(offlinePackageControllerProvider(key).notifier)
+                          .download(route),
+              icon: downloading
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(package.isUsable
+                      ? Icons.download_done_rounded
+                      : Icons.download_outlined),
+              label: Text(route.audioTour == null ? '暂无离线音频' : label),
+            ),
+          ),
+          if (package.message != null) ...[
+            const SizedBox(height: 8),
+            Text(package.message!,
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteStoryCard extends StatelessWidget {
+  const _RouteStoryCard({required this.route});
+
+  final RouteExperience route;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.ink,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RouteCanvas(stops: route.stops, height: 174, dark: true),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 21),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '路线不是命令，是一张故事地图',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(color: AppColors.white),
+                  ),
+                  const SizedBox(height: 9),
+                  Text(
+                    route.audioTour?.centralQuestion ?? route.description,
+                    style: TextStyle(
+                      color: AppColors.white.withValues(alpha: .75),
+                      height: 1.55,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _ClueSurface extends StatelessWidget {
+  const _ClueSurface({required this.route});
+
+  final RouteExperience route;
+
+  @override
+  Widget build(BuildContext context) {
+    final children = route.audioTour == null
+        ? route.stops
+            .map((stop) => _StopRow(
+                  stop: stop,
+                  isLast: stop == route.stops.last,
+                ))
+            .toList(growable: false)
+        : route.audioTour!.fragments
+            .map((fragment) => _FragmentPreviewRow(
+                  fragment: fragment,
+                  isLast: fragment == route.audioTour!.fragments.last,
+                ))
+            .toList(growable: false);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 0),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _AboutManualCard extends StatelessWidget {
+  const _AboutManualCard({required this.route});
+
+  final RouteExperience route;
+
+  @override
+  Widget build(BuildContext context) => _ManualCard(
+        eyebrow: '关于这条手册',
+        title: route.theme,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              route.description,
+              style:
+                  Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.65),
+            ),
+            const SizedBox(height: 15),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(label: Text(route.difficulty)),
+                Chip(label: Text('${route.numberOfStops} 个故事节点')),
+                if (!route.isPublished) const Chip(label: Text('内容预览中')),
+              ],
+            ),
+          ],
+        ),
+      );
+}
+
+class _ManualCard extends StatelessWidget {
+  const _ManualCard({
+    required this.eyebrow,
+    required this.title,
+    required this.child,
+  });
+
+  final String eyebrow;
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.line.withValues(alpha: .7)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              eyebrow,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: AppColors.terracotta, letterSpacing: 1.1),
+            ),
+            const SizedBox(height: 6),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 15),
+            child,
+          ],
+        ),
+      );
+}
+
+class _InstructionRow extends StatelessWidget {
+  const _InstructionRow({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.last = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(bottom: last ? 0 : 17),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: AppColors.paperDeep,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 19, color: AppColors.moss),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(body, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _FragmentPreviewRow extends StatelessWidget {

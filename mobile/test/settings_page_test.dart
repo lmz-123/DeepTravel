@@ -73,6 +73,8 @@ void main() {
     expect(await preferences.readPlaybackSpeed('user-a'), 1.25);
     expect(player.speed, 1.25);
 
+    await tester.ensureVisible(find.text('仅 Wi-Fi'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('仅 Wi-Fi'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('手动').last);
@@ -82,6 +84,12 @@ void main() {
       DownloadPolicy.manual,
     );
 
+    await tester.scrollUntilVisible(
+      find.byType(Switch),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     expect(location.mode, TourLocationMode.simulated);

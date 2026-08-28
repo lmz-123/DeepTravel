@@ -16,6 +16,7 @@ class RecapPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final recap = ref.watch(recapProvider(journeyId));
     return Scaffold(
+      backgroundColor: AppColors.ink,
       body: recap.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
@@ -47,10 +48,7 @@ class _RecapContent extends StatelessWidget {
           child: Container(
             padding: EdgeInsets.fromLTRB(
                 24, MediaQuery.paddingOf(context).top + 26, 24, 36),
-            decoration: const BoxDecoration(
-              color: AppColors.ink,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(34)),
-            ),
+            color: AppColors.ink,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -70,15 +68,14 @@ class _RecapContent extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 42),
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: const BoxDecoration(
-                      color: AppColors.gold, shape: BoxShape.circle),
-                  child: const Icon(Icons.auto_awesome_rounded,
-                      color: AppColors.ink, size: 28),
+                Text(
+                  '行走回顾',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.gold,
+                        letterSpacing: 1.2,
+                      ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 Text(
                   '你走完的不是一条路线，\n而是几种看城市的方式。',
                   style: Theme.of(context)
@@ -107,11 +104,14 @@ class _RecapContent extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 48),
           sliver: SliverList.list(
             children: [
               Text('这次行走留下的见识',
-                  style: Theme.of(context).textTheme.headlineMedium),
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineMedium
+                      ?.copyWith(color: AppColors.white)),
               const SizedBox(height: 18),
               ...recap.insights.indexed
                   .map((entry) => _Insight(index: entry.$1, item: entry.$2)),
@@ -119,14 +119,16 @@ class _RecapContent extends StatelessWidget {
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.terracotta,
+                  foregroundColor: AppColors.white,
+                  minimumSize: const Size.fromHeight(54),
                 ),
                 onPressed: () => context.go('/footprints'),
                 icon: const Icon(Icons.edit_note_rounded),
-                label: const Text('查看并整理足迹'),
+                label: const Text('整理这次足迹'),
               ),
               const SizedBox(height: 10),
               PrimaryAction(
-                label: '回到发现页',
+                label: '回到发现',
                 icon: Icons.explore_outlined,
                 onPressed: () => context.go('/'),
               ),
@@ -172,7 +174,11 @@ class _Insight extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Row(

@@ -30,6 +30,8 @@ void main() {
         findsOneWidget);
     expect(find.text('老树旁不挡路的位置'), findsNothing);
 
+    await tester.ensureVisible(find.text('可选的现场留念'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('可选的现场留念'));
     await tester.pumpAndSettle();
 

@@ -492,9 +492,12 @@ void main() {
     expect(find.text('设置模式：模拟定位'), findsOneWidget);
     expect(find.byType(Switch), findsNothing);
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('暂停自动导览'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('暂停自动导览'));
     await tester.pump();
     expect(find.byTooltip('继续自动导览'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('继续自动导览'));
     await tester.tap(find.byTooltip('继续自动导览'));
     await tester.pump();
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);

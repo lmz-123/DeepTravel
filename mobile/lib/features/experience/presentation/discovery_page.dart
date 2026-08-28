@@ -320,17 +320,21 @@ class _CityStoryModules extends StatelessWidget {
                   ),
                 )
               else
-                SizedBox(
-                  height: 190,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: module.items.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 14),
-                    itemBuilder: (context, index) => _CityStoryCardView(
-                      card: module.items[index],
-                      primary: false,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: .92,
                     ),
+                    itemCount: module.items.length,
+                    itemBuilder: (context, index) =>
+                        _MiniStoryCard(card: module.items[index]),
                   ),
                 ),
             ],
@@ -339,6 +343,83 @@ class _CityStoryModules extends StatelessWidget {
       }).toList(growable: false),
     );
   }
+}
+
+class _MiniStoryCard extends StatelessWidget {
+  const _MiniStoryCard({required this.card});
+
+  final CityStoryCard card;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => context.push('/story/${card.story.id}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    EditorialImage(source: card.story.coverImage),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0x88142b33)],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 12,
+                      bottom: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.paper.withValues(alpha: .9),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Text(
+                          card.contentType,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(13, 11, 11, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        card.story.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 17,
+                      color: AppColors.moss,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 class _PrimaryStoryRow extends StatelessWidget {
@@ -393,83 +474,6 @@ class _PrimaryStoryRow extends StatelessWidget {
                     child: Icon(
                       Icons.play_circle_outline_rounded,
                       color: AppColors.moss,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-}
-
-class _CityStoryCardView extends StatelessWidget {
-  const _CityStoryCardView({required this.card, required this.primary});
-
-  final CityStoryCard card;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        label: '${card.contentType}：${card.story.title}',
-        child: SizedBox(
-          width: primary ? 300 : 240,
-          child: Material(
-            clipBehavior: Clip.antiAlias,
-            color: AppColors.ink,
-            borderRadius: BorderRadius.circular(26),
-            child: InkWell(
-              key: primary ? const ValueKey('home-random-story-action') : null,
-              onTap: () => context.push('/story/${card.story.id}'),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  EditorialImage(source: card.story.coverImage),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xdd17201c)],
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          card.contentType,
-                          style: const TextStyle(
-                            color: AppColors.gold,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          card.story.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(color: AppColors.white),
-                        ),
-                        if (card.themes.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            card.themes.join(' · '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.white.withValues(alpha: .75),
-                            ),
-                          ),
-                        ],
-                      ],
                     ),
                   ),
                 ],
@@ -718,7 +722,7 @@ class _CitySelectionSheetState extends State<_CitySelectionSheet> {
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
                       childAspectRatio:
-                          MediaQuery.sizeOf(context).width < 700 ? 2.05 : 1.05,
+                          MediaQuery.sizeOf(context).width < 700 ? 3.25 : 1.05,
                     ),
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {

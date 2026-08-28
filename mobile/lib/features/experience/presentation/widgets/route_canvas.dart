@@ -11,11 +11,13 @@ class RouteCanvas extends StatelessWidget {
     super.key,
     this.currentPosition,
     this.height = 220,
+    this.dark = false,
   });
 
   final List<ExperienceStop> stops;
   final int? currentPosition;
   final double height;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
@@ -24,13 +26,16 @@ class RouteCanvas extends StatelessWidget {
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          color: const Color(0xFFE9E4D8),
+          color: dark ? AppColors.inkSoft : const Color(0xFFE9E4D8),
           borderRadius: BorderRadius.circular(24),
         ),
         clipBehavior: Clip.antiAlias,
         child: CustomPaint(
-          painter:
-              _RoutePainter(stops: stops, currentPosition: currentPosition),
+          painter: _RoutePainter(
+            stops: stops,
+            currentPosition: currentPosition,
+            dark: dark,
+          ),
           child: const SizedBox.expand(),
         ),
       ),
@@ -39,14 +44,21 @@ class RouteCanvas extends StatelessWidget {
 }
 
 class _RoutePainter extends CustomPainter {
-  _RoutePainter({required this.stops, required this.currentPosition});
+  _RoutePainter({
+    required this.stops,
+    required this.currentPosition,
+    required this.dark,
+  });
 
   final List<ExperienceStop> stops;
   final int? currentPosition;
+  final bool dark;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final background = Paint()..color = AppColors.ink.withValues(alpha: 0.035);
+    final background = Paint()
+      ..color = (dark ? AppColors.white : AppColors.ink)
+          .withValues(alpha: dark ? .055 : .035);
     for (var i = -2; i < 7; i++) {
       canvas.drawLine(
         Offset(i * 58.0, 0),
@@ -91,15 +103,25 @@ class _RoutePainter extends CustomPainter {
       canvas.drawCircle(
         p,
         isCurrent ? 11 : 8,
-        Paint()..color = isCurrent ? AppColors.terracotta : AppColors.ink,
+        Paint()
+          ..color = isCurrent
+              ? AppColors.terracotta
+              : dark
+                  ? AppColors.gold
+                  : AppColors.ink,
       );
-      canvas.drawCircle(p, isCurrent ? 5 : 3, Paint()..color = AppColors.paper);
+      canvas.drawCircle(
+        p,
+        isCurrent ? 5 : 3,
+        Paint()..color = dark ? AppColors.ink : AppColors.paper,
+      );
     }
   }
 
   @override
   bool shouldRepaint(covariant _RoutePainter oldDelegate) {
     return oldDelegate.currentPosition != currentPosition ||
-        oldDelegate.stops != stops;
+        oldDelegate.stops != stops ||
+        oldDelegate.dark != dark;
   }
 }

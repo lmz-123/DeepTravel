@@ -67,14 +67,40 @@ class SettingsPage extends ConsumerWidget {
                     title: '讲述',
                     children: [
                       _PlaybackSpeedTile(userId: userId),
+                      const Divider(height: 1),
+                      const ListTile(
+                        leading: Icon(Icons.record_voice_over_outlined),
+                        title: Text('讲述声音'),
+                        subtitle: Text('每条景点讲述可在播放器中切换可用声音'),
+                        trailing: Text('随内容提供'),
+                      ),
+                      const Divider(height: 1),
+                      const ListTile(
+                        leading: Icon(Icons.headphones_rounded),
+                        title: Text('建议佩戴耳机'),
+                        subtitle: Text('靠近景点时更容易听清环境与讲述的层次'),
+                      ),
                     ],
                   ),
                   _SettingsSection(
-                    title: '定位与下载',
+                    title: '定位与触发',
                     children: [
                       const _LocationModeTile(),
+                      const Divider(height: 1),
+                      const ListTile(
+                        leading: Icon(Icons.radar_rounded),
+                        title: Text('靠近景点自动准备讲述'),
+                        subtitle: Text('仅在行走导览开启时使用位置；系统限制会如实提示'),
+                      ),
+                    ],
+                  ),
+                  _SettingsSection(
+                    title: '下载',
+                    children: [
                       _DownloadPolicyTile(userId: userId),
+                      const Divider(height: 1),
                       const _OfflineCacheTile(),
+                      const Divider(height: 1),
                       const _ClearAudioCacheTile(),
                     ],
                   ),
@@ -82,11 +108,24 @@ class SettingsPage extends ConsumerWidget {
                     title: '照片与隐私',
                     children: [
                       _EvidencePolicyTile(userId: userId),
+                      const Divider(height: 1),
+                      const ListTile(
+                        leading: Icon(Icons.location_off_outlined),
+                        title: Text('照片位置保持私密'),
+                        subtitle: Text('上传时移除 EXIF；私人照片不会自动发布到社区'),
+                      ),
                     ],
                   ),
                   _SettingsSection(
-                    title: '关于',
+                    title: '账号与关于',
                     children: [
+                      const ListTile(
+                        leading: Icon(Icons.person_outline_rounded),
+                        title: Text('旅行者账号'),
+                        subtitle: Text('足迹、收藏与私人照片只对当前账号可见'),
+                        trailing: Icon(Icons.verified_user_outlined),
+                      ),
+                      const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.info_outline_rounded),
                         title: const Text('见地版本'),
