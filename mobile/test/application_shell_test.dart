@@ -59,13 +59,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('见地旅行者'), findsOneWidget);
-    expect(find.text('足迹'), findsOneWidget);
+    final drawerFootprints = find.widgetWithText(ListTile, '足迹');
+    expect(drawerFootprints, findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
     expect(find.text('退出登录'), findsOneWidget);
     expect(find.text('见地现场'), findsNothing);
     expect(find.text('动态'), findsNothing);
 
-    await tester.tap(find.text('足迹'));
+    await tester.tap(drawerFootprints);
     await tester.pumpAndSettle();
     expect(find.text('足迹页已打开'), findsOneWidget);
     expect(container.read(narrationPlayerProvider), same(originalPlayer));

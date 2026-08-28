@@ -18,6 +18,7 @@ import 'offline_package_controller.dart';
 import 'traveler_shell.dart';
 import 'widgets/rotating_tour_orb.dart';
 import 'widgets/favorite_button.dart';
+import 'widgets/traveler_bottom_navigation.dart';
 
 class DiscoveryPage extends ConsumerStatefulWidget {
   const DiscoveryPage({super.key});
@@ -80,6 +81,9 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     final discovery = ref.watch(discoveryControllerProvider);
     final archivedJourneys = ref.watch(archivedActiveJourneysProvider);
     return Scaffold(
+      bottomNavigationBar: const TravelerBottomNavigation(
+        active: TravelerSection.discovery,
+      ),
       body: Stack(
         children: [
           SafeArea(
@@ -104,12 +108,28 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 34, 20, 24),
+                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
                     sliver: SliverToBoxAdapter(
                       child: FadeSlideIn(
-                        child: Text(
-                          '今天，慢一点\n看见城市的里层。',
-                          style: Theme.of(context).textTheme.displaySmall,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'GOOD AFTERNOON · SHENZHEN',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: AppColors.terracotta,
+                                    letterSpacing: 1.5,
+                                  ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              '今天慢一点，\n看见城市的里层。',
+                              style: Theme.of(context).textTheme.displaySmall,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -197,7 +217,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     ),
                   ),
                   const SliverPadding(
-                    padding: EdgeInsets.fromLTRB(20, 38, 20, 48),
+                    padding: EdgeInsets.fromLTRB(20, 32, 20, 34),
                     sliver: SliverToBoxAdapter(child: _ExperiencePromise()),
                   ),
                 ],
@@ -285,25 +305,102 @@ class _CityStoryModules extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              SizedBox(
-                height: primary ? 220 : 190,
-                child: ListView.separated(
+              if (primary)
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: module.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 14),
-                  itemBuilder: (context, index) => _CityStoryCardView(
-                    card: module.items[index],
-                    primary: primary,
+                  child: Column(
+                    children: module.items
+                        .map(
+                          (card) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _PrimaryStoryRow(card: card),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 190,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: module.items.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 14),
+                    itemBuilder: (context, index) => _CityStoryCardView(
+                      card: module.items[index],
+                      primary: false,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         );
       }).toList(growable: false),
     );
   }
+}
+
+class _PrimaryStoryRow extends StatelessWidget {
+  const _PrimaryStoryRow({required this.card});
+
+  final CityStoryCard card;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: '${card.contentType}：${card.story.title}',
+        child: Material(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const ValueKey('home-random-story-action'),
+            onTap: () => context.push('/story/${card.story.id}'),
+            child: SizedBox(
+              height: 96,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 96,
+                    child: EditorialImage(source: card.story.coverImage),
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          card.contentType,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(color: AppColors.terracotta),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          card.story.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 13),
+                    child: Icon(
+                      Icons.play_circle_outline_rounded,
+                      color: AppColors.moss,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _CityStoryCardView extends StatelessWidget {
@@ -730,23 +827,58 @@ class _LocationStatus extends StatelessWidget {
     final message = state.isLocating
         ? '正在获取当前位置，景区顺序稍后更新…'
         : _failureMessage(state.locationFailure);
-    if (message == null) return const SizedBox.shrink();
+    final success = message == null &&
+        state.cards.any((card) => card.distanceMeters != null);
+    final displayMessage =
+        success ? '已定位到${state.cards.first.route.title}附近' : message;
+    if (displayMessage == null) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: Row(
-        children: [
-          Icon(
-            state.isLocating
-                ? Icons.my_location_rounded
-                : Icons.location_off_outlined,
-            size: 16,
-            color: AppColors.moss,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(message, style: Theme.of(context).textTheme.bodySmall),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ink.withValues(alpha: .06),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              success
+                  ? Icons.location_on_outlined
+                  : state.isLocating
+                      ? Icons.my_location_rounded
+                      : Icons.location_off_outlined,
+              size: 18,
+              color: success ? AppColors.terracotta : AppColors.moss,
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayMessage,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  if (success) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      '当前位置只用于排列附近手册，不会保存连续轨迹。',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -800,6 +932,23 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
       delay: const Duration(milliseconds: 80),
       child: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '城市手册',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const Spacer(),
+                Text(
+                  '左右滑动 · 按距离排序',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ],
+            ),
+          ),
           LayoutBuilder(
             builder: (context, constraints) {
               final cardWidth = constraints.maxWidth * .88 - 12;
@@ -1101,7 +1250,34 @@ class _RouteCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
-                    const SizedBox(height: 18),
+                    if ((route.pretrip?.companionTags ?? const <String>[])
+                        .isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: route.pretrip!.companionTags
+                            .take(3)
+                            .map(
+                              (tag) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.paperDeep,
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         _Metric(
@@ -1283,47 +1459,30 @@ class _ExperiencePromise extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const items = [
-      (Icons.visibility_outlined, '观察真实细节'),
-      (Icons.auto_awesome_outlined, '带走一条见识'),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('少看屏幕，多看眼前', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 18),
-        ...items.map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: null,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
-                            color: AppColors.paperDeep, shape: BoxShape.circle),
-                        child: Icon(item.$1, color: AppColors.ink, size: 20),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(item.$2,
-                            style: Theme.of(context).textTheme.bodyLarge),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: .58),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '我们不替你打卡，\n只帮你多看见一点。',
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Text(
+            '没有固定顺序，没有排名。故事会在你靠近时出现，走完后留下属于你的理解。',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.textMuted, height: 1.6),
+          ),
+        ],
+      ),
     );
   }
 }

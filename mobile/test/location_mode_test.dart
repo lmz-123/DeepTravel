@@ -80,6 +80,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('附近故事点'), findsNothing);
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('selected-node-detail-fragment-1')),
+      find.byType(ListView),
+      const Offset(0, -180),
+    );
     expect(find.byKey(const ValueKey('selected-node-detail-fragment-1')),
         findsOneWidget);
     expect(find.text('第一条线索'), findsOneWidget);
@@ -484,7 +489,6 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('第二条线索'), findsWidgets);
     expect(find.text('设置模式：模拟定位'), findsOneWidget);
     expect(find.byType(Switch), findsNothing);
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);
@@ -494,6 +498,9 @@ void main() {
     await tester.tap(find.byTooltip('继续自动导览'));
     await tester.pump();
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    expect(find.text('第二条线索'), findsWidgets);
     await tester.dragUntilVisible(
       find.text('阅读等价文字稿'),
       find.byType(ListView),

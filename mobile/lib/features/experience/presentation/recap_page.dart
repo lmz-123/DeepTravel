@@ -24,15 +24,19 @@ class RecapPage extends ConsumerWidget {
             child: const Text('重新生成回顾'),
           ),
         ),
-        data: (value) => _RecapContent(recap: value),
+        data: (value) => _RecapContent(
+          recap: value,
+          journeyId: journeyId,
+        ),
       ),
     );
   }
 }
 
 class _RecapContent extends StatelessWidget {
-  const _RecapContent({required this.recap});
+  const _RecapContent({required this.recap, required this.journeyId});
   final JourneyRecap recap;
+  final String journeyId;
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +54,22 @@ class _RecapContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const BrandMark(light: true),
-                const SizedBox(height: 46),
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      tooltip: '返回行走',
+                      onPressed: () => context.go('/journey/$journeyId'),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.white.withValues(alpha: .1),
+                        foregroundColor: AppColors.white,
+                      ),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                    const Spacer(),
+                    const BrandMark(light: true),
+                  ],
+                ),
+                const SizedBox(height: 42),
                 Container(
                   width: 58,
                   height: 58,
@@ -62,7 +80,7 @@ class _RecapContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  '你不只是来过，\n还读懂了一点。',
+                  '你走完的不是一条路线，\n而是几种看城市的方式。',
                   style: Theme.of(context)
                       .textTheme
                       .displaySmall
@@ -92,12 +110,21 @@ class _RecapContent extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
           sliver: SliverList.list(
             children: [
-              Text('你带走的五条见识',
+              Text('这次行走留下的见识',
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 18),
               ...recap.insights.indexed
                   .map((entry) => _Insight(index: entry.$1, item: entry.$2)),
               const SizedBox(height: 16),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.terracotta,
+                ),
+                onPressed: () => context.go('/footprints'),
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('查看并整理足迹'),
+              ),
+              const SizedBox(height: 10),
               PrimaryAction(
                 label: '回到发现页',
                 icon: Icons.explore_outlined,

@@ -6,6 +6,7 @@ import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/footprint_models.dart';
 import 'experience_providers.dart';
+import 'widgets/traveler_bottom_navigation.dart';
 
 class FootprintsPage extends ConsumerWidget {
   const FootprintsPage({super.key});
@@ -16,6 +17,9 @@ class FootprintsPage extends ConsumerWidget {
     return RouteBackScope(
       fallbackLocation: '/',
       child: Scaffold(
+        bottomNavigationBar: const TravelerBottomNavigation(
+          active: TravelerSection.footprints,
+        ),
         appBar: AppBar(
           title: const Text('我的足迹'),
           leading: IconButton(
@@ -229,82 +233,83 @@ class _Filters extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('按城市', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          ChoiceChip(
-            label: const Text('全部'),
-            selected: filter.citySlug == null,
-            onSelected: (_) => controller.selectCity(null),
-          ),
-          for (final city in result.cities)
-            ChoiceChip(
-              label: Text('${city.name} ${city.count}'),
-              selected: filter.citySlug == city.slug,
-              onSelected: (_) => controller.selectCity(city.slug),
+        Row(
+          children: [
+            Expanded(
+              child:
+                  Text('筛选足迹', style: Theme.of(context).textTheme.labelLarge),
             ),
-        ]),
-        if (result.themes.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text('按主题', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            ChoiceChip(
-              label: const Text('全部主题'),
-              selected: filter.theme == null,
-              onSelected: (_) => controller.selectTheme(null),
+            TextButton.icon(
+              onPressed: () => controller
+                  .selectOrder(filter.order == 'recent' ? 'oldest' : 'recent'),
+              icon: const Icon(Icons.swap_vert_rounded, size: 17),
+              label: Text(filter.order == 'recent' ? '最近留下' : '最早留下'),
             ),
-            for (final theme in result.themes)
+          ],
+        ),
+        const SizedBox(height: 6),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
               ChoiceChip(
-                label: Text('${theme.name} ${theme.count}'),
-                selected: filter.theme == theme.name,
-                onSelected: (_) => controller.selectTheme(theme.name),
+                label: const Text('全部'),
+                selected: filter.citySlug == null &&
+                    filter.theme == null &&
+                    filter.month == null &&
+                    filter.journeyState == null &&
+                    filter.organizationState == null,
+                onSelected: (_) {
+                  controller.selectCity(null);
+                  controller.selectTheme(null);
+                  controller.selectMonth(null);
+                  controller.selectJourneyState(null);
+                  controller.selectOrganizationState(null);
+                },
               ),
-          ]),
-        ],
-        if (result.months.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text('按时间', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            ChoiceChip(
-              label: const Text('全部时间'),
-              selected: filter.month == null,
-              onSelected: (_) => controller.selectMonth(null),
-            ),
-            for (final month in result.months)
+              const SizedBox(width: 8),
+              for (final city in result.cities) ...[
+                ChoiceChip(
+                  label: Text('${city.name} ${city.count}'),
+                  selected: filter.citySlug == city.slug,
+                  onSelected: (_) => controller.selectCity(city.slug),
+                ),
+                const SizedBox(width: 8),
+              ],
+              for (final theme in result.themes) ...[
+                ChoiceChip(
+                  label: Text('${theme.name} ${theme.count}'),
+                  selected: filter.theme == theme.name,
+                  onSelected: (_) => controller.selectTheme(theme.name),
+                ),
+                const SizedBox(width: 8),
+              ],
+              for (final month in result.months) ...[
+                ChoiceChip(
+                  label: Text(month.label),
+                  selected: filter.month == month.key,
+                  onSelected: (_) => controller.selectMonth(month.key),
+                ),
+                const SizedBox(width: 8),
+              ],
               ChoiceChip(
-                label: Text('${month.label} ${month.count}'),
-                selected: filter.month == month.key,
-                onSelected: (_) => controller.selectMonth(month.key),
+                label: const Text('未完成漫游'),
+                selected: filter.journeyState == 'partial',
+                onSelected: (_) => controller.selectJourneyState(
+                  filter.journeyState == 'partial' ? null : 'partial',
+                ),
               ),
-          ]),
-        ],
-        const SizedBox(height: 14),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          ChoiceChip(
-            label: const Text('全部旅程'),
-            selected: filter.journeyState == null,
-            onSelected: (_) => controller.selectJourneyState(null),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('待整理'),
+                selected: filter.organizationState == 'draft',
+                onSelected: (_) => controller.selectOrganizationState(
+                  filter.organizationState == 'draft' ? null : 'draft',
+                ),
+              ),
+            ],
           ),
-          ChoiceChip(
-            label: const Text('未完成漫游'),
-            selected: filter.journeyState == 'partial',
-            onSelected: (_) => controller.selectJourneyState('partial'),
-          ),
-          ChoiceChip(
-            label: const Text('待整理'),
-            selected: filter.organizationState == 'draft',
-            onSelected: (_) => controller.selectOrganizationState(
-                filter.organizationState == 'draft' ? null : 'draft'),
-          ),
-          ActionChip(
-            label: Text(filter.order == 'recent' ? '最近留下' : '最早留下'),
-            avatar: const Icon(Icons.swap_vert_rounded, size: 17),
-            onPressed: () => controller
-                .selectOrder(filter.order == 'recent' ? 'oldest' : 'recent'),
-          ),
-        ]),
+        ),
       ],
     );
   }
@@ -323,45 +328,116 @@ class _FootprintCard extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => context.push('/footprints/${item.id}'),
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: SizedBox(
+              height: 150,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(children: [
-                    Expanded(
-                      child: Text('${item.cityName} · ${item.sceneTitle}',
-                          style: Theme.of(context).textTheme.labelLarge),
+                  SizedBox(
+                    width: 112,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [AppColors.moss, AppColors.inkSoft],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            item.photo == null
+                                ? Icons.auto_stories_outlined
+                                : Icons.photo_outlined,
+                            color: AppColors.gold,
+                            size: 27,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            item.cityName,
+                            style: const TextStyle(
+                              color: AppColors.white,
+                              fontSize: 11,
+                            ),
+                          ),
+                          if (item.isPartialJourney) ...[
+                            const SizedBox(height: 5),
+                            const Text(
+                              '漫游未完成',
+                              style: TextStyle(
+                                color: AppColors.white,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                    if (item.isPartialJourney) const Chip(label: Text('漫游未完成')),
-                  ]),
-                  const SizedBox(height: 8),
-                  Text(item.storyTitle,
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                  Text(item.selectedSummaryText ?? item.editorialSummary,
-                      maxLines: 3, overflow: TextOverflow.ellipsis),
-                  if (item.themes.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: item.themes
-                          .map((theme) => Chip(label: Text(theme)))
-                          .toList(growable: false),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(15, 14, 12, 13),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${item.cityName} · ${item.sceneTitle}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: AppColors.terracotta,
+                                      ),
+                                ),
+                              ),
+                              if (item.isPartialJourney)
+                                const Icon(
+                                  Icons.directions_walk_rounded,
+                                  size: 16,
+                                  color: AppColors.moss,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            item.storyTitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            item.selectedSummaryText ?? item.editorialSummary,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              Text(
+                                item.needsOrganization ? '待整理' : '已整理',
+                                style: const TextStyle(
+                                  color: AppColors.moss,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                _date(item.createdAt),
+                                style: Theme.of(context).textTheme.labelSmall,
+                              ),
+                              const Icon(Icons.chevron_right_rounded, size: 17),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                  const SizedBox(height: 14),
-                  Row(children: [
-                    Icon(item.photo == null
-                        ? Icons.notes_rounded
-                        : Icons.photo_outlined),
-                    const SizedBox(width: 7),
-                    Text(item.needsOrganization ? '稍后再整理' : '已经整理'),
-                    const Spacer(),
-                    Text(_date(item.createdAt)),
-                    const Icon(Icons.chevron_right_rounded),
-                  ]),
+                  ),
                 ],
               ),
             ),

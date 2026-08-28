@@ -55,63 +55,128 @@ class _AuthPageState extends ConsumerState<_AuthPage> {
     final auth = ref.watch(authControllerProvider);
     final error = auth.hasError ? auth.error.toString() : widget.initialError;
     return Scaffold(
-      body: SafeArea(
-        child: Center(
+      backgroundColor: AppColors.ink,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(.72, -.82),
+            radius: 1.15,
+            colors: [Color(0x554F5D45), AppColors.ink],
+          ),
+        ),
+        child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Align(
-                        alignment: Alignment.centerLeft, child: BrandMark()),
-                    const SizedBox(height: 48),
-                    Text(
-                      _register ? '建立你的旅行档案' : '继续上一次行走',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '进度和现场照片只属于这个账号。',
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      key: const ValueKey('auth-username'),
-                      decoration: const InputDecoration(labelText: '用户名'),
-                      textInputAction: TextInputAction.next,
-                      onSaved: (value) => _username = value ?? '',
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      key: const ValueKey('auth-password'),
-                      obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: '密码（至少 8 位）'),
-                      onSaved: (value) => _password = value ?? '',
-                      onFieldSubmitted: (_) => _submit(),
-                    ),
-                    if (error != null) ...[
-                      const SizedBox(height: 14),
-                      Text(error,
-                          style: const TextStyle(color: AppColors.terracotta)),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: BrandMark(light: true),
+                      ),
+                      const SizedBox(height: 72),
+                      Text(
+                        'KEEP WHAT YOU NOTICE',
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: AppColors.gold,
+                                  letterSpacing: 1.4,
+                                ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _register ? '建立一份只属于你的\n旅行档案。' : '登录以后，\n让走过的城市留下来。',
+                        style: Theme.of(context)
+                            .textTheme
+                            .displaySmall
+                            ?.copyWith(color: AppColors.white),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '同步足迹、收藏与离线手册。进度和现场照片只属于这个账号。',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.white.withValues(alpha: .62),
+                            ),
+                      ),
+                      const SizedBox(height: 28),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(26),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              _register ? '注册账号' : '账号登录',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 18),
+                            TextFormField(
+                              key: const ValueKey('auth-username'),
+                              decoration:
+                                  const InputDecoration(labelText: '用户名'),
+                              textInputAction: TextInputAction.next,
+                              onSaved: (value) => _username = value ?? '',
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              key: const ValueKey('auth-password'),
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: '密码（至少 8 位）',
+                              ),
+                              onSaved: (value) => _password = value ?? '',
+                              onFieldSubmitted: (_) => _submit(),
+                            ),
+                            if (error != null) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                error,
+                                style: const TextStyle(
+                                  color: AppColors.terracotta,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            FilledButton(
+                              key: const ValueKey('auth-submit'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.terracotta,
+                              ),
+                              onPressed: auth.isLoading ? null : _submit,
+                              child: Text(_register ? '注册并开始' : '登录并继续'),
+                            ),
+                            TextButton(
+                              onPressed: auth.isLoading
+                                  ? null
+                                  : () =>
+                                      setState(() => _register = !_register),
+                              child: Text(
+                                _register ? '已有账号，直接登录' : '第一次使用，注册账号',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        '继续即表示你同意用户协议与隐私政策。定位仅在行走导览中用于判断是否靠近故事点。',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.white.withValues(alpha: .46),
+                          fontSize: 11,
+                          height: 1.6,
+                        ),
+                      ),
                     ],
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      key: const ValueKey('auth-submit'),
-                      onPressed: auth.isLoading ? null : _submit,
-                      child: Text(_register ? '注册并开始' : '登录'),
-                    ),
-                    TextButton(
-                      onPressed: auth.isLoading
-                          ? null
-                          : () => setState(() => _register = !_register),
-                      child: Text(_register ? '已有账号，直接登录' : '第一次使用，注册账号'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

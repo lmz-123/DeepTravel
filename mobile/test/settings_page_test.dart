@@ -50,6 +50,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.textContaining('保留 30 天'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.textContaining('保留 30 天'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('见地版本'),
@@ -58,12 +63,9 @@ void main() {
     );
     expect(find.text('0.3.2+6'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.text('默认播放速度'),
-      -200,
-      scrollable: find.byType(Scrollable).first,
-    );
-
+    await tester.drag(find.byType(ListView), const Offset(0, 700));
+    await tester.pumpAndSettle();
+    expect(find.text('默认播放速度'), findsOneWidget);
     await tester.tap(find.text('1.0×'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('1.25×').last);

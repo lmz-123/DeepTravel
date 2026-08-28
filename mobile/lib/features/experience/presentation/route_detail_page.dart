@@ -15,6 +15,7 @@ import 'home_story_controller.dart';
 import 'location_mode_controller.dart';
 import 'offline_package_controller.dart';
 import 'widgets/route_canvas.dart';
+import 'widgets/favorite_button.dart';
 
 class RouteDetailPage extends ConsumerWidget {
   const RouteDetailPage({required this.slug, super.key});
@@ -47,6 +48,8 @@ class _RouteDetail extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final journey = ref.watch(journeyControllerProvider);
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final heroHeight = 360.0 + ((textScale - 1).clamp(0.0, 1.0) * 110.0);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -61,6 +64,19 @@ class _RouteDetail extends ConsumerWidget {
             ),
           ),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.white.withValues(alpha: .88),
+                shape: BoxShape.circle,
+              ),
+              child: FavoriteButton(kind: 'route', targetId: route.id),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(20, 10, 20, 16),
@@ -79,10 +95,10 @@ class _RouteDetail extends ConsumerWidget {
           SliverToBoxAdapter(
             child: EditorialImage(
               source: route.heroImage,
-              height: 430,
+              height: heroHeight,
               heroTag: 'route-${route.slug}',
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 120, 24, 28),
+                padding: const EdgeInsets.fromLTRB(22, 100, 22, 28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -119,9 +135,11 @@ class _RouteDetail extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
             sliver: SliverList.list(
               children: [
+                const _ManualTabs(),
+                const SizedBox(height: 20),
                 if (route.predeparture?.available ?? false) ...[
                   _PredepartureSurface(route: route),
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 18),
                 ],
                 _Metrics(route: route),
                 if (route.audioTour != null) ...[
@@ -236,10 +254,9 @@ class _PredepartureSurface extends ConsumerWidget {
     };
     return Container(
       key: const ValueKey('predeparture-surface'),
-      padding: const EdgeInsets.fromLTRB(20, 18, 14, 18),
-      decoration: BoxDecoration(
-        color: AppColors.paperDeep,
-        borderRadius: BorderRadius.circular(24),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 20),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.line)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,7 +265,7 @@ class _PredepartureSurface extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('出发前', style: Theme.of(context).textTheme.titleLarge),
+                Text('先认识这座城', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Text(
                   introduction.text,
@@ -265,7 +282,7 @@ class _PredepartureSurface extends ConsumerWidget {
               ],
             ),
           ),
-          IconButton(
+          IconButton.filled(
             key: const ValueKey('predeparture-play-pause'),
             tooltip: label,
             onPressed: () async {
@@ -278,12 +295,58 @@ class _PredepartureSurface extends ConsumerWidget {
                 await controller.toggle();
               }
             },
+            style: IconButton.styleFrom(
+              backgroundColor: phase == HomeStoryPhase.playing
+                  ? AppColors.terracotta
+                  : AppColors.ink,
+              foregroundColor: phase == HomeStoryPhase.playing
+                  ? AppColors.white
+                  : AppColors.gold,
+            ),
             icon: Icon(icon),
           ),
         ],
       ),
     );
   }
+}
+
+class _ManualTabs extends StatelessWidget {
+  const _ManualTabs();
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _tab(context, '出发前', active: true),
+            const SizedBox(width: 18),
+            _tab(context, '故事方向'),
+            const SizedBox(width: 18),
+            _tab(context, '行走提示'),
+          ],
+        ),
+      );
+
+  Widget _tab(BuildContext context, String label, {bool active = false}) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: active ? AppColors.ink : AppColors.textMuted,
+                ),
+          ),
+          const SizedBox(height: 6),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: active ? 20 : 0,
+            height: 2,
+            color: AppColors.terracotta,
+          ),
+        ],
+      );
 }
 
 class _PretripSection extends StatelessWidget {
@@ -369,23 +432,25 @@ class _Metrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final values = [
-      ('${route.durationMinutes}', '分钟'),
-      ('${route.distanceKm}', '公里'),
+    final values = <(IconData, String)>[
+      (Icons.schedule_rounded, '${route.durationMinutes} 分钟'),
+      (Icons.route_rounded, '${route.distanceKm} km'),
       (
-        '${route.audioTour?.fragments.length ?? route.stops.length}',
-        route.audioTour == null ? '站停留' : '段线索'
+        Icons.headphones_rounded,
+        '${route.audioTour?.fragments.length ?? route.stops.length} ${route.audioTour == null ? '站停留' : '段讲述'}'
       ),
     ];
-    return Row(
+    return Wrap(
+      runSpacing: 10,
       children: values
           .map(
-            (value) => Expanded(
-              child: Column(
+            (value) => Padding(
+              padding: const EdgeInsets.only(right: 17),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(value.$1,
-                      style: Theme.of(context).textTheme.headlineMedium),
-                  const SizedBox(height: 3),
+                  Icon(value.$1, size: 16, color: AppColors.moss),
+                  const SizedBox(width: 5),
                   Text(value.$2,
                       style: Theme.of(context).textTheme.labelMedium),
                 ],

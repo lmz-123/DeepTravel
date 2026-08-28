@@ -55,7 +55,7 @@ void main() {
   testWidgets('first visit still enters the headphone invitation',
       (tester) async {
     await _pumpDiscovery(tester, journeyItem: null, context: null);
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await _tapRouteCard(tester);
     await tester.pumpAndSettle();
     expect(find.text('headphone-gate'), findsOneWidget);
   });
@@ -106,7 +106,7 @@ void main() {
       journeyItem: _item(ownerContext),
       context: ownerContext,
     );
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await _tapRouteCard(tester);
     await tester.pumpAndSettle();
     expect(find.text('journey-target'), findsOneWidget);
   });
@@ -121,7 +121,7 @@ void main() {
       context: ownerContext,
       activeController: controller,
     );
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await _tapRouteCard(tester);
     await tester.pumpAndSettle();
     expect(find.text('journey-target'), findsOneWidget);
     expect(controller.revisitedJourneyId, 'journey-a');
@@ -135,7 +135,7 @@ void main() {
       journeyItem: _item(ownerContext),
       context: ownerContext,
     );
-    await tester.tap(find.byKey(const ValueKey('route-card-route-a')));
+    await _tapRouteCard(tester);
     await tester.pumpAndSettle();
     expect(find.text('legacy-footprint'), findsOneWidget);
   });
@@ -170,6 +170,14 @@ void main() {
     final index = await container.read(routeJourneyIndexProvider.future);
     expect(index['route-a']?.journey.id, 'journey-active');
   });
+}
+
+Future<void> _tapRouteCard(WidgetTester tester) async {
+  final card = find.byKey(const ValueKey('route-card-route-a'));
+  await tester.ensureVisible(card);
+  await tester.drag(find.byType(CustomScrollView), const Offset(0, -120));
+  await tester.pumpAndSettle();
+  await tester.tap(card);
 }
 
 Future<void> _pumpDiscovery(

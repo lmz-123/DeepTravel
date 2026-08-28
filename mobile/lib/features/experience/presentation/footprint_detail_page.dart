@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../data/footprint_share_service.dart';
 import '../domain/footprint_models.dart';
 import 'experience_providers.dart';
+import 'widgets/traveler_bottom_navigation.dart';
 
 class FootprintDetailPage extends ConsumerWidget {
   const FootprintDetailPage({required this.footprintId, super.key});
@@ -20,6 +21,9 @@ class FootprintDetailPage extends ConsumerWidget {
     return RouteBackScope(
       fallbackLocation: '/footprints',
       child: Scaffold(
+        bottomNavigationBar: const TravelerBottomNavigation(
+          active: TravelerSection.footprints,
+        ),
         appBar: AppBar(
           title: const Text('足迹详情'),
           leading: IconButton(
@@ -95,28 +99,53 @@ class _FootprintEditorState extends ConsumerState<_FootprintEditor> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 44),
         children: [
-          Row(children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${entry.cityName} · ${entry.sceneTitle}',
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.ink,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.ink.withValues(alpha: .16),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${entry.cityName} · ${entry.sceneTitle}',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: AppColors.gold,
+                            letterSpacing: 1,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      entry.storyTitle,
                       style: Theme.of(context)
                           .textTheme
-                          .labelLarge
-                          ?.copyWith(color: AppColors.moss)),
-                  const SizedBox(height: 6),
-                  Text(entry.storyTitle,
-                      style: Theme.of(context).textTheme.headlineMedium),
-                ],
+                          .headlineMedium
+                          ?.copyWith(color: AppColors.white),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              tooltip: '生成分享卡',
-              onPressed: _busy ? null : () => _share(entry),
-              icon: const Icon(Icons.ios_share_rounded),
-            ),
-          ]),
+              IconButton.filledTonal(
+                tooltip: '生成分享卡',
+                onPressed: _busy ? null : () => _share(entry),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.white.withValues(alpha: .12),
+                  foregroundColor: AppColors.white,
+                ),
+                icon: const Icon(Icons.ios_share_rounded),
+              ),
+            ]),
+          ),
           if (entry.isPartialJourney) ...[
             const SizedBox(height: 12),
             FilledButton.tonalIcon(

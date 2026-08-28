@@ -65,6 +65,8 @@ void main() {
       420,
       scrollable: _verticalScrollable(),
     );
+    await tester.drag(_verticalScrollable(), const Offset(0, -120));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('home-random-story-action')));
     await tester.pumpAndSettle();
 

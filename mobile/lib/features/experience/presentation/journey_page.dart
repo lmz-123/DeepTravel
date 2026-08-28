@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +14,7 @@ import 'experience_providers.dart';
 import 'widgets/evidence_photo_widgets.dart';
 import 'widgets/narration_voice_selector.dart';
 import 'widgets/node_community_section.dart';
+import 'widgets/traveler_bottom_navigation.dart';
 
 class JourneyPage extends ConsumerStatefulWidget {
   const JourneyPage({required this.journeyId, super.key});
@@ -111,6 +113,8 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
       },
       child: Scaffold(
         appBar: AppBar(
+          backgroundColor: AppColors.ink,
+          foregroundColor: AppColors.white,
           leading: IconButton(
               tooltip: '返回首页',
               onPressed: () => context.go('/'),
@@ -126,11 +130,21 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
             const SizedBox(width: 8)
           ],
         ),
+        bottomNavigationBar: TravelerBottomNavigation(
+          active: TravelerSection.journey,
+          journeyId: widget.journeyId,
+        ),
         body: SafeArea(
           top: false,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
             children: [
+              _JourneyMapHeader(
+                routeTitle: state.route!.title,
+                pointCount: manifest.fragments.length,
+                collectedCount: ledger?.collectedCount ?? 0,
+              ),
+              const SizedBox(height: 18),
               _StatusPanel(state: state),
               const SizedBox(height: 20),
               Text(manifest.centralQuestion,
@@ -440,6 +454,143 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                       const Text('内容状态：研究预览。现场物件与坐标仍待实地核验，来源可在线索簿中查看。'),
                     ])));
   }
+}
+
+class _JourneyMapHeader extends StatelessWidget {
+  const _JourneyMapHeader({
+    required this.routeTitle,
+    required this.pointCount,
+    required this.collectedCount,
+  });
+
+  final String routeTitle;
+  final int pointCount;
+  final int collectedCount;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 190,
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 15),
+        decoration: const BoxDecoration(
+          color: AppColors.ink,
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              routeTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.gold,
+                    letterSpacing: 1,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: CustomPaint(
+                painter: _JourneyRoutePainter(
+                  pointCount: pointCount,
+                  collectedCount: collectedCount,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+            Align(
+              alignment: Alignment.center,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: AppColors.gold,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '正在寻找附近的历史线索',
+                      style: TextStyle(
+                        color: AppColors.white.withValues(alpha: .82),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _JourneyRoutePainter extends CustomPainter {
+  const _JourneyRoutePainter({
+    required this.pointCount,
+    required this.collectedCount,
+  });
+
+  final int pointCount;
+  final int collectedCount;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(8, size.height * .72)
+      ..cubicTo(
+        size.width * .18,
+        size.height * .08,
+        size.width * .36,
+        size.height * .92,
+        size.width * .5,
+        size.height * .42,
+      )
+      ..cubicTo(
+        size.width * .66,
+        size.height * -.02,
+        size.width * .8,
+        size.height * .15,
+        size.width - 8,
+        size.height * .55,
+      );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = AppColors.gold.withValues(alpha: .34)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    final count = pointCount.clamp(1, 8);
+    for (var index = 0; index < count; index += 1) {
+      final metric = path.computeMetrics().first;
+      final tangent = metric.getTangentForOffset(
+        metric.length * (index / math.max(1, count - 1)),
+      );
+      if (tangent == null) continue;
+      canvas.drawCircle(
+        tangent.position,
+        index < collectedCount ? 5 : 4,
+        Paint()
+          ..color =
+              index < collectedCount ? AppColors.terracotta : AppColors.gold,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_JourneyRoutePainter oldDelegate) =>
+      oldDelegate.pointCount != pointCount ||
+      oldDelegate.collectedCount != collectedCount;
 }
 
 class _LegacyJourneyView extends ConsumerWidget {

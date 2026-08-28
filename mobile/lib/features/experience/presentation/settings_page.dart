@@ -14,6 +14,7 @@ import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'location_mode_controller.dart';
 import 'offline_package_controller.dart';
+import 'widgets/traveler_bottom_navigation.dart';
 
 final playbackSpeedPreferenceProvider = FutureProvider.family<double, String>(
     (ref, userId) =>
@@ -46,6 +47,9 @@ class SettingsPage extends ConsumerWidget {
     return RouteBackScope(
       fallbackLocation: '/',
       child: Scaffold(
+        bottomNavigationBar: const TravelerBottomNavigation(
+          active: TravelerSection.discovery,
+        ),
         appBar: AppBar(
           title: const Text('设置'),
           leading: IconButton(
@@ -60,13 +64,13 @@ class SettingsPage extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
                 children: [
                   _SettingsSection(
-                    title: '播放',
+                    title: '讲述',
                     children: [
                       _PlaybackSpeedTile(userId: userId),
                     ],
                   ),
                   _SettingsSection(
-                    title: '行走与下载',
+                    title: '定位与下载',
                     children: [
                       const _LocationModeTile(),
                       _DownloadPolicyTile(userId: userId),

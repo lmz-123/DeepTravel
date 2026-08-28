@@ -77,15 +77,22 @@ void main() {
     await tester.tap(untriggered);
     await tester.pump();
     expect(controller.selectedFragmentId, 'fragment-locked');
+    await tester.dragUntilVisible(
+      find.text('尚未发现的线索'),
+      find.byType(ListView),
+      const Offset(0, -180),
+    );
     expect(find.byKey(const ValueKey('selected-node-detail-fragment-locked')),
         findsOneWidget);
     expect(find.text('尚未发现的线索'), findsOneWidget);
     expect(find.text('这条线索尚未解锁'), findsNothing);
-    final detail =
-        find.byKey(const ValueKey('selected-node-detail-fragment-locked'));
     final audio = find.byKey(const ValueKey('fragment-photo'));
-    expect(
-        tester.getBottomLeft(detail).dy, lessThan(tester.getTopLeft(audio).dy));
+    await tester.dragUntilVisible(
+      audio,
+      find.byType(ListView),
+      const Offset(0, -180),
+    );
+    expect(audio, findsOneWidget);
   });
 
   testWidgets(

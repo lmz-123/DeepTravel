@@ -10,6 +10,8 @@ abstract final class AppColors {
   static const paperDeep = Color(0xFFECE4D7);
   static const gold = Color(0xFFD6B875);
   static const white = Color(0xFFFFFCF7);
+  static const line = Color(0x1A142B33);
+  static const textMuted = Color(0xFF687571);
 }
 
 abstract final class AppTheme {
@@ -30,42 +32,58 @@ abstract final class AppTheme {
     fontFamilyFallback: const ['PingFang SC', 'Noto Sans CJK SC', 'sans-serif'],
     textTheme: const TextTheme(
       displayLarge: TextStyle(
-        fontSize: 45,
-        height: 1.08,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -1.8,
+        fontFamily: 'Songti SC',
+        fontFamilyFallback: ['STSong', 'Noto Serif CJK SC', 'serif'],
+        fontSize: 43,
+        height: 1.12,
+        fontWeight: FontWeight.w500,
+        letterSpacing: -1.2,
       ),
       displaySmall: TextStyle(
-        fontSize: 34,
-        height: 1.16,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -1,
+        fontFamily: 'Songti SC',
+        fontFamilyFallback: ['STSong', 'Noto Serif CJK SC', 'serif'],
+        fontSize: 32,
+        height: 1.18,
+        fontWeight: FontWeight.w500,
+        letterSpacing: -0.8,
       ),
       headlineMedium: TextStyle(
-        fontSize: 26,
-        height: 1.22,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.5,
+        fontFamily: 'Songti SC',
+        fontFamilyFallback: ['STSong', 'Noto Serif CJK SC', 'serif'],
+        fontSize: 25,
+        height: 1.28,
+        fontWeight: FontWeight.w500,
+        letterSpacing: -0.3,
       ),
-      titleLarge:
-          TextStyle(fontSize: 20, height: 1.3, fontWeight: FontWeight.w600),
-      titleMedium:
-          TextStyle(fontSize: 16, height: 1.35, fontWeight: FontWeight.w600),
+      titleLarge: TextStyle(
+        fontFamily: 'Songti SC',
+        fontFamilyFallback: ['STSong', 'Noto Serif CJK SC', 'serif'],
+        fontSize: 20,
+        height: 1.35,
+        fontWeight: FontWeight.w500,
+      ),
+      titleMedium: TextStyle(
+        fontFamily: 'Songti SC',
+        fontFamilyFallback: ['STSong', 'Noto Serif CJK SC', 'serif'],
+        fontSize: 16,
+        height: 1.4,
+        fontWeight: FontWeight.w500,
+      ),
       bodyLarge:
-          TextStyle(fontSize: 17, height: 1.72, fontWeight: FontWeight.w400),
+          TextStyle(fontSize: 16, height: 1.72, fontWeight: FontWeight.w400),
       bodyMedium:
-          TextStyle(fontSize: 15, height: 1.62, fontWeight: FontWeight.w400),
+          TextStyle(fontSize: 14, height: 1.62, fontWeight: FontWeight.w400),
       labelLarge: TextStyle(
-          fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.2),
+          fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.15),
       labelMedium: TextStyle(
-          fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.8),
+          fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.7),
     ),
     cardTheme: CardThemeData(
       color: AppColors.white,
       margin: EdgeInsets.zero,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
         side: BorderSide(color: AppColors.ink.withValues(alpha: 0.07)),
       ),
     ),
@@ -83,6 +101,34 @@ abstract final class AppTheme {
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.white.withValues(alpha: .72),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: AppColors.line),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: AppColors.line),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: AppColors.terracotta, width: 1.4),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: AppColors.paperDeep,
+      selectedColor: AppColors.moss,
+      disabledColor: AppColors.paperDeep,
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      labelStyle: const TextStyle(fontSize: 12, color: AppColors.ink),
+      secondaryLabelStyle: const TextStyle(color: AppColors.white),
+    ),
+    dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: AppColors.ink,
       contentTextStyle: const TextStyle(color: AppColors.white),

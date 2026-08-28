@@ -15,26 +15,52 @@ class BrandMark extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 32,
-          height: 32,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
             color:
                 light ? AppColors.white.withValues(alpha: 0.16) : AppColors.ink,
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
-          child: Icon(Icons.explore_rounded,
-              size: 18, color: light ? color : AppColors.gold),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          '见地',
-          style: TextStyle(
-            color: color,
-            fontSize: 19,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 3,
+          child: Text(
+            '见',
+            style: TextStyle(
+              color: light ? color : AppColors.gold,
+              fontFamily: 'Songti SC',
+              fontFamilyFallback: const ['STSong', 'serif'],
+              fontSize: 17,
+              fontWeight: FontWeight.w500,
+            ),
           ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '见地',
+              style: TextStyle(
+                color: color,
+                fontFamily: 'Songti SC',
+                fontFamilyFallback: const ['STSong', 'serif'],
+                fontSize: 17,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 3,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'JIAN · DI',
+              style: TextStyle(
+                color: color.withValues(alpha: .62),
+                fontSize: 7,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.7,
+              ),
+            ),
+          ],
         ),
       ],
     );

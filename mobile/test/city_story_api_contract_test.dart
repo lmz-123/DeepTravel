@@ -129,7 +129,6 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('城市故事'), findsOneWidget);
     expect(find.text('继续我的足迹'), findsNothing);
     final scrollView = tester.widget<CustomScrollView>(
       find.byType(CustomScrollView),
@@ -139,6 +138,12 @@ void main() {
       sliverKeys.indexOf(const ValueKey('route-selection-section')),
       lessThan(sliverKeys.indexOf(const ValueKey('city-story-section'))),
     );
+    await tester.drag(
+      find.byType(CustomScrollView),
+      const Offset(0, -900),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('城市故事'), findsOneWidget);
     final storyCard = find.bySemanticsLabel(RegExp('未来类型.*街角的旧砖'));
     expect(storyCard, findsOneWidget);
     await tester.scrollUntilVisible(
@@ -178,7 +183,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('predeparture-surface')), findsOneWidget);
-    expect(find.byKey(const ValueKey('predeparture-play-pause')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('predeparture-play-pause')), findsOneWidget);
     expect(find.byType(Slider), findsNothing);
     expect(find.byType(LinearProgressIndicator), findsNothing);
     await tester.scrollUntilVisible(

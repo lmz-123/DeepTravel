@@ -59,7 +59,11 @@ class _TravelerDrawer extends ConsumerWidget {
     final session = ref.watch(authControllerProvider).asData?.value;
     final username = session?.user.username?.trim();
     return Drawer(
+      width: MediaQuery.sizeOf(context).width * .84,
       backgroundColor: AppColors.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(30)),
+      ),
       child: SafeArea(
         child: Column(
           children: [
@@ -70,8 +74,15 @@ class _TravelerDrawer extends ConsumerWidget {
                   const CircleAvatar(
                     radius: 28,
                     backgroundColor: AppColors.ink,
-                    child: Icon(Icons.person_outline_rounded,
-                        color: AppColors.gold, size: 30),
+                    child: Text(
+                      '见',
+                      style: TextStyle(
+                        color: AppColors.gold,
+                        fontFamily: 'Songti SC',
+                        fontFamilyFallback: ['STSong', 'serif'],
+                        fontSize: 18,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -85,7 +96,7 @@ class _TravelerDrawer extends ConsumerWidget {
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 3),
-                        Text('把走过的地方，留成自己的见识',
+                        Text('下午好 · 把走过的地方，留成自己的见识',
                             style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
