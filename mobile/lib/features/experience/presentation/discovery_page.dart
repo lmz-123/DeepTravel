@@ -14,7 +14,6 @@ import '../domain/models.dart';
 import 'active_tour_controller.dart';
 import 'discovery_controller.dart';
 import 'experience_providers.dart';
-import 'offline_package_controller.dart';
 import 'traveler_shell.dart';
 import 'widgets/rotating_tour_orb.dart';
 import 'widgets/favorite_button.dart';
@@ -920,7 +919,7 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   @override
   void initState() {
     super.initState();
-    _controller = PageController(viewportFraction: .88);
+    _controller = PageController(viewportFraction: 1);
   }
 
   @override
@@ -955,7 +954,7 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
           ),
           LayoutBuilder(
             builder: (context, constraints) {
-              final cardWidth = constraints.maxWidth * .88 - 12;
+              final cardWidth = constraints.maxWidth - 40;
               final layout = _measureCardLayout(context, cardWidth);
               return SizedBox(
                 height: layout.carouselHeight,
@@ -988,7 +987,7 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
                       );
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: _RouteCard(
                         card: widget.cards[index],
                         heroHeight: layout.heroHeight,
@@ -1024,8 +1023,8 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
                   key: ValueKey('route-indicator-$index'),
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
-                  width: selected ? 24 : 7,
-                  height: 7,
+                  width: selected ? 24 : 5,
+                  height: 5,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     color: selected
@@ -1170,7 +1169,7 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   }
 }
 
-class _RouteCard extends ConsumerWidget {
+class _RouteCard extends StatelessWidget {
   const _RouteCard({
     required this.card,
     required this.heroHeight,
@@ -1182,20 +1181,18 @@ class _RouteCard extends ConsumerWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final route = card.route;
-    final packageKey = OfflinePackageKey(
-      route.slug,
-      route.audioTour?.scriptVersion,
-    );
-    final packageStatus =
-        ref.watch(offlinePackageControllerProvider(packageKey)).asData?.value ??
-            const OfflinePackageStatus.idle();
     return Semantics(
       button: true,
       label: '查看景区 ${route.title}',
-      child: Card(
+      child: Material(
         key: ValueKey('route-card-${route.slug}'),
+        color: AppColors.white,
+        elevation: 3,
+        shadowColor: AppColors.ink.withValues(alpha: .14),
+        surfaceTintColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(27),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -1208,7 +1205,7 @@ class _RouteCard extends ConsumerWidget {
                 height: heroHeight,
                 heroTag: 'route-${route.slug}',
                 child: Padding(
-                  padding: const EdgeInsets.all(22),
+                  padding: const EdgeInsets.fromLTRB(17, 13, 17, 15),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1243,85 +1240,72 @@ class _RouteCard extends ConsumerWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      route.subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                    if ((route.pretrip?.companionTags ?? const <String>[])
-                        .isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: route.pretrip!.companionTags
-                            .take(3)
-                            .map(
-                              (tag) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 5,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(17, 14, 17, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        route.subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              height: 1.6,
+                            ),
+                      ),
+                      if ((route.pretrip?.companionTags ?? const <String>[])
+                          .isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: route.pretrip!.companionTags
+                              .take(3)
+                              .map(
+                                (tag) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.paperDeep,
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style:
+                                        Theme.of(context).textTheme.labelSmall,
+                                  ),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.paperDeep,
-                                  borderRadius: BorderRadius.circular(99),
-                                ),
-                                child: Text(
-                                  tag,
-                                  style: Theme.of(context).textTheme.labelSmall,
-                                ),
-                              ),
-                            )
-                            .toList(growable: false),
+                              )
+                              .toList(growable: false),
+                        ),
+                      ],
+                      const Spacer(),
+                      Row(
+                        children: [
+                          _Metric(
+                            icon: Icons.schedule_rounded,
+                            text: '${route.durationMinutes} 分钟',
+                          ),
+                          _Metric(
+                            icon: Icons.route_rounded,
+                            text: '${route.distanceKm} km',
+                          ),
+                          _Metric(
+                            icon: Icons.flag_outlined,
+                            text: '${route.numberOfStops} 站',
+                          ),
+                          const Spacer(),
+                          Text(
+                            '打开城市手册 →',
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        _Metric(
-                          icon: Icons.schedule_rounded,
-                          text: '${route.durationMinutes} 分钟',
-                        ),
-                        _Metric(
-                          icon: Icons.route_rounded,
-                          text: '${route.distanceKm} km',
-                        ),
-                        _Metric(
-                          icon: Icons.flag_outlined,
-                          text: '${route.numberOfStops} 站',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        _OfflinePackageButton(
-                          route: route,
-                          status: packageStatus,
-                          onPressed: () => ref
-                              .read(offlinePackageControllerProvider(packageKey)
-                                  .notifier)
-                              .download(route),
-                        ),
-                        const Spacer(),
-                        Text('打开城市手册',
-                            style: Theme.of(context).textTheme.labelLarge),
-                        const SizedBox(width: 10),
-                        const CircleAvatar(
-                          radius: 20,
-                          backgroundColor: AppColors.ink,
-                          foregroundColor: AppColors.white,
-                          child: Icon(Icons.arrow_forward_rounded, size: 19),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -1340,70 +1324,6 @@ class _RouteCardLayout {
 
   final double heroHeight;
   final double carouselHeight;
-}
-
-class _OfflinePackageButton extends StatelessWidget {
-  const _OfflinePackageButton({
-    required this.route,
-    required this.status,
-    required this.onPressed,
-  });
-
-  final RouteExperience route;
-  final OfflinePackageStatus status;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final downloading = status.phase == OfflinePackagePhase.downloading;
-    final tooltip = switch (status.phase) {
-      OfflinePackagePhase.idle => '下载离线包',
-      OfflinePackagePhase.downloading => status.total > 0
-          ? '正在下载离线包 ${status.complete}/${status.total}'
-          : '正在下载离线包',
-      OfflinePackagePhase.complete => '离线包已下载 · ${status.message ?? '完整性校验通过'}',
-      OfflinePackagePhase.stale => '离线包有新版本，点击更新',
-      OfflinePackagePhase.failed => status.message ?? '下载失败，点击重试',
-    };
-    final icon = switch (status.phase) {
-      OfflinePackagePhase.idle => Icons.download_outlined,
-      OfflinePackagePhase.complete => Icons.download_done_rounded,
-      OfflinePackagePhase.stale => Icons.system_update_alt_rounded,
-      OfflinePackagePhase.failed => Icons.error_outline_rounded,
-      OfflinePackagePhase.downloading => null,
-    };
-    return Semantics(
-      label: tooltip,
-      button: true,
-      child: SizedBox.square(
-        dimension: 48,
-        child: IconButton(
-          key: ValueKey('offline-package-${route.slug}'),
-          tooltip: tooltip,
-          onPressed: downloading ? null : onPressed,
-          iconSize: 20,
-          icon: downloading
-              ? SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    value: status.total > 0
-                        ? (status.complete / status.total)
-                            .clamp(0.0, 1.0)
-                            .toDouble()
-                        : null,
-                  ),
-                )
-              : Icon(
-                  icon,
-                  color: status.phase == OfflinePackagePhase.failed
-                      ? Theme.of(context).colorScheme.error
-                      : AppColors.ink,
-                ),
-        ),
-      ),
-    );
-  }
 }
 
 String _formatDistance(double meters) {

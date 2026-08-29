@@ -153,7 +153,11 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 18),
-                      _FragmentRail(manifest: manifest, ledger: ledger),
+                      _FragmentRail(
+                        manifest: manifest,
+                        ledger: ledger,
+                        points: state.nearbyStoryPoints,
+                      ),
                       const SizedBox(height: 14),
                       _SelectedNodeDetail(
                         manifest: manifest,
@@ -162,9 +166,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                         points: state.nearbyStoryPoints,
                         isLoading: state.isBusy || ledger == null,
                       ),
-                      const SizedBox(height: 18),
-                      _StatusPanel(state: state),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 13),
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 380),
                         child: state.current == null
@@ -181,30 +183,6 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                             state: state,
                           ),
                         ),
-                      if (state.locationMode == TourLocationMode.simulated) ...[
-                        const SizedBox(height: 18),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: state.isBusy ||
-                                    state.status != 'simulated'
-                                ? null
-                                : () => ref
-                                    .read(activeTourControllerProvider.notifier)
-                                    .triggerNextDemo(),
-                            icon: state.isBusy
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.my_location_rounded),
-                            label:
-                                Text(state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）'),
-                          ),
-                        ),
-                      ],
                       if (state.playbackMode == TourPlaybackMode.liveReplay &&
                           state.liveFragmentId != null) ...[
                         const SizedBox(height: 10),
@@ -232,6 +210,32 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                           journeyId: widget.journeyId,
                           fragment: selectedFragment,
                         ),
+                      const SizedBox(height: 13),
+                      _ModeSelector(state: state),
+                      if (state.locationMode == TourLocationMode.simulated) ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: state.isBusy ||
+                                    state.status != 'simulated'
+                                ? null
+                                : () => ref
+                                    .read(activeTourControllerProvider.notifier)
+                                    .triggerNextDemo(),
+                            icon: state.isBusy
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.my_location_rounded),
+                            label:
+                                Text(state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -717,103 +721,16 @@ class _LegacyJourneyView extends ConsumerWidget {
   }
 }
 
-class _StatusPanel extends ConsumerWidget {
-  const _StatusPanel({required this.state});
-  final ActiveTourState state;
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final monitoring = state.status == 'monitoring';
-    final simulated = state.status == 'simulated';
-    final revisiting = state.playbackMode == TourPlaybackMode.revisit;
-    final running = monitoring || simulated;
-    final label = switch (state.status) {
-      'preparing' => '正在准备离线故事',
-      'permission_limited' => '自动定位受限',
-      'simulated' => '模拟定位中 · 不读取 GPS',
-      'paused' => '导览已暂停',
-      'stopped' => '导览已停止',
-      'revisit' => '足迹回听中 · 不改写进度',
-      _ => monitoring ? '正在寻找附近的历史线索' : '正在恢复导览'
-    };
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-          color: AppColors.ink, borderRadius: BorderRadius.circular(24)),
-      child: Column(children: [
-        Row(children: [
-          Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                  color: running ? AppColors.gold : AppColors.terracotta,
-                  shape: BoxShape.circle)),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(label,
-                  style: const TextStyle(
-                      color: AppColors.white, fontWeight: FontWeight.w600))),
-          IconButton.filledTonal(
-              tooltip: revisiting
-                  ? state.isPlaying
-                      ? '暂停回听'
-                      : '继续回听'
-                  : running
-                      ? '暂停自动导览'
-                      : '继续自动导览',
-              onPressed: revisiting
-                  ? () => ref
-                      .read(activeTourControllerProvider.notifier)
-                      .togglePlayback()
-                  : running
-                      ? () => ref
-                          .read(activeTourControllerProvider.notifier)
-                          .pauseTour()
-                      : () => ref
-                          .read(activeTourControllerProvider.notifier)
-                          .resumeTour(),
-              icon: Icon((revisiting ? state.isPlaying : running)
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded)),
-          IconButton(
-              tooltip: '停止自动导览',
-              color: AppColors.white,
-              onPressed: () =>
-                  ref.read(activeTourControllerProvider.notifier).stopTour(),
-              icon: const Icon(Icons.stop_circle_outlined)),
-        ]),
-        if (state.locationMessage != null)
-          Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(state.locationMessage!,
-                      style: TextStyle(
-                          color: AppColors.white.withValues(alpha: .72),
-                          height: 1.45)))),
-        if (!revisiting)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                state.locationMode == TourLocationMode.simulated
-                    ? '设置模式：模拟定位'
-                    : '设置模式：真实定位',
-                style: TextStyle(
-                    color: AppColors.white.withValues(alpha: .62),
-                    fontSize: 12),
-              ),
-            ),
-          ),
-      ]),
-    );
-  }
-}
-
 class _FragmentRail extends ConsumerWidget {
-  const _FragmentRail({required this.manifest, required this.ledger});
+  const _FragmentRail({
+    required this.manifest,
+    required this.ledger,
+    required this.points,
+  });
   final AudioTourManifest manifest;
   final StoryLedger? ledger;
+  final List<NearbyStoryPoint> points;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(activeTourControllerProvider);
@@ -827,21 +744,14 @@ class _FragmentRail extends ConsumerWidget {
       );
     }
     return LayoutBuilder(builder: (context, constraints) {
-      const minNodeExtent = 44.0;
-      const maxNodeExtent = 56.0;
-      const minSpacing = 4.0;
-      const maxSpacing = 18.0;
+      const nodeExtent = 43.0;
+      const minSpacing = 8.0;
+      const maxSpacing = 22.0;
       final count = fragments.length;
       final availableWidth = constraints.maxWidth;
-      final minimumWidth = count * minNodeExtent + (count - 1) * minSpacing;
+      final minimumWidth = count * nodeExtent + (count - 1) * minSpacing;
       final scrollable =
           availableWidth.isFinite && minimumWidth > availableWidth;
-      final rawExtent = count == 0 || !availableWidth.isFinite
-          ? maxNodeExtent
-          : (availableWidth - (count - 1) * minSpacing) / count;
-      final nodeExtent = scrollable
-          ? minNodeExtent
-          : rawExtent.clamp(minNodeExtent, maxNodeExtent).toDouble();
       final remaining = availableWidth.isFinite
           ? availableWidth - nodeExtent * count
           : minSpacing * (count - 1);
@@ -862,6 +772,11 @@ class _FragmentRail extends ConsumerWidget {
         final collected = entry?.isCollected ?? false;
         final pending = entry?.isMissionPending ?? false;
         final revealed = entry?.isRevealed ?? false;
+        final point = points
+            .where((candidate) => candidate.fragment.id == fragment.id)
+            .firstOrNull;
+        final nearby = point?.status == NearbyStoryPointStatus.inRange ||
+            point?.status == NearbyStoryPointStatus.approaching;
         final selected = state.selectedFragmentId == fragment.id;
         final live = state.liveFragmentId == fragment.id;
         final action = collected
@@ -877,59 +792,53 @@ class _FragmentRail extends ConsumerWidget {
         if (index > 0) nodes.add(SizedBox(width: spacing));
         nodes.add(SizedBox(
           width: nodeExtent,
-          child: Column(
-            children: [
-              Semantics(
-                button: true,
-                selected: selected,
-                label:
-                    '第 ${fragment.position} 个节点，${fragment.title ?? fragment.safePreview}，$stateLabel${live ? '，当前行走进度' : ''}，$action',
-                child: SizedBox.square(
-                  dimension: nodeExtent,
-                  child: IconButton(
-                    tooltip: '$action第 ${fragment.position} 个节点',
-                    onPressed: () => ref
-                        .read(activeTourControllerProvider.notifier)
-                        .selectNode(fragment.id),
-                    style: IconButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.square(nodeExtent),
-                      maximumSize: Size.square(nodeExtent),
-                      backgroundColor: collected || revealed
-                          ? AppColors.moss
-                          : pending
+          child: Semantics(
+            button: true,
+            selected: selected,
+            label:
+                '第 ${fragment.position} 个节点，${fragment.title ?? fragment.safePreview}，$stateLabel${live ? '，当前行走进度' : ''}，$action',
+            child: AnimatedScale(
+              scale: selected ? 1.1 : 1,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              child: SizedBox.square(
+                dimension: nodeExtent,
+                child: IconButton(
+                  key: ValueKey('journey-node-${fragment.id}'),
+                  tooltip: '$action第 ${fragment.position} 个节点',
+                  onPressed: () => ref
+                      .read(activeTourControllerProvider.notifier)
+                      .selectNode(fragment.id),
+                  style: IconButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size.square(nodeExtent),
+                    maximumSize: const Size.square(nodeExtent),
+                    backgroundColor: collected || revealed
+                        ? AppColors.moss
+                        : nearby || pending
+                            ? AppColors.terracotta
+                            : AppColors.paperDeep,
+                    foregroundColor: collected || revealed || nearby || pending
+                        ? AppColors.white
+                        : AppColors.ink,
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.gold
+                          : live
                               ? AppColors.terracotta
-                              : AppColors.paperDeep,
-                      foregroundColor: collected || revealed || pending
-                          ? AppColors.white
-                          : AppColors.ink,
-                      side: BorderSide(
-                        color: selected
-                            ? AppColors.gold
-                            : live
-                                ? AppColors.terracotta
-                                : Colors.transparent,
-                        width: selected || live ? 3 : 1,
-                      ),
-                    ),
-                    icon: Icon(
-                      collected
-                          ? selected
-                              ? Icons.graphic_eq_rounded
-                              : Icons.check_rounded
-                          : revealed
-                              ? Icons.volume_up_outlined
-                              : pending
-                                  ? Icons.photo_camera_outlined
-                                  : Icons.radio_button_unchecked_rounded,
+                              : AppColors.white,
+                      width: selected || live ? 3 : 1,
                     ),
                   ),
+                  icon: collected
+                      ? const Icon(Icons.check_rounded)
+                      : Text(
+                          '${fragment.position}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text('${fragment.position}',
-                  style: Theme.of(context).textTheme.labelMedium),
-            ],
+            ),
           ),
         ));
       }
@@ -1010,56 +919,90 @@ class _SelectedNodeDetail extends StatelessWidget {
     final durationMinutes = durationSeconds == null
         ? null
         : (durationSeconds / 60).ceil().clamp(1, 99);
-    final revealed = ledgerFragment?.isRevealed ?? false;
     final metadata = <String>[
-      if (fragment.displayTheme != null) fragment.displayTheme!,
       if (durationMinutes != null) '约 $durationMinutes 分钟',
-      isLoading && point == null ? '正在准备节点状态' : _statusLabel(status),
-      if (point?.distanceMeters != null) _distanceLabel(point!.distanceMeters!),
+      if (isLoading && point == null) '正在准备节点状态',
+      ...fragment.experienceTags,
     ];
-    return Card(
+    return Container(
       key: ValueKey('selected-node-detail-${fragment.id}'),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_statusIcon(status), color: _statusColor(status)),
-                const SizedBox(width: 10),
-                Text('节点 ${fragment.position}',
-                    style: Theme.of(context).textTheme.labelLarge),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              fragment.title ?? fragment.safePreview,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            if (fragment.title != null && fragment.safePreview.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(fragment.safePreview),
-            ],
-            if (metadata.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: metadata
-                    .map((value) => Chip(label: Text(value)))
-                    .toList(growable: false),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink.withValues(alpha: .08),
+            blurRadius: 24,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '节点 ${fragment.position}${fragment.displayTheme == null ? '' : ' · ${fragment.displayTheme}'}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.terracotta,
+                        letterSpacing: .8,
+                      ),
+                ),
+              ),
+              Text(
+                point?.distanceMeters == null
+                    ? _statusLabel(status)
+                    : _distanceLabel(point!.distanceMeters!),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: _statusColor(status),
+                    ),
               ),
             ],
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            fragment.title ?? fragment.safePreview,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          if (fragment.title != null && fragment.safePreview.isNotEmpty) ...[
+            const SizedBox(height: 8),
             Text(
-              revealed
-                  ? '这个节点已经触发，可以在下方播放卡片继续收听或回听。'
-                  : '先按自己的方向行走；靠近这个节点后，讲解会自动触发。',
-              style: Theme.of(context).textTheme.bodySmall,
+              fragment.safePreview,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textMuted,
+                    height: 1.55,
+                  ),
             ),
           ],
-        ),
+          if (metadata.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: metadata
+                  .map(
+                    (value) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.paperDeep,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        value,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1072,15 +1015,6 @@ String _statusLabel(NearbyStoryPointStatus status) => switch (status) {
       NearbyStoryPointStatus.inRange => '已进入触发范围',
       NearbyStoryPointStatus.triggered => '已触发，可回听',
       NearbyStoryPointStatus.heard => '已听过，可回听',
-    };
-
-IconData _statusIcon(NearbyStoryPointStatus status) => switch (status) {
-      NearbyStoryPointStatus.locationUnavailable => Icons.location_off_outlined,
-      NearbyStoryPointStatus.outside => Icons.radio_button_unchecked_rounded,
-      NearbyStoryPointStatus.approaching => Icons.radar_rounded,
-      NearbyStoryPointStatus.inRange => Icons.location_on_outlined,
-      NearbyStoryPointStatus.triggered => Icons.volume_up_outlined,
-      NearbyStoryPointStatus.heard => Icons.check_circle_outline_rounded,
     };
 
 Color _statusColor(NearbyStoryPointStatus status) => switch (status) {
@@ -1096,152 +1030,498 @@ String _distanceLabel(double meters) {
   return '${(meters / 1000).toStringAsFixed(1)} 公里';
 }
 
-class _ListeningCard extends StatelessWidget {
+class _ListeningCard extends ConsumerWidget {
   const _ListeningCard({required this.state, super.key});
   final ActiveTourState state;
-  @override
-  Widget build(BuildContext context) => Card(
-      child: Padding(
-          padding: const EdgeInsets.all(24),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Icon(Icons.headphones_rounded,
-                size: 36, color: AppColors.moss),
-            const SizedBox(height: 16),
-            Text('把手机放进口袋', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(state.locationMode == TourLocationMode.simulated
-                ? '当前忽略真实位置。需要推进时，点击“模拟到达下一条线索”；故事、拍照和线索簿仍走完整后端流程。'
-                : '靠近地点后，需要两次稳定定位才会唤醒故事。耳机断开时音频会先暂停。')
-          ])));
-}
 
-class _NarrationCard extends ConsumerWidget {
-  const _NarrationCard({required this.state, super.key});
-  final ActiveTourState state;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final revisiting = state.playbackMode == TourPlaybackMode.revisit;
+    final running = state.status == 'monitoring' || state.status == 'simulated';
+    final playing = revisiting ? state.isPlaying : running;
+    final title = switch (state.status) {
+      'preparing' => '正在准备沿途讲述',
+      'permission_limited' => '等待你允许定位',
+      'simulated' => '正在模拟寻找下一条线索',
+      'paused' => '自动导览已暂停',
+      'stopped' => '自动导览已停止',
+      'revisit' => '正在回听这段足迹',
+      _ => '正在寻找附近的历史线索',
+    };
+    return _DarkNarrationSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _NarrationPlayButton(
+                icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                tooltip: revisiting
+                    ? playing
+                        ? '暂停回听'
+                        : '继续回听'
+                    : playing
+                        ? '暂停自动导览'
+                        : '继续自动导览',
+                onPressed: revisiting
+                    ? () => ref
+                        .read(activeTourControllerProvider.notifier)
+                        .togglePlayback()
+                    : playing
+                        ? () => ref
+                            .read(activeTourControllerProvider.notifier)
+                            .pauseTour()
+                        : () => ref
+                            .read(activeTourControllerProvider.notifier)
+                            .resumeTour(),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: AppColors.white,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      state.locationMessage ??
+                          (state.locationMode == TourLocationMode.simulated
+                              ? '无需 GPS，手动推进节点'
+                              : '靠近节点后自动唤醒故事'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.white.withValues(alpha: .65),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: '停止自动导览',
+                color: AppColors.white.withValues(alpha: .75),
+                onPressed: () =>
+                    ref.read(activeTourControllerProvider.notifier).stopTour(),
+                icon: const Icon(Icons.stop_circle_outlined, size: 21),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: AppColors.white.withValues(alpha: .14),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            state.locationMode == TourLocationMode.simulated
+                ? '设置模式：模拟定位'
+                : '设置模式：真实定位',
+            style: TextStyle(
+              color: AppColors.white.withValues(alpha: .62),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NarrationCard extends ConsumerStatefulWidget {
+  const _NarrationCard({required this.state, super.key});
+  final ActiveTourState state;
+
+  @override
+  ConsumerState<_NarrationCard> createState() => _NarrationCardState();
+}
+
+class _NarrationCardState extends ConsumerState<_NarrationCard> {
+  var _showTranscript = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
     final fragment = state.current!;
     final total = state.duration?.inMilliseconds ?? 0;
     final progress = total == 0
         ? 0.0
         : (state.position.inMilliseconds / total).clamp(0.0, 1.0);
-    return Material(
-      color: AppColors.ink,
-      borderRadius: BorderRadius.circular(26),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('线索 ${fragment.position} · 研究预览',
-              style: const TextStyle(
-                  color: AppColors.gold, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          Text(fragment.title ?? fragment.safePreview,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineMedium
-                  ?.copyWith(color: AppColors.white)),
-          const SizedBox(height: 16),
-          Slider(
-              value: progress,
-              onChanged: total == 0
-                  ? null
-                  : (value) => ref
-                      .read(activeTourControllerProvider.notifier)
-                      .seek(Duration(milliseconds: (total * value).round()))),
-          Row(
-            children: [
-              Text(
-                _formatAudioTime(state.position),
-                style: TextStyle(
-                  color: AppColors.white.withValues(alpha: .72),
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                total == 0 ? '--:--' : _formatAudioTime(state.duration!),
-                style: TextStyle(
-                  color: AppColors.white.withValues(alpha: .72),
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(children: [
-            IconButton(
-                color: AppColors.white,
-                tooltip: '重播',
-                onPressed: () =>
-                    ref.read(activeTourControllerProvider.notifier).replay(),
-                icon: const Icon(Icons.replay_rounded)),
-            const Spacer(),
-            IconButton.filled(
-                style: IconButton.styleFrom(
-                    backgroundColor: AppColors.gold,
-                    foregroundColor: AppColors.ink),
-                tooltip: state.isPlaying ? '暂停' : '继续',
-                onPressed: () => ref
-                    .read(activeTourControllerProvider.notifier)
-                    .togglePlayback(),
-                icon: Icon(state.isPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded)),
-            const Spacer(),
-            PopupMenuButton<double>(
-                initialValue: state.speed,
-                tooltip: '速度',
-                onSelected: (value) => ref
-                    .read(activeTourControllerProvider.notifier)
-                    .setSpeed(value),
-                itemBuilder: (_) => const [.8, 1.0, 1.2, 1.5]
-                    .map((speed) =>
-                        PopupMenuItem(value: speed, child: Text('${speed}x')))
-                    .toList(),
-                child: Text('${state.speed}x',
-                    style: const TextStyle(color: AppColors.white))),
-            NarrationVoiceIconButton(
-              profiles: state.route!.audioTour!.narrationProfiles,
-              selectedProfileId: state.narrationProfileId,
-              foregroundColor: AppColors.white,
-              onSelected: (profileId) => ref
+    final profiles = state.route!.audioTour!.narrationProfiles;
+    final selectedProfile = profiles
+        .where((profile) => profile.id == state.narrationProfileId)
+        .firstOrNull;
+    final monitoring =
+        state.status == 'monitoring' || state.status == 'simulated';
+    return _DarkNarrationSurface(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(
+          children: [
+            _NarrationPlayButton(
+              icon: state.isPlaying
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              tooltip: state.isPlaying ? '暂停' : '继续',
+              onPressed: () => ref
                   .read(activeTourControllerProvider.notifier)
-                  .selectNarrationProfile(profileId),
+                  .togglePlayback(),
             ),
-          ]),
-          if (state.narrationProfileMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                state.narrationProfileMessage!,
-                style: TextStyle(
-                  color: AppColors.white.withValues(alpha: .72),
-                  fontSize: 12,
-                ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '正在播放：${fragment.title ?? fragment.safePreview}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppColors.white,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_formatAudioTime(state.position)} / ${total == 0 ? '--:--' : _formatAudioTime(state.duration!)} · 锁屏可继续播放',
+                    style: TextStyle(
+                      color: AppColors.white.withValues(alpha: .62),
+                      fontSize: 12,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
               ),
             ),
-          if (fragment.transcript != null)
-            ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                collapsedIconColor: AppColors.white,
-                iconColor: AppColors.gold,
-                title: const Text('阅读等价文字稿',
-                    style: TextStyle(color: AppColors.white)),
-                children: [
-                  Text(fragment.transcript!,
-                      style: TextStyle(
-                          color: AppColors.white.withValues(alpha: .82),
-                          height: 1.7))
-                ]),
-          if (state.queue.isNotEmpty)
-            Text('另有 ${state.queue.length} 段故事在队列中',
+            IconButton(
+              tooltip: monitoring ? '暂停自动导览' : '继续自动导览',
+              color: AppColors.white.withValues(alpha: .72),
+              onPressed: monitoring
+                  ? () => ref
+                      .read(activeTourControllerProvider.notifier)
+                      .pauseTour()
+                  : () => ref
+                      .read(activeTourControllerProvider.notifier)
+                      .resumeTour(),
+              icon: Icon(
+                monitoring
+                    ? Icons.pause_circle_outline_rounded
+                    : Icons.play_circle_outline_rounded,
+                size: 21,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 3,
+            activeTrackColor: AppColors.terracotta,
+            inactiveTrackColor: AppColors.white.withValues(alpha: .15),
+            thumbColor: AppColors.white,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+          ),
+          child: Slider(
+            value: progress,
+            onChanged: total == 0
+                ? null
+                : (value) => ref
+                    .read(activeTourControllerProvider.notifier)
+                    .seek(Duration(milliseconds: (total * value).round())),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          children: [
+            PopupMenuButton<double>(
+              initialValue: state.speed,
+              tooltip: '速度',
+              onSelected: (value) => ref
+                  .read(activeTourControllerProvider.notifier)
+                  .setSpeed(value),
+              itemBuilder: (_) => const [.8, 1.0, 1.2, 1.5]
+                  .map((speed) => PopupMenuItem(
+                        value: speed,
+                        child: Text('${speed}x'),
+                      ))
+                  .toList(),
+              child: _DarkControlSurface(
+                icon: Icons.speed_rounded,
+                label: '${state.speed}× 语速',
+              ),
+            ),
+            if (profiles.isNotEmpty)
+              _DarkControlButton(
+                icon: Icons.record_voice_over_outlined,
+                label: selectedProfile?.name ?? profiles.first.name,
+                onPressed: profiles.length <= 1
+                    ? null
+                    : () async {
+                        final chosen = await showNarrationVoicePicker(
+                          context,
+                          profiles: profiles,
+                          selectedProfileId: state.narrationProfileId,
+                        );
+                        if (chosen != null &&
+                            chosen != state.narrationProfileId) {
+                          ref
+                              .read(activeTourControllerProvider.notifier)
+                              .selectNarrationProfile(chosen);
+                        }
+                      },
+              ),
+            if (fragment.transcript != null)
+              _DarkControlButton(
+                icon: Icons.subject_rounded,
+                label: '阅读等价文字稿',
+                selected: _showTranscript,
+                onPressed: () =>
+                    setState(() => _showTranscript = !_showTranscript),
+              ),
+          ],
+        ),
+        if (state.narrationProfileMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              state.narrationProfileMessage!,
+              style: TextStyle(
+                color: AppColors.white.withValues(alpha: .72),
+                fontSize: 12,
+              ),
+            ),
+          ),
+        if (_showTranscript && fragment.transcript != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            fragment.transcript!,
+            style: TextStyle(
+              color: AppColors.white.withValues(alpha: .82),
+              height: 1.7,
+            ),
+          ),
+        ],
+        if (state.queue.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text('另有 ${state.queue.length} 段故事在队列中',
                 style: const TextStyle(color: AppColors.gold)),
-        ]),
-      ),
+          ),
+      ]),
     );
   }
+}
+
+class _DarkNarrationSurface extends StatelessWidget {
+  const _DarkNarrationSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(17),
+        decoration: BoxDecoration(
+          color: AppColors.ink,
+          borderRadius: BorderRadius.circular(23),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ink.withValues(alpha: .16),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: child,
+      );
+}
+
+class _NarrationPlayButton extends StatelessWidget {
+  const _NarrationPlayButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton.filled(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          fixedSize: const Size.square(48),
+          backgroundColor: AppColors.terracotta,
+          foregroundColor: AppColors.white,
+        ),
+        icon: Icon(icon),
+      );
+}
+
+class _DarkControlButton extends StatelessWidget {
+  const _DarkControlButton({
+    required this.icon,
+    required this.label,
+    this.onPressed,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(99),
+        child: _DarkControlSurface(
+          icon: icon,
+          label: label,
+          selected: selected,
+        ),
+      );
+}
+
+class _DarkControlSurface extends StatelessWidget {
+  const _DarkControlSurface({
+    required this.icon,
+    required this.label,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.terracotta.withValues(alpha: .22)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: selected
+                ? AppColors.terracotta
+                : AppColors.white.withValues(alpha: .22),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: AppColors.white),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(color: AppColors.white, fontSize: 11),
+            ),
+          ],
+        ),
+      );
+}
+
+class _ModeSelector extends ConsumerWidget {
+  const _ModeSelector({required this.state});
+
+  final ActiveTourState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Row(
+        children: [
+          Expanded(
+            child: _ModeButton(
+              key: const ValueKey('journey-mode-real'),
+              icon: Icons.directions_walk_rounded,
+              label: '真实行走模式',
+              selected: state.locationMode == TourLocationMode.real,
+              onPressed: () => ref
+                  .read(activeTourControllerProvider.notifier)
+                  .setLocationMode(TourLocationMode.real),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _ModeButton(
+              key: const ValueKey('journey-mode-simulated'),
+              icon: Icons.explore_outlined,
+              label: '模拟预览模式',
+              selected: state.locationMode == TourLocationMode.simulated,
+              onPressed: () => ref
+                  .read(activeTourControllerProvider.notifier)
+                  .setLocationMode(TourLocationMode.simulated),
+            ),
+          ),
+        ],
+      );
+}
+
+class _ModeButton extends StatelessWidget {
+  const _ModeButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: selected ? AppColors.moss : Colors.transparent,
+        borderRadius: BorderRadius.circular(17),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: selected ? null : onPressed,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(
+                color: selected
+                    ? AppColors.moss
+                    : AppColors.ink.withValues(alpha: .14),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 17,
+                  color: selected ? AppColors.white : AppColors.ink,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: selected ? AppColors.white : AppColors.ink,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
 String _formatAudioTime(Duration value) {

@@ -83,6 +83,12 @@ Alternative considered: replace the established card dimensions with a viewport-
 
 If pre-departure fails, the manual remains readable. If story compatibility migration finds an ambiguous source/track, it records a blocker and leaves the old publication readable until resolved. If OSS audit cannot verify configuration, scope, authorization, or an object, it fails readiness without deleting or rewriting the asset; there is no local runtime fallback.
 
+### 8. Treat the final client design components as structural contracts
+
+The discovery scenic-manual card keeps its photographic hero, distance/status pill, title overlay, descriptive copy, server-driven tags, compact metrics, and one trailing manual action in the same card. The manual detail uses the designed paper-over-hero composition and distinct white information cards rather than generic list tiles. During a journey, one connected row of circular node controls is the only node selector: each circle includes its useful state/position content, is directly tappable, and updates the single node-introduction card below it. A second numeric row is prohibited. The current narration appears in one dark player card with a 48-pixel primary control, title/status copy, progress, and compact speed/voice/transcript controls. Real-walk and simulated-preview modes remain a separate two-column segmented surface after the node content.
+
+Alternative considered: keep the old rail labels and add the designed circles above them. Rejected because it duplicates the same navigation, weakens hierarchy, and caused the implementation to diverge from the approved design.
+
 ## Risks / Trade-offs
 
 - [A shared audio coordinator touches mature playback paths] → Add state-machine and rapid-switch tests first, retain adapter contract tests, and roll out pre-departure after city-story/on-site parity passes.

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,42 +58,16 @@ void main() {
     expect(find.text('headphone-gate'), findsOneWidget);
   });
 
-  testWidgets('offline package control is 48dp and never opens the route',
-      (tester) async {
-    final service = _RecordingOfflinePackageService(holdDownload: true);
+  testWidgets('home scenic card keeps one clear manual entry', (tester) async {
     await _pumpDiscovery(
       tester,
       journeyItem: null,
       context: null,
-      offlineService: service,
       userId: null,
     );
-    final button = find.byKey(const ValueKey('offline-package-route-a'));
-    await tester.ensureVisible(button);
-    await tester.pumpAndSettle();
-    expect(tester.getSize(button), const Size(48, 48));
-    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
-
-    await tester.tap(button);
-    await tester.pump();
-
-    final progress = tester.widget<CircularProgressIndicator>(
-      find.descendant(
-        of: button,
-        matching: find.byType(CircularProgressIndicator),
-      ),
-    );
-    expect(progress.value, .5);
-    expect(find.byType(Dialog), findsNothing);
-    expect(find.byType(BottomSheet), findsNothing);
-
-    expect(service.installedSlug, 'route-a');
-    expect(find.text('headphone-gate'), findsNothing);
+    expect(find.byKey(const ValueKey('offline-package-route-a')), findsNothing);
+    expect(find.text('打开城市手册 →'), findsOneWidget);
     expect(find.byKey(const ValueKey('route-card-route-a')), findsOneWidget);
-
-    service.finishDownload();
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.download_done_rounded), findsOneWidget);
   });
 
   testWidgets('active route opens its existing journey directly',
@@ -234,16 +206,10 @@ Future<void> _pumpDiscovery(
 }
 
 class _RecordingOfflinePackageService extends RouteOfflinePackageService {
-  _RecordingOfflinePackageService({this.holdDownload = false})
+  _RecordingOfflinePackageService()
       : super(Dio(), _CardStore(), PreparedRouteService(Dio(), _CardStore()));
 
-  final bool holdDownload;
-  final _downloadGate = Completer<void>();
   String? installedSlug;
-
-  void finishDownload() {
-    if (!_downloadGate.isCompleted) _downloadGate.complete();
-  }
 
   @override
   Future<OfflinePackageStatus> status(
@@ -260,7 +226,6 @@ class _RecordingOfflinePackageService extends RouteOfflinePackageService {
   }) async {
     installedSlug = slug;
     onProgress?.call(1, 2);
-    if (holdDownload) await _downloadGate.future;
     return const InstalledRoutePackage(
       city: _city,
       route: _route,

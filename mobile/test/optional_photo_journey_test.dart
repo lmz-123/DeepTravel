@@ -67,8 +67,9 @@ void main() {
 
     final collected = find.byTooltip('回听第 1 个节点');
     final untriggered = find.byTooltip('查看信息第 2 个节点');
-    expect(tester.getSize(collected).width, inInclusiveRange(44, 56));
-    expect(tester.getSize(untriggered).width, inInclusiveRange(44, 56));
+    expect(tester.getSize(collected), const Size(43, 43));
+    expect(tester.getSize(untriggered), const Size(43, 43));
+    expect(find.text('2'), findsOneWidget);
     expect(
         find.bySemanticsLabel('第 1 个节点，城门的变化，已听过，当前行走进度，回听'), findsOneWidget);
 
@@ -95,6 +96,17 @@ void main() {
       const Offset(0, -180),
     );
     expect(audio, findsOneWidget);
+
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('journey-mode-real')),
+      find.byType(ListView),
+      const Offset(0, -180),
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('journey-mode-real')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('journey-mode-real')));
+    await tester.pump();
+    expect(controller.locationMode, TourLocationMode.real);
   });
 
   testWidgets(
@@ -194,6 +206,7 @@ class _StaticTourController extends ActiveTourController {
 
   final ActiveTourState initial;
   String? selectedFragmentId;
+  TourLocationMode? locationMode;
 
   @override
   ActiveTourState build() => initial;
@@ -203,6 +216,12 @@ class _StaticTourController extends ActiveTourController {
     selectedFragmentId = fragmentId;
     state = state.copyWith(selectedFragmentId: fragmentId);
     return true;
+  }
+
+  @override
+  Future<void> setLocationMode(TourLocationMode mode) async {
+    locationMode = mode;
+    state = state.copyWith(locationMode: mode);
   }
 }
 

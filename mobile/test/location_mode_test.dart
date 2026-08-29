@@ -88,7 +88,7 @@ void main() {
     expect(find.byKey(const ValueKey('selected-node-detail-fragment-1')),
         findsOneWidget);
     expect(find.text('第一条线索'), findsOneWidget);
-    expect(find.text('潮汐里的旧城'), findsOneWidget);
+    expect(find.textContaining('潮汐里的旧城'), findsOneWidget);
     expect(find.text('约 3 分钟'), findsOneWidget);
     expect(find.text('等待定位'), findsOneWidget);
     expect(
@@ -489,9 +489,14 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置模式：模拟定位'), findsOneWidget);
     expect(find.byType(Switch), findsNothing);
     expect(find.byTooltip('暂停自动导览'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('journey-mode-simulated')),
+      find.byType(ListView),
+      const Offset(0, -220),
+    );
+    expect(find.text('模拟预览模式'), findsOneWidget);
     await tester.ensureVisible(find.byTooltip('暂停自动导览'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('暂停自动导览'));
@@ -510,8 +515,7 @@ void main() {
       const Offset(0, -220),
     );
     await tester.pumpAndSettle();
-    expect(find.text('00:00'), findsOneWidget);
-    expect(find.text('--:--'), findsOneWidget);
+    expect(find.textContaining('00:00 / --:--'), findsOneWidget);
     await tester.tap(find.text('阅读等价文字稿'));
     await tester.pumpAndSettle();
     expect(find.text('第二条线索的正文'), findsOneWidget);
@@ -525,8 +529,7 @@ void main() {
     player.emitDuration(const Duration(minutes: 2));
     player.emitPosition(const Duration(seconds: 30));
     await tester.pump();
-    expect(find.text('00:30'), findsOneWidget);
-    expect(find.text('02:00'), findsOneWidget);
+    expect(find.textContaining('00:30 / 02:00'), findsOneWidget);
 
     await tester.tap(find.byTooltip('暂停'));
     await tester.pump();

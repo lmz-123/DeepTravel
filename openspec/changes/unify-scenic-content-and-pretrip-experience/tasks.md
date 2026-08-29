@@ -44,6 +44,7 @@
 - [x] 6.3 Place the scenic/manual carousel and its indicator before city stories, preserve the established 505/276 default scenic-card visual baseline while allowing measured accessibility growth, remove device-specific overall section offsets, and use normal sliver spacing; add regression tests for the default baseline, minimum supported phone, long bounded copy, safe areas, orientation, and 200% text scale.
 - [x] 6.4 Remove or redirect any separate client-facing “首页听故事” entry so current city-story cards reuse the unified detail/player, while preserving older deep links through compatibility routing; add navigation and semantics tests.
 - [x] 6.5 Include configured pre-departure narration in the same scenic coverage and generate-missing/regenerate-all batch as later story nodes; verify combined counts and current/stale matching.
+- [x] 6.6 Rebuild the discovery scenic-manual card, manual-detail cards, journey node introduction, current-narration card, and two-column mode surface to match the final design component hierarchy; make the single connected circular node row the only tappable node selector and remove the duplicate numeric row; add widget tests for selection, state styling, and mode switching.
 
 ## 7. Cross-repository verification and production delivery
 

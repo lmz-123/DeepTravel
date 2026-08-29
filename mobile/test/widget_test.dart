@@ -203,8 +203,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('route-card-old-harbor')), findsOneWidget);
-    expect(find.byKey(const ValueKey('route-card-mountain-coast')),
-        findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('route-card-mountain-coast')), findsNothing);
     expect(find.text('旧港码头'), findsNothing);
     expect(find.text('山海栈道'), findsNothing);
 
@@ -217,13 +217,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('route-card-mountain-coast')),
+        findsOneWidget);
+
     final firstIndicator = tester.widget<AnimatedContainer>(
       find.byKey(const ValueKey('route-indicator-0')),
     );
     final secondIndicator = tester.widget<AnimatedContainer>(
       find.byKey(const ValueKey('route-indicator-1')),
     );
-    expect(firstIndicator.constraints?.maxWidth, 7);
+    expect(firstIndicator.constraints?.maxWidth, 5);
     expect(secondIndicator.constraints?.maxWidth, 24);
 
     await tester.tap(

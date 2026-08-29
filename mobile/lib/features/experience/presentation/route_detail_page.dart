@@ -6,7 +6,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/primary_action.dart';
 import '../domain/tour_runtime.dart';
-import '../domain/city_story.dart';
 import '../domain/models.dart';
 import '../domain/fragment_models.dart';
 import 'active_tour_controller.dart';
@@ -156,10 +155,6 @@ class _RouteDetail extends ConsumerWidget {
                     _PreparationCard(route: route),
                     const SizedBox(height: 16),
                     _RouteStoryCard(route: route),
-                    if (route.pretrip?.available ?? false) ...[
-                      const SizedBox(height: 16),
-                      _PretripSection(pretrip: route.pretrip!),
-                    ],
                     const SizedBox(height: 28),
                     Text(
                       route.audioTour == null ? '这一路，你会看见什么' : '故事方向',
@@ -353,83 +348,6 @@ class _ManualTabs extends StatelessWidget {
       );
 }
 
-class _PretripSection extends StatelessWidget {
-  const _PretripSection({required this.pretrip});
-
-  final PretripExperience pretrip;
-
-  @override
-  Widget build(BuildContext context) {
-    final tips = <(String, IconData, List<String>)>[
-      ('安全', Icons.shield_outlined, pretrip.tips.safety),
-      ('休息', Icons.chair_outlined, pretrip.tips.rest),
-      ('无障碍', Icons.accessible_forward_rounded, pretrip.tips.accessibility),
-      ('天气适应', Icons.wb_cloudy_outlined, pretrip.tips.weatherAdaptation),
-    ].where((item) => item.$3.isNotEmpty);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.paperDeep,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('出发前，先认识这段漫游', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          const Text('不必到达现场；故事方向只是参考，可以按任意顺序打开。'),
-          if (pretrip.companionTags.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: pretrip.companionTags
-                  .map((tag) => Chip(label: Text(tag)))
-                  .toList(growable: false),
-            ),
-          ],
-          if (pretrip.themeStory case final story?) ...[
-            const SizedBox(height: 14),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading:
-                  const CircleAvatar(child: Icon(Icons.headphones_rounded)),
-              title: Text(story.story.title),
-              subtitle: Text(story.story.introduction, maxLines: 2),
-              trailing: const Icon(Icons.arrow_forward_rounded),
-              onTap: () => context.push('/story/${story.story.id}'),
-            ),
-          ],
-          if (pretrip.storyDirections.isNotEmpty) ...[
-            const Divider(height: 28),
-            Text('主要故事方向', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 6),
-            ...pretrip.storyDirections.map(
-              (direction) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(direction.title),
-                subtitle: Text(direction.summary, maxLines: 2),
-                trailing: const Icon(Icons.play_circle_outline_rounded),
-                onTap: () => context.push('/story/${direction.catalogId}'),
-              ),
-            ),
-          ],
-          for (final tip in tips) ...[
-            const SizedBox(height: 12),
-            Row(children: [
-              Icon(tip.$2, size: 18, color: AppColors.moss),
-              const SizedBox(width: 8),
-              Text(tip.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
-            ]),
-            const SizedBox(height: 5),
-            ...tip.$3.map((text) => Text('• $text')),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _Metrics extends StatelessWidget {
   const _Metrics({required this.route});
   final RouteExperience route;
@@ -477,7 +395,6 @@ class _HowToWalkCard extends ConsumerWidget {
     final mode = ref.watch(locationModeControllerProvider).asData?.value ??
         TourLocationMode.real;
     return _ManualCard(
-      eyebrow: '行走方式',
       title: '这一路，你会怎样行走',
       child: Column(
         children: [
@@ -538,8 +455,14 @@ class _PreparationCard extends ConsumerWidget {
       OfflinePackagePhase.failed => '重试下载',
     };
     final tags = route.pretrip?.companionTags ?? const <String>[];
+    final tips = route.pretrip?.tips;
+    final preparationNotes = <String>[
+      ...?tips?.safety.take(1),
+      ...?tips?.rest.take(1),
+      ...?tips?.accessibility.take(1),
+      ...?tips?.weatherAdaptation.take(1),
+    ];
     return _ManualCard(
-      eyebrow: '出发前准备',
       title: '轻装出发，也留一点余量',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -555,9 +478,19 @@ class _PreparationCard extends ConsumerWidget {
           ),
           const SizedBox(height: 13),
           const Text('提前下载后，网络不稳定时仍可继续听讲述；位置触发是否可用取决于系统定位状态。'),
+          if (preparationNotes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...preparationNotes.map(
+              (note) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('· $note',
+                    style: Theme.of(context).textTheme.bodySmall),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
+          Align(
+            alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
               onPressed:
                   route.audioTour == null || downloading || package.isUsable
@@ -652,10 +585,17 @@ class _ClueSurface extends StatelessWidget {
                 ))
             .toList(growable: false);
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 17),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink.withValues(alpha: .07),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(children: children),
     );
@@ -669,8 +609,7 @@ class _AboutManualCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _ManualCard(
-        eyebrow: '关于这条手册',
-        title: route.theme,
+        title: '关于这条手册',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -696,37 +635,33 @@ class _AboutManualCard extends StatelessWidget {
 
 class _ManualCard extends StatelessWidget {
   const _ManualCard({
-    required this.eyebrow,
     required this.title,
     required this.child,
   });
 
-  final String eyebrow;
   final String title;
   final Widget child;
 
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(17),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.line.withValues(alpha: .7)),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ink.withValues(alpha: .07),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              eyebrow,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: AppColors.terracotta, letterSpacing: 1.1),
-            ),
-            const SizedBox(height: 6),
             Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 15),
+            const SizedBox(height: 14),
             child,
           ],
         ),
@@ -752,16 +687,14 @@ class _InstructionRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                color: AppColors.paperDeep,
-                shape: BoxShape.circle,
+            SizedBox(
+              width: 27,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Icon(icon, size: 17, color: AppColors.terracotta),
               ),
-              child: Icon(icon, size: 19, color: AppColors.moss),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -783,47 +716,15 @@ class _FragmentPreviewRow extends StatelessWidget {
   final bool isLast;
 
   @override
-  Widget build(BuildContext context) => IntrinsicHeight(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(
-            width: 36,
-            child: Column(children: [
-              Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                      color: AppColors.ink, shape: BoxShape.circle),
-                  alignment: Alignment.center,
-                  child: Text('${fragment.position}',
-                      style: const TextStyle(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.w600))),
-              if (!isLast)
-                Expanded(
-                    child: Container(
-                        width: 1, color: AppColors.ink.withValues(alpha: .18)))
-            ])),
-        const SizedBox(width: 12),
-        Expanded(
-            child: Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(fragment.safePreview,
-                          style: Theme.of(context).textTheme.titleMedium),
-                      if (fragment.experienceTags.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        _ExperienceTags(tags: fragment.experienceTags),
-                      ],
-                      const SizedBox(height: 5),
-                      Text(
-                          fragment.interactionType == 'photo'
-                              ? '包含一次可稍后完成的拍照线索'
-                              : '自动播放 · 可阅读文字稿',
-                          style: Theme.of(context).textTheme.bodyMedium)
-                    ]))),
-      ]));
+  Widget build(BuildContext context) => _ClueRow(
+        number: fragment.position,
+        title: fragment.title ?? fragment.safePreview,
+        metadata: fragment.interactionType == 'photo'
+            ? '可选拍照线索 · 可稍后完成'
+            : '自动播放 · 可阅读文字稿',
+        tags: fragment.experienceTags,
+        isLast: isLast,
+      );
 }
 
 class _StopRow extends StatelessWidget {
@@ -832,59 +733,77 @@ class _StopRow extends StatelessWidget {
   final bool isLast;
 
   @override
-  Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 36,
-            child: Column(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                      color: AppColors.ink, shape: BoxShape.circle),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${stop.position}',
-                    style: const TextStyle(
-                        color: AppColors.white, fontWeight: FontWeight.w600),
+  Widget build(BuildContext context) => _ClueRow(
+        number: stop.position,
+        title: stop.title,
+        metadata: stop.kicker,
+        tags: stop.experienceTags,
+        isLast: isLast,
+      );
+}
+
+class _ClueRow extends StatelessWidget {
+  const _ClueRow({
+    required this.number,
+    required this.title,
+    required this.metadata,
+    required this.tags,
+    required this.isLast,
+  });
+
+  final int number;
+  final String title;
+  final String metadata;
+  final List<String> tags;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          border: isLast
+              ? null
+              : Border(
+                  bottom: BorderSide(
+                    color: AppColors.ink.withValues(alpha: .09),
                   ),
                 ),
-                if (!isLast)
-                  Expanded(
-                      child: Container(
-                          width: 1,
-                          color: AppColors.ink.withValues(alpha: 0.18))),
-              ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 29,
+              child: Text(
+                number.toString().padLeft(2, '0'),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.terracotta,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(stop.title,
-                      style: Theme.of(context).textTheme.titleLarge),
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text(stop.kicker,
-                      style: Theme.of(context).textTheme.bodyMedium),
-                  if (stop.experienceTags.isNotEmpty) ...[
+                  Text(metadata, style: Theme.of(context).textTheme.bodySmall),
+                  if (tags.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    _ExperienceTags(tags: stop.experienceTags),
+                    _ExperienceTags(tags: tags),
                   ],
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(width: 8),
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Icon(Icons.chevron_right_rounded, size: 18),
+            ),
+          ],
+        ),
+      );
 }
 
 class _ExperienceTags extends StatelessWidget {
