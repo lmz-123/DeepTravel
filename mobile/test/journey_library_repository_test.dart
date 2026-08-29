@@ -107,6 +107,29 @@ void main() {
     expect(requests.single.headers['Authorization'], 'Bearer private-token');
   });
 
+  test('clears canonical exploration progress with bearer authorization',
+      () async {
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+      requests.add(options);
+      handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'data': {'journey_count': 2, 'fragment_count': 10}
+        },
+      ));
+    }));
+    final repository = ApiExperienceRepository(dio, _TokenAuthRepository(dio));
+
+    final result = await repository.clearExplorationProgress();
+
+    expect(result.journeyCount, 2);
+    expect(result.fragmentCount, 10);
+    expect(requests.single.method, 'DELETE');
+    expect(requests.single.path, '/journeys/progress');
+    expect(requests.single.headers['Authorization'], 'Bearer private-token');
+  });
+
   test('maps auth expiry and private evidence 404/410 distinctly', () async {
     var status = 401;
     var expiredCalls = 0;

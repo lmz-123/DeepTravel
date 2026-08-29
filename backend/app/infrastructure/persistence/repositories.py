@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.domain.content_graph import normalize_experience_tags
@@ -20,6 +20,7 @@ from app.domain.models import (
     User,
 )
 from app.infrastructure.persistence.models import (
+    ActiveTourModel,
     CityModel,
     EvidenceModel,
     GuestSessionModel,
@@ -27,6 +28,7 @@ from app.infrastructure.persistence.models import (
     JourneyFragmentModel,
     JourneyModel,
     MediaAssetModel,
+    ReconstructionModel,
     RouteModel,
     StopModel,
     StoryArcModel,
@@ -376,6 +378,63 @@ class SqlAlchemyJourneyRepository:
         )
         model = self.session.scalar(statement)
         return _journey_to_domain(model) if model else None
+
+    def reset_exploration_progress(
+        self, user_id: str, updated_at: datetime
+    ) -> tuple[int, int]:
+        journey_ids = list(
+            self.session.scalars(
+                select(JourneyModel.id).where(JourneyModel.user_id == user_id)
+            )
+        )
+        if not journey_ids:
+            return 0, 0
+
+        fragment_count = self.session.scalar(
+            select(func.count(JourneyFragmentModel.id)).where(
+                JourneyFragmentModel.journey_id.in_(journey_ids)
+            )
+        ) or 0
+        self.session.execute(
+            delete(JourneyAnswerModel).where(
+                JourneyAnswerModel.journey_id.in_(journey_ids)
+            )
+        )
+        self.session.execute(
+            delete(ActiveTourModel).where(ActiveTourModel.journey_id.in_(journey_ids))
+        )
+        self.session.execute(
+            delete(ReconstructionModel).where(
+                ReconstructionModel.journey_id.in_(journey_ids)
+            )
+        )
+        self.session.execute(
+            update(JourneyFragmentModel)
+            .where(JourneyFragmentModel.journey_id.in_(journey_ids))
+            .values(
+                state="undiscovered",
+                trigger_method=None,
+                triggered_at=None,
+                playback_started_at=None,
+                playback_completed_at=None,
+                playback_progress=0.0,
+                evidence_id=None,
+                collected_at=None,
+                reconstructed_at=None,
+            )
+        )
+        self.session.execute(
+            update(JourneyModel)
+            .where(JourneyModel.id.in_(journey_ids))
+            .values(
+                status=JourneyStatus.ACTIVE.value,
+                current_stop_position=1,
+                arrived_stop_id=None,
+                updated_at=updated_at,
+                completed_at=None,
+            )
+        )
+        return len(journey_ids), int(fragment_count)
 
     def list_active_for_user(self, user_id: str) -> list[Journey]:
         statement = (

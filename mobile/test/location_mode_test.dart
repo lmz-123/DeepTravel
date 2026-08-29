@@ -37,7 +37,7 @@ void main() {
     expect(await restored.read(), TourLocationMode.simulated);
   });
 
-  testWidgets('route setup shows read-only mode and keeps editing in settings',
+  testWidgets('route detail switches and persists real or simulated mode',
       (tester) async {
     final modeStore = _MemoryLocationModeStore(TourLocationMode.real);
     await tester.pumpWidget(ProviderScope(
@@ -51,8 +51,21 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -520));
     await tester.pumpAndSettle();
 
-    expect(find.text('当前使用设置中的真实定位模式'), findsOneWidget);
+    expect(find.text('真实行走已启用，开始导览后会按位置发现线索'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('route-detail-mode-real')), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-detail-mode-simulated')),
+        findsOneWidget);
     expect(find.byType(Switch), findsNothing);
+    expect(modeStore.mode, TourLocationMode.real);
+
+    await tester.tap(find.byKey(const ValueKey('route-detail-mode-simulated')));
+    await tester.pumpAndSettle();
+    expect(modeStore.mode, TourLocationMode.simulated);
+    expect(find.text('模拟预览已启用，开始导览后可手动推进线索'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('route-detail-mode-real')));
+    await tester.pumpAndSettle();
     expect(modeStore.mode, TourLocationMode.real);
   });
 
@@ -101,7 +114,8 @@ void main() {
     expect(find.byType(Switch), findsNothing);
   });
 
-  test('selecting an untriggered node changes selection only', () async {
+  test('selecting an untriggered node is rejected without changing selection',
+      () async {
     final store = _MemoryTourStore();
     final repository = _ProgressingFragmentRepository();
     final container = ProviderContainer(overrides: [
@@ -126,11 +140,12 @@ void main() {
     await controller.start(_twoFragmentRoute, _session);
     final before = container.read(activeTourControllerProvider);
 
-    expect(await controller.selectNode('fragment-2'), isTrue);
+    expect(await controller.selectNode('fragment-2'), isFalse);
     final after = container.read(activeTourControllerProvider);
-    expect(after.selectedFragmentId, 'fragment-2');
+    expect(after.selectedFragmentId, before.selectedFragmentId);
     expect(after.ledger?.collectedCount, before.ledger?.collectedCount);
     expect(after.current, before.current);
+    expect(after.locationMessage, contains('尚未解锁'));
     expect(repository.stateOf('fragment-2'), 'undiscovered');
     expect(repository.selectionTriggerCalls, 0);
     expect(repository.selectionAcknowledgeCalls, 0);

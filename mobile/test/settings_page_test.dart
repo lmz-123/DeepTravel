@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/features/experience/data/prepared_route_service.dart';
+import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/data/route_offline_package_service.dart';
 import 'package:jiandi/features/experience/data/user_preferences_repository.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
+import 'package:jiandi/features/experience/domain/experience_repository.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
@@ -24,6 +26,8 @@ void main() {
     final cache = _CacheService();
     final offlineCache = _OfflineCacheService();
     final player = _Player();
+    final tourStore = _Store();
+    final repository = _ResetRepository();
     await tester.pumpWidget(ProviderScope(
       overrides: [
         currentUserIdProvider.overrideWithValue('user-a'),
@@ -45,6 +49,9 @@ void main() {
         preparedRouteServiceProvider.overrideWithValue(cache),
         routeOfflinePackageServiceProvider.overrideWithValue(offlineCache),
         narrationPlayerProvider.overrideWithValue(player),
+        tourStoreProvider.overrideWithValue(tourStore),
+        experienceRepositoryProvider.overrideWithValue(repository),
+        locationTrackerProvider.overrideWithValue(_Tracker()),
       ],
       child: const MaterialApp(home: SettingsPage()),
     ));
@@ -63,7 +70,11 @@ void main() {
     );
     expect(find.text('0.3.2+6'), findsOneWidget);
 
-    await tester.drag(find.byType(ListView), const Offset(0, 700));
+    await tester.scrollUntilVisible(
+      find.text('默认播放速度'),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('默认播放速度'), findsOneWidget);
     await tester.tap(find.text('1.0×'));
@@ -127,7 +138,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(cache.clearCalls, 1);
     expect(find.textContaining('已清除 3 条音频缓存'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('清除探索记录'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('清除探索记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('清除全部探索记录？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '确认清除'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(repository.clearCalls, 1);
+    expect(tourStore.clearCalls, 1);
+    expect(find.textContaining('已重置 2 段旅程、10 个节点'), findsOneWidget);
   });
+}
+
+class _ResetRepository extends DemoExperienceRepository {
+  _ResetRepository() : super(latency: Duration.zero);
+
+  int clearCalls = 0;
+
+  @override
+  Future<ExplorationResetResult> clearExplorationProgress() async {
+    clearCalls += 1;
+    return const ExplorationResetResult(journeyCount: 2, fragmentCount: 10);
+  }
 }
 
 class _OfflineCacheService extends RouteOfflinePackageService {
@@ -245,12 +286,26 @@ class _Player implements NarrationPlayer {
   Future<void> stop() async {}
 }
 
+class _Tracker implements LocationTracker {
+  @override
+  Future<TourLocationPermission> requestPermission() async =>
+      TourLocationPermission.granted;
+
+  @override
+  Stream<LocationSample> samples() => const Stream.empty();
+
+  @override
+  Future<void> stop() async {}
+}
+
 class _Store implements TourStore {
+  int clearCalls = 0;
+
   @override
   Future<void> acknowledge(String id) async {}
 
   @override
-  Future<void> clearPrivateData() async {}
+  Future<void> clearPrivateData() async => clearCalls += 1;
 
   @override
   Future<void> enqueue(OutboxEvent event) async {}

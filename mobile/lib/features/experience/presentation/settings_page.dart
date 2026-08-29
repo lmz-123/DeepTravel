@@ -116,6 +116,12 @@ class SettingsPage extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const _SettingsSection(
+                    title: '数据与测试',
+                    children: [
+                      _ClearExplorationDataTile(),
+                    ],
+                  ),
                   _SettingsSection(
                     title: '账号与关于',
                     children: [
@@ -428,6 +434,73 @@ class _EvidencePolicyTile extends ConsumerWidget {
       ),
       data: (policy) => _PolicyContent(policy: policy),
     );
+  }
+}
+
+class _ClearExplorationDataTile extends ConsumerWidget {
+  const _ClearExplorationDataTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ListTile(
+        leading: const Icon(Icons.restart_alt_rounded),
+        title: const Text('清除探索记录'),
+        subtitle: const Text('重新锁定所有节点；保留账号、收藏、照片和下载内容'),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => _clear(context, ref),
+      );
+
+  Future<void> _clear(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('清除全部探索记录？'),
+        content: const Text(
+          '所有旅程进度、已解锁节点、线索簿和故事拼合状态都会重置，便于重新测试上锁流程。'
+          '\n\n账号、收藏、已上传照片、足迹、社区内容、离线包和音频缓存不会删除。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await ref
+          .read(activeTourControllerProvider.notifier)
+          .clearForAccountExit();
+      final result = await ref
+          .read(experienceRepositoryProvider)
+          .clearExplorationProgress();
+      await ref.read(tourStoreProvider).clearPrivateData();
+      ref.invalidate(journeyControllerProvider);
+      ref.invalidate(activeTourControllerProvider);
+      ref.invalidate(archivedActiveJourneysProvider);
+      ref.invalidate(journeyLibraryProvider);
+      ref.invalidate(journeyContextProvider);
+      ref.invalidate(currentJourneyLibraryProvider);
+      ref.invalidate(currentAllJourneysProvider);
+      ref.invalidate(routeJourneyIndexProvider);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '已重置 ${result.journeyCount} 段旅程、${result.fragmentCount} 个节点',
+          ),
+        ),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('探索记录清除失败，请检查网络后重试')),
+      );
+    }
   }
 }
 

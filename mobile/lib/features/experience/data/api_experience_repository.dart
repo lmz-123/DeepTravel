@@ -264,6 +264,19 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
+  Future<ExplorationResetResult> clearExplorationProgress() async {
+    await _ensureAuth();
+    final response = await _request(
+      () => _dio.delete('/journeys/progress', options: _authorized),
+    );
+    final data = response.data['data'] as Map<String, dynamic>;
+    return ExplorationResetResult(
+      journeyCount: data['journey_count'] as int? ?? 0,
+      fragmentCount: data['fragment_count'] as int? ?? 0,
+    );
+  }
+
+  @override
   Future<FootprintPageResult> footprints(FootprintFilter filter,
       {String? cursor}) async {
     await _ensureAuth();

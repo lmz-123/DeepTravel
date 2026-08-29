@@ -20,7 +20,7 @@ The discovery client SHALL lay out the city-manual scenic carousel, its page ind
 - **THEN** downstream sections move relative to the measured content instead of being painted over it
 
 ### Requirement: Journey node selection has one visual and interaction source
-The journey client SHALL make the connected small route points in the upper journey map/header the sole node selector. Each point SHALL expose its position and heard, nearby, selected, or unavailable state through semantics and styling, and activating it SHALL update the one node-introduction card below. The journey body MUST NOT render a second 1–5 node rail, numbered circles, or another competing selector. The current narration SHALL use the designed dark playback card, and real-walk/simulated-preview selection SHALL remain a distinct two-column mode surface after journey content.
+The journey client SHALL make the connected small route points in the upper journey map/header the sole node selector. Each point SHALL expose its position and heard, nearby, selected, or unavailable state through semantics and styling. Activating a revealed point SHALL update the one node-introduction card below; an unavailable point MUST NOT become selected, reveal content, start narration, or advance progress. The journey body MUST NOT render a second 1–5 node rail, numbered circles, or another competing selector. The current narration SHALL use the designed dark playback card, and real-walk/simulated-preview selection SHALL remain a distinct two-column mode surface after journey content.
 
 #### Scenario: Traveler switches a revealed node
 - **WHEN** the traveler activates another route point in the upper connected map path
@@ -32,4 +32,19 @@ The journey client SHALL make the connected small route points in the upper jour
 
 #### Scenario: Traveler changes preview mode
 - **WHEN** real walking and simulated preview are available
-- **THEN** both choices appear together in the designed two-column mode surface with exactly one active state
+- **THEN** both choices appear together in the designed two-column mode surface with exactly one active state, and activating the other choice immediately updates and persists the mode used when the journey starts or continues
+
+#### Scenario: Traveler activates a locked route point
+- **WHEN** a route point has not been revealed by the normal trigger and dependency rules
+- **THEN** it is styled and announced as locked, has no actionable node-selection handler, and the current selected node and exploration progress remain unchanged
+
+### Requirement: Exploration progress can be reset safely for repeat testing
+The authenticated client SHALL provide a confirmed settings action that clears the current account's explored journey and node progress from the canonical API and clears local exploration snapshots and pending progress events. The action SHALL stop any active tour and refresh private journey projections. It MUST NOT delete the account, favorites, public/offline content, prepared audio, uploaded evidence objects, footprint records, or community contributions.
+
+#### Scenario: Traveler confirms exploration reset
+- **WHEN** the traveler confirms “清除探索记录” in settings
+- **THEN** all of that account's journeys return to their initial active state, fragment ledgers return to undiscovered state, reconstructions and active-tour runtime rows are reset, local exploration state cannot replay stale unlock events, and the next route entry starts with locked nodes again
+
+#### Scenario: Exploration reset fails
+- **WHEN** the canonical API cannot reset the account's progress
+- **THEN** the client reports a retryable failure and does not claim success or clear unrelated local data

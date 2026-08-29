@@ -13,6 +13,7 @@ import 'experience_providers.dart';
 import 'home_story_controller.dart';
 import 'location_mode_controller.dart';
 import 'offline_package_controller.dart';
+import 'widgets/location_mode_selector.dart';
 import 'widgets/route_canvas.dart';
 import 'widgets/favorite_button.dart';
 
@@ -446,12 +447,19 @@ class _HowToWalkCard extends ConsumerWidget {
             last: true,
           ),
           const SizedBox(height: 14),
+          LocationModeSelector(
+            keyPrefix: 'route-detail-mode',
+            value: mode,
+            onChanged: (next) =>
+                ref.read(locationModeControllerProvider.notifier).setMode(next),
+          ),
+          const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
               mode == TourLocationMode.simulated
-                  ? '当前使用设置中的模拟定位模式'
-                  : '当前使用设置中的真实定位模式',
+                  ? '模拟预览已启用，开始导览后可手动推进线索'
+                  : '真实行走已启用，开始导览后会按位置发现线索',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: AppColors.moss,
                   ),

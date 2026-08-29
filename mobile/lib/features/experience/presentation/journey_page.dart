@@ -12,6 +12,7 @@ import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'widgets/evidence_photo_widgets.dart';
+import 'widgets/location_mode_selector.dart';
 import 'widgets/narration_voice_selector.dart';
 import 'widgets/node_community_section.dart';
 import 'widgets/traveler_bottom_navigation.dart';
@@ -218,7 +219,13 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                           fragment: selectedFragment,
                         ),
                       const SizedBox(height: 13),
-                      _ModeSelector(state: state),
+                      LocationModeSelector(
+                        keyPrefix: 'journey-mode',
+                        value: state.locationMode,
+                        onChanged: (mode) => ref
+                            .read(activeTourControllerProvider.notifier)
+                            .setLocationMode(mode),
+                      ),
                       if (state.locationMode == TourLocationMode.simulated) ...[
                         const SizedBox(height: 10),
                         SizedBox(
@@ -646,11 +653,17 @@ class _JourneyRouteSelector extends StatelessWidget {
             );
           }
           final metric = metrics.first;
-          final selectedId = fragments
-                  .where((fragment) => fragment.id == selectedFragmentId)
+          final revealedIds = ledger?.entries
+                  .where((entry) => entry.isRevealed)
+                  .map((entry) => entry.id)
+                  .toSet() ??
+              const <String>{};
+          final selectedId = revealedIds.contains(selectedFragmentId)
+              ? selectedFragmentId
+              : fragments
+                  .where((fragment) => revealedIds.contains(fragment.id))
                   .firstOrNull
-                  ?.id ??
-              fragments.first.id;
+                  ?.id;
           return CustomPaint(
             painter: const _JourneyRoutePainter(),
             child: Stack(
@@ -695,7 +708,7 @@ class _JourneyRouteSelector extends StatelessWidget {
             ? '已接近'
             : revealed
                 ? '已触发'
-                : '尚未触发';
+                : '未解锁';
     final dotSize = selected ? 18.0 : (collected || nearby ? 14.0 : 12.0);
     final dotColor = collected
         ? AppColors.moss
@@ -703,7 +716,7 @@ class _JourneyRouteSelector extends StatelessWidget {
             ? AppColors.terracotta
             : revealed
                 ? AppColors.gold
-                : AppColors.gold.withValues(alpha: .72);
+                : AppColors.white.withValues(alpha: .28);
     return Positioned(
       left: center.dx - 22,
       top: center.dy - 22,
@@ -711,14 +724,17 @@ class _JourneyRouteSelector extends StatelessWidget {
       height: 44,
       child: Semantics(
         button: true,
+        enabled: revealed,
         selected: selected,
         label:
             '第 ${fragment.position} 个节点，${fragment.title ?? fragment.safePreview}，$stateLabel',
         child: Tooltip(
-          message: '查看第 ${fragment.position} 个节点',
+          message: revealed
+              ? '查看第 ${fragment.position} 个节点'
+              : '第 ${fragment.position} 个节点尚未解锁',
           child: InkResponse(
             key: ValueKey('journey-node-${fragment.id}'),
-            onTap: () => onSelectNode(fragment.id),
+            onTap: revealed ? () => onSelectNode(fragment.id) : null,
             radius: 22,
             child: Center(
               child: AnimatedContainer(
@@ -1416,100 +1432,6 @@ class _DarkControlSurface extends StatelessWidget {
               style: const TextStyle(color: AppColors.white, fontSize: 8),
             ),
           ],
-        ),
-      );
-}
-
-class _ModeSelector extends ConsumerWidget {
-  const _ModeSelector({required this.state});
-
-  final ActiveTourState state;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => Row(
-        children: [
-          Expanded(
-            child: _ModeButton(
-              key: const ValueKey('journey-mode-real'),
-              icon: Icons.directions_walk_rounded,
-              label: '真实行走模式',
-              selected: state.locationMode == TourLocationMode.real,
-              onPressed: () => ref
-                  .read(activeTourControllerProvider.notifier)
-                  .setLocationMode(TourLocationMode.real),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _ModeButton(
-              key: const ValueKey('journey-mode-simulated'),
-              icon: Icons.explore_outlined,
-              label: '模拟预览模式',
-              selected: state.locationMode == TourLocationMode.simulated,
-              onPressed: () => ref
-                  .read(activeTourControllerProvider.notifier)
-                  .setLocationMode(TourLocationMode.simulated),
-            ),
-          ),
-        ],
-      );
-}
-
-class _ModeButton extends StatelessWidget {
-  const _ModeButton({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onPressed,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: selected ? AppColors.moss : Colors.transparent,
-        borderRadius: BorderRadius.circular(17),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: selected ? null : onPressed,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(17),
-              border: Border.all(
-                color: selected
-                    ? AppColors.moss
-                    : AppColors.ink.withValues(alpha: .14),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 17,
-                  color: selected ? AppColors.white : AppColors.ink,
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: selected ? AppColors.white : AppColors.ink,
-                          fontSize: 9,
-                          letterSpacing: 0,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       );
 }

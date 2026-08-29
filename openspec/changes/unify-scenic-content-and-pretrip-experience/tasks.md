@@ -45,6 +45,7 @@
 - [x] 6.4 Remove or redirect any separate client-facing “首页听故事” entry so current city-story cards reuse the unified detail/player, while preserving older deep links through compatibility routing; add navigation and semantics tests.
 - [x] 6.5 Include configured pre-departure narration in the same scenic coverage and generate-missing/regenerate-all batch as later story nodes; verify combined counts and current/stale matching.
 - [x] 6.6 Rebuild the discovery scenic-manual card, manual-detail cards, journey node introduction, current-narration card, and two-column mode surface to match the final design component hierarchy, proportions, typography, and compact-label sizing; remove the body 1–5 node rail entirely, make the connected small route points in the upper journey map/header the only tappable node selector, and add widget tests for selection, state styling, proportions, and mode switching.
+- [x] 6.7 Enforce non-actionable locked route points without changing selection or progress, make the city-manual detail and active journey share a directly tappable persisted real-walk/simulated-preview control, and add an authenticated confirmed settings reset that clears canonical and local exploration progress while preserving account/media/user content; add API, repository, controller, store, and widget tests.
 
 ## 7. Cross-repository verification and production delivery
 

@@ -299,6 +299,46 @@ def test_real_location_can_trigger_out_of_order_but_demo_stays_dependency_ordere
     assert demo.get_json()["error"]["code"] == "fragment_locked"
 
 
+def test_authenticated_progress_reset_relocks_fragments_and_resumes_clean_journey(
+    client, guest_headers
+):
+    route, journey = _start(client, guest_headers)
+    first = route["audio_tour"]["fragments"][0]
+    triggered = client.post(
+        f"/api/v1/journeys/{journey['id']}/fragments/{first['id']}/triggers",
+        json={
+            "method": "location",
+            "latitude": first["trigger_region"]["latitude"],
+            "longitude": first["trigger_region"]["longitude"],
+            "accuracy_m": 10,
+            "idempotency_key": str(uuid4()),
+        },
+        headers=guest_headers,
+    )
+    assert triggered.status_code == 200
+    assert triggered.get_json()["data"]["fragment"]["transcript"]
+
+    reset = client.delete("/api/v1/journeys/progress", headers=guest_headers)
+
+    assert reset.status_code == 200
+    assert reset.get_json()["data"] == {"journey_count": 1, "fragment_count": 5}
+    ledger = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
+    ).get_json()["data"]
+    assert ledger["collected_count"] == 0
+    assert all(item["state"] == "undiscovered" for item in ledger["entries"])
+    assert all("transcript" not in item for item in ledger["entries"])
+
+    resumed = client.post(
+        "/api/v1/journeys",
+        json={"route_id": route["id"]},
+        headers=guest_headers,
+    ).get_json()["data"]
+    assert resumed["id"] == journey["id"]
+    assert resumed["status"] == "active"
+    assert resumed["progress"] == 0
+
+
 def test_real_trigger_requires_current_public_route_but_saved_progress_remains_readable(
     app, client, guest_headers
 ):

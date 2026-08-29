@@ -54,7 +54,7 @@ void main() {
     expect(find.text('下一条线索（测试）'), findsOneWidget);
   });
 
-  testWidgets('header route points keep safe targets and select every node',
+  testWidgets('header route points keep safe targets and reject locked nodes',
       (tester) async {
     final controller = _StaticTourController(_railState);
     await tester.pumpWidget(ProviderScope(
@@ -66,7 +66,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final collected = find.byTooltip('查看第 1 个节点');
-    final untriggered = find.byTooltip('查看第 2 个节点');
+    final untriggered = find.byTooltip('第 2 个节点尚未解锁');
     expect(tester.getSize(collected), const Size(44, 44));
     expect(tester.getSize(untriggered), const Size(44, 44));
     expect(
@@ -85,6 +85,7 @@ void main() {
         find.byKey(const ValueKey('fragment-node-rail-scroll')), findsNothing);
     expect(find.text('2'), findsNothing);
     expect(find.bySemanticsLabel('第 1 个节点，城门的变化，已听过'), findsOneWidget);
+    expect(find.bySemanticsLabel('第 2 个节点，尚未发现的线索，未解锁'), findsOneWidget);
 
     await tester.tap(collected);
     await tester.pump();
@@ -92,16 +93,11 @@ void main() {
 
     await tester.tap(untriggered);
     await tester.pump();
-    expect(controller.selectedFragmentId, 'fragment-locked');
-    await tester.dragUntilVisible(
-      find.text('尚未发现的线索'),
-      find.byType(ListView),
-      const Offset(0, -180),
-    );
+    expect(controller.selectedFragmentId, 'fragment-photo');
     expect(find.byKey(const ValueKey('selected-node-detail-fragment-locked')),
+        findsNothing);
+    expect(find.byKey(const ValueKey('selected-node-detail-fragment-photo')),
         findsOneWidget);
-    expect(find.text('尚未发现的线索'), findsOneWidget);
-    expect(find.text('这条线索尚未解锁'), findsNothing);
     final audio = find.byKey(const ValueKey('fragment-photo'));
     await tester.dragUntilVisible(
       audio,
@@ -137,6 +133,9 @@ void main() {
         reviewState: 'reviewed',
         triggerRegion: _region,
         audio: _photoFragment.audio,
+        title: '密集节点 ${index + 1}',
+        transcript: '密集节点 ${index + 1} 的正文',
+        state: 'triggered',
       ),
     );
     final manifest = AudioTourManifest(
@@ -205,7 +204,7 @@ void main() {
     await tester.tap(find.byTooltip('查看第 8 个节点'));
     await tester.pump();
     expect(controller.selectedFragmentId, 'dense-8');
-    expect(find.text('密集节点 8'), findsOneWidget);
+    expect(find.text('密集节点 8'), findsNWidgets(2));
   });
 }
 

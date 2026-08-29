@@ -573,14 +573,13 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     final ledgerEntry = state.ledger?.entries
         .where((item) => item.id == fragmentId)
         .firstOrNull;
-    if (ledgerEntry?.isRevealed == true) {
-      return selectRevealedFragment(fragmentId);
+    if (ledgerEntry?.isRevealed != true) {
+      state = state.copyWith(
+        locationMessage: '这条线索尚未解锁，继续行走或按顺序推进后再回来听。',
+      );
+      return false;
     }
-    state = state.copyWith(
-      selectedFragmentId: manifestEntry.id,
-      clearError: true,
-    );
-    return true;
+    return selectRevealedFragment(manifestEntry.id);
   }
 
   Future<bool> selectRevealedFragment(String fragmentId) async {
@@ -1666,6 +1665,13 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   Future<void> _applyLocationMode(TourLocationMode mode) async {
     if (state.playbackMode == TourPlaybackMode.revisit ||
         state.session?.isCompleted == true) {
+      state = state.copyWith(
+        locationMode: mode,
+        locationMessage: mode == TourLocationMode.simulated
+            ? '已保存模拟预览模式；当前回听不会改写旅程进度。'
+            : '已保存真实行走模式；下一段现场旅程会启用定位。',
+        clearError: true,
+      );
       return;
     }
     await _stopLocationMonitoring();

@@ -7,6 +7,16 @@ import 'footprint_models.dart';
 import 'models.dart';
 import 'home_story.dart';
 
+class ExplorationResetResult {
+  const ExplorationResetResult({
+    required this.journeyCount,
+    required this.fragmentCount,
+  });
+
+  final int journeyCount;
+  final int fragmentCount;
+}
+
 abstract interface class ExperienceRepository {
   Future<List<CityExperience>> cities();
 
@@ -46,6 +56,8 @@ abstract interface class ExperienceRepository {
   Future<JourneyRecap> recap(String journeyId);
 
   Future<List<JourneyLibraryItem>> journeys({String? status});
+
+  Future<ExplorationResetResult> clearExplorationProgress();
 
   Future<FootprintPageResult> footprints(FootprintFilter filter,
       {String? cursor});

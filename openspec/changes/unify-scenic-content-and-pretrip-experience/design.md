@@ -89,6 +89,8 @@ The discovery scenic-manual card keeps its photographic hero, distance/status pi
 
 Alternative considered: keep a second numbered node rail in the body. Rejected because the upper route points already provide that navigation, duplicating the five nodes weakens hierarchy and caused the implementation to diverge from the approved design.
 
+Locked upper route points remain visible as non-actionable orientation markers, but only ledger entries with revealed content receive a node-selection handler. Client selection never calls trigger/progress APIs and cannot bypass dependency or location rules. The same two-column real-walk/simulated-preview component appears in the city-manual detail and active journey: the manual version writes the persisted preference used at start, while the active version also switches location monitoring immediately. A confirmed settings reset calls an authenticated account-scoped progress reset before clearing local exploration snapshots/outbox state and refreshing journey providers; it preserves media, evidence, footprints, favorites, community content, and reusable offline packages.
+
 ## Risks / Trade-offs
 
 - [A shared audio coordinator touches mature playback paths] → Add state-machine and rapid-switch tests first, retain adapter contract tests, and roll out pre-departure after city-story/on-site parity passes.

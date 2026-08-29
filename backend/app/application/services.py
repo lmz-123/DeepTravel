@@ -349,6 +349,17 @@ class JourneyService:
         with self.uow_factory() as uow:
             return uow.journeys.list_library_items(user_id, statuses)
 
+    def clear_exploration_progress(self, user_id: str) -> dict[str, int]:
+        with self.uow_factory() as uow:
+            journey_count, fragment_count = uow.journeys.reset_exploration_progress(
+                user_id, self.clock()
+            )
+            uow.commit()
+        return {
+            "journey_count": journey_count,
+            "fragment_count": fragment_count,
+        }
+
     def arrive(
         self,
         user_id: str,

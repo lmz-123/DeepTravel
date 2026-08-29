@@ -288,6 +288,18 @@ class DemoExperienceRepository implements ExperienceRepository {
   }
 
   @override
+  Future<ExplorationResetResult> clearExplorationProgress() async {
+    await _pause();
+    final hadJourney = _journey != null;
+    _journey = null;
+    _answers.clear();
+    return ExplorationResetResult(
+      journeyCount: hadJourney ? 1 : 0,
+      fragmentCount: 0,
+    );
+  }
+
+  @override
   Future<FootprintPageResult> footprints(FootprintFilter filter,
       {String? cursor}) async {
     await _pause();

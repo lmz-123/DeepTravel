@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from app.domain.models import (
@@ -68,6 +69,10 @@ class JourneyRepository(Protocol):
     def add_answer(self, journey_id: str, answer: JourneyAnswer) -> None: ...
 
     def save(self, journey: Journey) -> None: ...
+
+    def reset_exploration_progress(
+        self, user_id: str, updated_at: datetime
+    ) -> tuple[int, int]: ...
 
 
 class UnitOfWork(Protocol):

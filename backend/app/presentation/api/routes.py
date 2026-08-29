@@ -429,6 +429,14 @@ def list_journeys():
     return jsonify({"data": [journey_library_item_to_dict(item) for item in items]})
 
 
+@api.delete("/journeys/progress")
+@require_user
+def clear_journey_progress():
+    return jsonify(
+        {"data": _services()["journeys"].clear_exploration_progress(g.current_user.id)}
+    )
+
+
 @api.post("/journeys/<journey_id>/arrivals")
 @require_user
 def arrive(journey_id: str):
