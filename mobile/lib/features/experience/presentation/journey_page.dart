@@ -123,15 +123,21 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
             children: [
               _JourneyMapHeader(
                 routeTitle: state.route!.title,
-                pointCount: manifest.fragments.length,
+                fragments: manifest.fragments,
+                ledger: ledger,
+                points: state.nearbyStoryPoints,
+                selectedFragmentId: selectedFragmentId,
                 collectedCount: ledger?.collectedCount ?? 0,
                 onBack: () => context.go('/'),
                 onLedger: ledger == null ? null : () => _showLedger(ledger),
+                onSelectNode: (fragmentId) => ref
+                    .read(activeTourControllerProvider.notifier)
+                    .selectNode(fragmentId),
               ),
               Transform.translate(
                 offset: const Offset(0, -16),
                 child: Container(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 44),
+                  padding: const EdgeInsets.fromLTRB(18, 22, 18, 44),
                   decoration: const BoxDecoration(
                     color: AppColors.paper,
                     borderRadius:
@@ -144,21 +150,22 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                         '空间上自由 · 故事上有序',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.terracotta,
+                              fontSize: 9,
                               letterSpacing: 1.1,
                             ),
                       ),
                       const SizedBox(height: 7),
                       Text(
                         manifest.centralQuestion,
-                        style: Theme.of(context).textTheme.headlineMedium,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
+                              fontSize: 21,
+                              height: 1.36,
+                            ),
                       ),
-                      const SizedBox(height: 18),
-                      _FragmentRail(
-                        manifest: manifest,
-                        ledger: ledger,
-                        points: state.nearbyStoryPoints,
-                      ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       _SelectedNodeDetail(
                         manifest: manifest,
                         ledger: ledger,
@@ -486,17 +493,25 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
 class _JourneyMapHeader extends StatelessWidget {
   const _JourneyMapHeader({
     required this.routeTitle,
-    required this.pointCount,
+    required this.fragments,
+    required this.ledger,
+    required this.points,
+    required this.selectedFragmentId,
     required this.collectedCount,
     required this.onBack,
     required this.onLedger,
+    required this.onSelectNode,
   });
 
   final String routeTitle;
-  final int pointCount;
+  final List<StoryFragment> fragments;
+  final StoryLedger? ledger;
+  final List<NearbyStoryPoint> points;
+  final String? selectedFragmentId;
   final int collectedCount;
   final VoidCallback onBack;
   final VoidCallback? onLedger;
+  final ValueChanged<String> onSelectNode;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -525,21 +540,22 @@ class _JourneyMapHeader extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        '行走中的故事',
+                        '$routeTitle · 自由漫游',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.gold,
+                              fontSize: 8,
                               letterSpacing: 1.2,
                             ),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        routeTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        '行走中的故事',
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
-                            ?.copyWith(color: AppColors.white),
+                            ?.copyWith(color: AppColors.white, fontSize: 16),
                       ),
                     ],
                   ),
@@ -560,12 +576,12 @@ class _JourneyMapHeader extends StatelessWidget {
             ),
             const SizedBox(height: 9),
             Expanded(
-              child: CustomPaint(
-                painter: _JourneyRoutePainter(
-                  pointCount: pointCount,
-                  collectedCount: collectedCount,
-                ),
-                child: const SizedBox.expand(),
+              child: _JourneyRouteSelector(
+                fragments: fragments,
+                ledger: ledger,
+                points: points,
+                selectedFragmentId: selectedFragmentId,
+                onSelectNode: onSelectNode,
               ),
             ),
             Container(
@@ -591,7 +607,7 @@ class _JourneyMapHeader extends StatelessWidget {
                     '正在寻找附近的历史线索',
                     style: TextStyle(
                       color: AppColors.white.withValues(alpha: .82),
-                      fontSize: 11,
+                      fontSize: 8,
                     ),
                   ),
                 ],
@@ -602,35 +618,146 @@ class _JourneyMapHeader extends StatelessWidget {
       );
 }
 
-class _JourneyRoutePainter extends CustomPainter {
-  const _JourneyRoutePainter({
-    required this.pointCount,
-    required this.collectedCount,
+class _JourneyRouteSelector extends StatelessWidget {
+  const _JourneyRouteSelector({
+    required this.fragments,
+    required this.ledger,
+    required this.points,
+    required this.selectedFragmentId,
+    required this.onSelectNode,
   });
 
-  final int pointCount;
-  final int collectedCount;
+  final List<StoryFragment> fragments;
+  final StoryLedger? ledger;
+  final List<NearbyStoryPoint> points;
+  final String? selectedFragmentId;
+  final ValueChanged<String> onSelectNode;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final size = constraints.biggest;
+          final path = _journeyRoutePath(size);
+          final metrics = path.computeMetrics().toList(growable: false);
+          if (metrics.isEmpty || fragments.isEmpty) {
+            return CustomPaint(
+              painter: const _JourneyRoutePainter(),
+              child: const SizedBox.expand(),
+            );
+          }
+          final metric = metrics.first;
+          final selectedId = fragments
+                  .where((fragment) => fragment.id == selectedFragmentId)
+                  .firstOrNull
+                  ?.id ??
+              fragments.first.id;
+          return CustomPaint(
+            painter: const _JourneyRoutePainter(),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (final indexed in fragments.indexed)
+                  if (metric.getTangentForOffset(
+                    metric.length *
+                        (indexed.$1 / math.max(1, fragments.length - 1)),
+                  )
+                      case final tangent?)
+                    _positionedNode(
+                      context,
+                      fragment: indexed.$2,
+                      center: tangent.position,
+                      selected: indexed.$2.id == selectedId,
+                    ),
+              ],
+            ),
+          );
+        },
+      );
+
+  Widget _positionedNode(
+    BuildContext context, {
+    required StoryFragment fragment,
+    required Offset center,
+    required bool selected,
+  }) {
+    final ledgerEntry =
+        ledger?.entries.where((entry) => entry.id == fragment.id).firstOrNull;
+    final point = points
+        .where((candidate) => candidate.fragment.id == fragment.id)
+        .firstOrNull;
+    final collected = ledgerEntry?.isCollected ?? false;
+    final revealed = ledgerEntry?.isRevealed ?? false;
+    final nearby = point?.status == NearbyStoryPointStatus.inRange ||
+        point?.status == NearbyStoryPointStatus.approaching;
+    final stateLabel = collected
+        ? '已听过'
+        : nearby
+            ? '已接近'
+            : revealed
+                ? '已触发'
+                : '尚未触发';
+    final dotSize = selected ? 18.0 : (collected || nearby ? 14.0 : 12.0);
+    final dotColor = collected
+        ? AppColors.moss
+        : nearby
+            ? AppColors.terracotta
+            : revealed
+                ? AppColors.gold
+                : AppColors.gold.withValues(alpha: .72);
+    return Positioned(
+      left: center.dx - 22,
+      top: center.dy - 22,
+      width: 44,
+      height: 44,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label:
+            '第 ${fragment.position} 个节点，${fragment.title ?? fragment.safePreview}，$stateLabel',
+        child: Tooltip(
+          message: '查看第 ${fragment.position} 个节点',
+          child: InkResponse(
+            key: ValueKey('journey-node-${fragment.id}'),
+            onTap: () => onSelectNode(fragment.id),
+            radius: 22,
+            child: Center(
+              child: AnimatedContainer(
+                key: ValueKey('journey-node-dot-${fragment.id}'),
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                width: dotSize,
+                height: dotSize,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? AppColors.white : AppColors.ink,
+                    width: selected ? 3 : 2,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          const BoxShadow(
+                            color: AppColors.gold,
+                            spreadRadius: 3,
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _JourneyRoutePainter extends CustomPainter {
+  const _JourneyRoutePainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(8, size.height * .72)
-      ..cubicTo(
-        size.width * .18,
-        size.height * .08,
-        size.width * .36,
-        size.height * .92,
-        size.width * .5,
-        size.height * .42,
-      )
-      ..cubicTo(
-        size.width * .66,
-        size.height * -.02,
-        size.width * .8,
-        size.height * .15,
-        size.width - 8,
-        size.height * .55,
-      );
+    final path = _journeyRoutePath(size);
     canvas.drawPath(
       path,
       Paint()
@@ -638,28 +765,30 @@ class _JourneyRoutePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
-    final count = pointCount.clamp(1, 8);
-    for (var index = 0; index < count; index += 1) {
-      final metric = path.computeMetrics().first;
-      final tangent = metric.getTangentForOffset(
-        metric.length * (index / math.max(1, count - 1)),
-      );
-      if (tangent == null) continue;
-      canvas.drawCircle(
-        tangent.position,
-        index < collectedCount ? 5 : 4,
-        Paint()
-          ..color =
-              index < collectedCount ? AppColors.terracotta : AppColors.gold,
-      );
-    }
   }
 
   @override
-  bool shouldRepaint(_JourneyRoutePainter oldDelegate) =>
-      oldDelegate.pointCount != pointCount ||
-      oldDelegate.collectedCount != collectedCount;
+  bool shouldRepaint(_JourneyRoutePainter oldDelegate) => false;
 }
+
+Path _journeyRoutePath(Size size) => Path()
+  ..moveTo(24, size.height * .72)
+  ..cubicTo(
+    size.width * .18,
+    size.height * .08,
+    size.width * .36,
+    size.height * .92,
+    size.width * .5,
+    size.height * .42,
+  )
+  ..cubicTo(
+    size.width * .66,
+    size.height * -.02,
+    size.width * .8,
+    size.height * .15,
+    size.width - 24,
+    size.height * .55,
+  );
 
 class _LegacyJourneyView extends ConsumerWidget {
   const _LegacyJourneyView({required this.state});
@@ -718,158 +847,6 @@ class _LegacyJourneyView extends ConsumerWidget {
         ],
       ),
     );
-  }
-}
-
-class _FragmentRail extends ConsumerWidget {
-  const _FragmentRail({
-    required this.manifest,
-    required this.ledger,
-    required this.points,
-  });
-  final AudioTourManifest manifest;
-  final StoryLedger? ledger;
-  final List<NearbyStoryPoint> points;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(activeTourControllerProvider);
-    final fragments = manifest.fragments;
-    if (fragments.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(18),
-          child: Text('当前漫游暂无可展示的节点。'),
-        ),
-      );
-    }
-    return LayoutBuilder(builder: (context, constraints) {
-      const nodeExtent = 43.0;
-      const minSpacing = 8.0;
-      const maxSpacing = 22.0;
-      final count = fragments.length;
-      final availableWidth = constraints.maxWidth;
-      final minimumWidth = count * nodeExtent + (count - 1) * minSpacing;
-      final scrollable =
-          availableWidth.isFinite && minimumWidth > availableWidth;
-      final remaining = availableWidth.isFinite
-          ? availableWidth - nodeExtent * count
-          : minSpacing * (count - 1);
-      final spacing = count <= 1
-          ? 0.0
-          : scrollable
-              ? 8.0
-              : (remaining / (count - 1))
-                  .clamp(minSpacing, maxSpacing)
-                  .toDouble();
-      final nodes = <Widget>[];
-      for (var index = 0; index < fragments.length; index += 1) {
-        final fragment = fragments[index];
-        StoryFragment? entry;
-        for (final value in ledger?.entries ?? const <StoryFragment>[]) {
-          if (value.id == fragment.id) entry = value;
-        }
-        final collected = entry?.isCollected ?? false;
-        final pending = entry?.isMissionPending ?? false;
-        final revealed = entry?.isRevealed ?? false;
-        final point = points
-            .where((candidate) => candidate.fragment.id == fragment.id)
-            .firstOrNull;
-        final nearby = point?.status == NearbyStoryPointStatus.inRange ||
-            point?.status == NearbyStoryPointStatus.approaching;
-        final selected = state.selectedFragmentId == fragment.id;
-        final live = state.liveFragmentId == fragment.id;
-        final action = collected
-            ? '回听'
-            : revealed
-                ? '打开'
-                : '查看信息';
-        final stateLabel = collected
-            ? '已听过'
-            : revealed
-                ? '已触发'
-                : '尚未触发';
-        if (index > 0) nodes.add(SizedBox(width: spacing));
-        nodes.add(SizedBox(
-          width: nodeExtent,
-          child: Semantics(
-            button: true,
-            selected: selected,
-            label:
-                '第 ${fragment.position} 个节点，${fragment.title ?? fragment.safePreview}，$stateLabel${live ? '，当前行走进度' : ''}，$action',
-            child: AnimatedScale(
-              scale: selected ? 1.1 : 1,
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              child: SizedBox.square(
-                dimension: nodeExtent,
-                child: IconButton(
-                  key: ValueKey('journey-node-${fragment.id}'),
-                  tooltip: '$action第 ${fragment.position} 个节点',
-                  onPressed: () => ref
-                      .read(activeTourControllerProvider.notifier)
-                      .selectNode(fragment.id),
-                  style: IconButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size.square(nodeExtent),
-                    maximumSize: const Size.square(nodeExtent),
-                    backgroundColor: collected || revealed
-                        ? AppColors.moss
-                        : nearby || pending
-                            ? AppColors.terracotta
-                            : AppColors.paperDeep,
-                    foregroundColor: collected || revealed || nearby || pending
-                        ? AppColors.white
-                        : AppColors.ink,
-                    side: BorderSide(
-                      color: selected
-                          ? AppColors.gold
-                          : live
-                              ? AppColors.terracotta
-                              : AppColors.white,
-                      width: selected || live ? 3 : 1,
-                    ),
-                  ),
-                  icon: collected
-                      ? const Icon(Icons.check_rounded)
-                      : Text(
-                          '${fragment.position}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                ),
-              ),
-            ),
-          ),
-        ));
-      }
-      final railWidth = nodeExtent * count + spacing * math.max(0, count - 1);
-      final rail = SizedBox(
-        width: railWidth,
-        child: Stack(
-          children: [
-            if (count > 1)
-              Positioned(
-                left: nodeExtent / 2,
-                right: nodeExtent / 2,
-                top: nodeExtent / 2 - .5,
-                child: Container(
-                  height: 1,
-                  color: AppColors.ink.withValues(alpha: .18),
-                ),
-              ),
-            Row(mainAxisSize: MainAxisSize.min, children: nodes),
-          ],
-        ),
-      );
-      if (scrollable) {
-        return SingleChildScrollView(
-          key: const ValueKey('fragment-node-rail-scroll'),
-          scrollDirection: Axis.horizontal,
-          child: rail,
-        );
-      }
-      return Align(alignment: Alignment.center, child: rail);
-    });
   }
 }
 
@@ -948,7 +925,8 @@ class _SelectedNodeDetail extends StatelessWidget {
                   '节点 ${fragment.position}${fragment.displayTheme == null ? '' : ' · ${fragment.displayTheme}'}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppColors.terracotta,
-                        letterSpacing: .8,
+                        fontSize: 9,
+                        letterSpacing: 0,
                       ),
                 ),
               ),
@@ -958,6 +936,7 @@ class _SelectedNodeDetail extends StatelessWidget {
                     : _distanceLabel(point!.distanceMeters!),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: _statusColor(status),
+                      fontSize: 9,
                     ),
               ),
             ],
@@ -965,7 +944,10 @@ class _SelectedNodeDetail extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             fragment.title ?? fragment.safePreview,
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 19,
+                  height: 1.35,
+                ),
           ),
           if (fragment.title != null && fragment.safePreview.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -973,7 +955,8 @@ class _SelectedNodeDetail extends StatelessWidget {
               fragment.safePreview,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textMuted,
-                    height: 1.55,
+                    fontSize: 10,
+                    height: 1.6,
                   ),
             ),
           ],
@@ -987,7 +970,7 @@ class _SelectedNodeDetail extends StatelessWidget {
                     (value) => Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 9,
-                        vertical: 5,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.paperDeep,
@@ -995,7 +978,10 @@ class _SelectedNodeDetail extends StatelessWidget {
                       ),
                       child: Text(
                         value,
-                        style: Theme.of(context).textTheme.labelSmall,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontSize: 8,
+                              letterSpacing: 0,
+                            ),
                       ),
                     ),
                   )
@@ -1084,6 +1070,7 @@ class _ListeningCard extends ConsumerWidget {
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: AppColors.white,
+                            fontSize: 13,
                           ),
                     ),
                     const SizedBox(height: 4),
@@ -1096,7 +1083,7 @@ class _ListeningCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: AppColors.white.withValues(alpha: .65),
-                        fontSize: 12,
+                        fontSize: 8,
                       ),
                     ),
                   ],
@@ -1126,7 +1113,7 @@ class _ListeningCard extends ConsumerWidget {
                 : '设置模式：真实定位',
             style: TextStyle(
               color: AppColors.white.withValues(alpha: .62),
-              fontSize: 12,
+              fontSize: 8,
             ),
           ),
         ],
@@ -1184,6 +1171,7 @@ class _NarrationCardState extends ConsumerState<_NarrationCard> {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: AppColors.white,
+                          fontSize: 13,
                         ),
                   ),
                   const SizedBox(height: 4),
@@ -1191,7 +1179,7 @@ class _NarrationCardState extends ConsumerState<_NarrationCard> {
                     '${_formatAudioTime(state.position)} / ${total == 0 ? '--:--' : _formatAudioTime(state.duration!)} · 锁屏可继续播放',
                     style: TextStyle(
                       color: AppColors.white.withValues(alpha: .62),
-                      fontSize: 12,
+                      fontSize: 8,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
@@ -1295,7 +1283,7 @@ class _NarrationCardState extends ConsumerState<_NarrationCard> {
               state.narrationProfileMessage!,
               style: TextStyle(
                 color: AppColors.white.withValues(alpha: .72),
-                fontSize: 12,
+                fontSize: 8,
               ),
             ),
           ),
@@ -1425,7 +1413,7 @@ class _DarkControlSurface extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(color: AppColors.white, fontSize: 11),
+              style: const TextStyle(color: AppColors.white, fontSize: 8),
             ),
           ],
         ),
@@ -1514,6 +1502,8 @@ class _ModeButton extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                           color: selected ? AppColors.white : AppColors.ink,
+                          fontSize: 9,
+                          letterSpacing: 0,
                         ),
                   ),
                 ),

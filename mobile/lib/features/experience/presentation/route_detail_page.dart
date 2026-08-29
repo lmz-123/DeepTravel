@@ -104,26 +104,37 @@ class _RouteDetail extends ConsumerWidget {
                   children: [
                     Text(
                       route.theme.toUpperCase(),
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(color: AppColors.gold),
+                      style: const TextStyle(
+                        color: AppColors.gold,
+                        fontSize: 9,
+                        height: 1.3,
+                        letterSpacing: 1.1,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Text(
                       route.title,
-                      style: Theme.of(context)
-                          .textTheme
-                          .displaySmall
-                          ?.copyWith(color: AppColors.white),
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontFamily: 'Songti SC',
+                        fontFamilyFallback: [
+                          'STSong',
+                          'Noto Serif CJK SC',
+                          'serif',
+                        ],
+                        fontSize: 27,
+                        height: 1.2,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       route.subtitle,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyLarge
-                          ?.copyWith(color: AppColors.white),
+                      style: TextStyle(
+                        color: AppColors.white.withValues(alpha: .76),
+                        fontSize: 10,
+                        height: 1.55,
+                      ),
                     ),
                   ],
                 ),
@@ -134,7 +145,7 @@ class _RouteDetail extends ConsumerWidget {
             child: Transform.translate(
               offset: const Offset(0, -16),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 25, 20, 40),
+                padding: const EdgeInsets.fromLTRB(18, 22, 18, 40),
                 decoration: const BoxDecoration(
                   color: AppColors.paper,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -158,7 +169,10 @@ class _RouteDetail extends ConsumerWidget {
                     const SizedBox(height: 28),
                     Text(
                       route.audioTour == null ? '这一路，你会看见什么' : '故事方向',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontSize: 19,
+                              ),
                     ),
                     const SizedBox(height: 12),
                     _ClueSurface(route: route),
@@ -264,11 +278,20 @@ class _PredepartureSurface extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('先认识这座城', style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  '先认识这座城',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 22,
+                      ),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   introduction.text,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontFamily: 'Songti SC',
+                        fontSize: 13,
+                        height: 1.82,
+                      ),
                 ),
                 if (ownsPlayback && playback.message != null) ...[
                   const SizedBox(height: 8),
@@ -335,6 +358,7 @@ class _ManualTabs extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: active ? AppColors.ink : AppColors.textMuted,
+                  fontSize: 9,
                 ),
           ),
           const SizedBox(height: 6),
@@ -372,10 +396,15 @@ class _Metrics extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(value.$1, size: 16, color: AppColors.moss),
+                  Icon(value.$1, size: 13, color: AppColors.moss),
                   const SizedBox(width: 5),
-                  Text(value.$2,
-                      style: Theme.of(context).textTheme.labelMedium),
+                  Text(
+                    value.$2,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontSize: 9,
+                          letterSpacing: 0,
+                        ),
+                  ),
                 ],
               ),
             ),
@@ -473,7 +502,7 @@ class _PreparationCard extends ConsumerWidget {
             children: (tags.isEmpty
                     ? const ['建议佩戴耳机', '穿适合步行的鞋', '留意天气']
                     : tags.take(4))
-                .map((tag) => Chip(label: Text(tag)))
+                .map((tag) => _ManualTag(label: tag))
                 .toList(growable: false),
           ),
           const SizedBox(height: 13),
@@ -546,14 +575,15 @@ class _RouteStoryCard extends StatelessWidget {
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
-                        ?.copyWith(color: AppColors.white),
+                        ?.copyWith(color: AppColors.white, fontSize: 17),
                   ),
                   const SizedBox(height: 9),
                   Text(
                     route.audioTour?.centralQuestion ?? route.description,
                     style: TextStyle(
                       color: AppColors.white.withValues(alpha: .75),
-                      height: 1.55,
+                      fontSize: 9,
+                      height: 1.6,
                     ),
                   ),
                 ],
@@ -615,17 +645,20 @@ class _AboutManualCard extends StatelessWidget {
           children: [
             Text(
               route.description,
-              style:
-                  Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.65),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontSize: 10,
+                    height: 1.7,
+                    color: const Color(0xFF596965),
+                  ),
             ),
             const SizedBox(height: 15),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                Chip(label: Text(route.difficulty)),
-                Chip(label: Text('${route.numberOfStops} 个故事节点')),
-                if (!route.isPublished) const Chip(label: Text('内容预览中')),
+                _ManualTag(label: route.difficulty),
+                _ManualTag(label: '${route.numberOfStops} 个故事节点'),
+                if (!route.isPublished) const _ManualTag(label: '内容预览中'),
               ],
             ),
           ],
@@ -660,8 +693,13 @@ class _ManualCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 14),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontSize: 18,
+                  ),
+            ),
+            const SizedBox(height: 12),
             child,
           ],
         ),
@@ -699,9 +737,22 @@ class _InstructionRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(body, style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    body,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 9,
+                          height: 1.5,
+                          color: const Color(0xFF717B77),
+                        ),
+                  ),
                 ],
               ),
             ),
@@ -778,6 +829,9 @@ class _ClueRow extends StatelessWidget {
                 number.toString().padLeft(2, '0'),
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: AppColors.terracotta,
+                  fontFamily: 'Songti SC',
+                  fontSize: 15,
+                  letterSpacing: 0,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
@@ -786,9 +840,21 @@ class _ClueRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontSize: 11,
+                          height: 1.45,
+                        ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(metadata, style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    metadata,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 8,
+                          color: const Color(0xFF7C837E),
+                        ),
+                  ),
                   if (tags.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     _ExperienceTags(tags: tags),
@@ -806,6 +872,29 @@ class _ClueRow extends StatelessWidget {
       );
 }
 
+class _ManualTag extends StatelessWidget {
+  const _ManualTag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.paperDeep,
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF4A5B55),
+            fontSize: 8,
+            height: 1.2,
+          ),
+        ),
+      );
+}
+
 class _ExperienceTags extends StatelessWidget {
   const _ExperienceTags({required this.tags});
 
@@ -815,18 +904,8 @@ class _ExperienceTags extends StatelessWidget {
   Widget build(BuildContext context) => Wrap(
         spacing: 7,
         runSpacing: 6,
-        children: tags
-            .map(
-              (tag) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.moss.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text(tag, style: Theme.of(context).textTheme.labelSmall),
-              ),
-            )
-            .toList(growable: false),
+        children:
+            tags.map((tag) => _ManualTag(label: tag)).toList(growable: false),
       );
 }
 

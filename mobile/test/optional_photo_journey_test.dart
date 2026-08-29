@@ -54,7 +54,7 @@ void main() {
     expect(find.text('下一条线索（测试）'), findsOneWidget);
   });
 
-  testWidgets('fragment rail keeps safe targets and selects every node',
+  testWidgets('header route points keep safe targets and select every node',
       (tester) async {
     final controller = _StaticTourController(_railState);
     await tester.pumpWidget(ProviderScope(
@@ -65,13 +65,26 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final collected = find.byTooltip('回听第 1 个节点');
-    final untriggered = find.byTooltip('查看信息第 2 个节点');
-    expect(tester.getSize(collected), const Size(43, 43));
-    expect(tester.getSize(untriggered), const Size(43, 43));
-    expect(find.text('2'), findsOneWidget);
+    final collected = find.byTooltip('查看第 1 个节点');
+    final untriggered = find.byTooltip('查看第 2 个节点');
+    expect(tester.getSize(collected), const Size(44, 44));
+    expect(tester.getSize(untriggered), const Size(44, 44));
     expect(
-        find.bySemanticsLabel('第 1 个节点，城门的变化，已听过，当前行走进度，回听'), findsOneWidget);
+      tester.getSize(
+        find.byKey(const ValueKey('journey-node-dot-fragment-photo')),
+      ),
+      const Size(18, 18),
+    );
+    expect(
+      tester.getSize(
+        find.byKey(const ValueKey('journey-node-dot-fragment-locked')),
+      ),
+      const Size(12, 12),
+    );
+    expect(
+        find.byKey(const ValueKey('fragment-node-rail-scroll')), findsNothing);
+    expect(find.text('2'), findsNothing);
+    expect(find.bySemanticsLabel('第 1 个节点，城门的变化，已听过'), findsOneWidget);
 
     await tester.tap(collected);
     await tester.pump();
@@ -110,7 +123,7 @@ void main() {
   });
 
   testWidgets(
-      'dense rail renders an arbitrary backend node count without overflow',
+      'header path renders an arbitrary backend node count without overflow',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -184,17 +197,12 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('fragment-node-rail-scroll')),
-        findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('fragment-node-rail-scroll')), findsNothing);
     for (var position = 1; position <= 8; position += 1) {
-      expect(find.byTooltip('查看信息第 $position 个节点'), findsOneWidget);
+      expect(find.byTooltip('查看第 $position 个节点'), findsOneWidget);
     }
-    await tester.drag(
-      find.byKey(const ValueKey('fragment-node-rail-scroll')),
-      const Offset(-240, 0),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('查看信息第 8 个节点'));
+    await tester.tap(find.byTooltip('查看第 8 个节点'));
     await tester.pump();
     expect(controller.selectedFragmentId, 'dense-8');
     expect(find.text('密集节点 8'), findsOneWidget);

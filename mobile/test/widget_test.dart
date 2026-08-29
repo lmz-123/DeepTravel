@@ -9,6 +9,8 @@ import 'package:jiandi/features/experience/presentation/experience_providers.dar
 
 void main() {
   testWidgets('featured route can start in two taps', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(404, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     appRouter.go('/');
     final repository = DemoExperienceRepository(latency: Duration.zero);
     await tester.pumpWidget(
@@ -24,10 +26,7 @@ void main() {
     );
     expect(firstScenicArea, findsOneWidget);
     await _scrollToScenic(tester);
-    expect(
-      tester.getSize(find.byKey(const ValueKey('route-carousel'))).height,
-      505,
-    );
+    expect(tester.getSize(firstScenicArea).width, 368);
     expect(
       tester
           .getSize(
@@ -36,7 +35,11 @@ void main() {
             ),
           )
           .height,
-      276,
+      220,
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('route-carousel'))).height,
+      lessThan(400),
     );
     await tester.tap(firstScenicArea);
     await tester.pumpAndSettle();

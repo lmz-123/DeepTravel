@@ -910,8 +910,10 @@ class _RouteCarousel extends ConsumerStatefulWidget {
 }
 
 class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
-  static const _baseCarouselHeight = 505.0;
-  static const _baseHeroHeight = 276.0;
+  static const _referenceCardWidth = 368.0;
+  static const _referenceHeroHeight = 220.0;
+  static const _bodyHeightWithTags = 126.0;
+  static const _bodyHeightWithoutTags = 94.0;
 
   late final PageController _controller;
   var _selectedIndex = 0;
@@ -936,25 +938,30 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 11),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   '城市手册',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 19,
+                      ),
                 ),
                 const Spacer(),
                 Text(
                   '左右滑动 · 按距离排序',
-                  style: Theme.of(context).textTheme.labelSmall,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontSize: 9,
+                        color: AppColors.textMuted,
+                      ),
                 ),
               ],
             ),
           ),
           LayoutBuilder(
             builder: (context, constraints) {
-              final cardWidth = constraints.maxWidth - 40;
+              final cardWidth = constraints.maxWidth - 36;
               final layout = _measureCardLayout(context, cardWidth);
               return SizedBox(
                 height: layout.carouselHeight,
@@ -987,7 +994,7 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
                       );
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
                       child: _RouteCard(
                         card: widget.cards[index],
                         heroHeight: layout.heroHeight,
@@ -1012,7 +1019,7 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
               );
             },
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 9),
           Semantics(
             label: '第 ${_selectedIndex + 1} 个，共 ${widget.cards.length} 个景区',
             child: Row(
@@ -1047,16 +1054,23 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   ) {
     final scaler = MediaQuery.textScalerOf(context);
     final textDirection = Directionality.of(context);
-    final theme = Theme.of(context).textTheme;
-    final textWidth = math.max(1.0, cardWidth - 44);
+    final textWidth = math.max(1.0, cardWidth - 34);
     var heroGrowth = 0.0;
     var bodyGrowth = 0.0;
+    var hasTags = false;
 
     for (final scenicCard in widget.cards) {
       final route = scenicCard.route;
-      final heroStyle = theme.headlineMedium ?? const TextStyle(fontSize: 28);
-      final themeStyle = theme.labelMedium ?? const TextStyle(fontSize: 12);
-      final subtitleStyle = theme.bodyLarge ?? const TextStyle(fontSize: 16);
+      const heroStyle = TextStyle(
+        fontFamily: 'Songti SC',
+        fontSize: 23,
+        height: 1.2,
+        fontWeight: FontWeight.w500,
+      );
+      const themeStyle = TextStyle(fontSize: 8, height: 1.3);
+      const subtitleStyle = TextStyle(fontSize: 11, height: 1.6);
+      hasTags = hasTags ||
+          (route.pretrip?.companionTags ?? const <String>[]).isNotEmpty;
 
       final scaledHeroText = _measureTextHeight(
             route.theme,
@@ -1107,13 +1121,13 @@ class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
       bodyGrowth = math.max(bodyGrowth, scaledSubtitle - baseSubtitle);
     }
 
-    // The original scenic card is the visual baseline. Accessibility scaling may
-    // only grow it; viewport-relative calculations must never shrink it again.
     final safeHeroGrowth = math.max(0, heroGrowth);
     final safeBodyGrowth = math.max(0, bodyGrowth);
+    final heroHeight = cardWidth * (_referenceHeroHeight / _referenceCardWidth);
+    final bodyHeight = hasTags ? _bodyHeightWithTags : _bodyHeightWithoutTags;
     return _RouteCardLayout(
-      heroHeight: _baseHeroHeight + safeHeroGrowth,
-      carouselHeight: _baseCarouselHeight + safeHeroGrowth + safeBodyGrowth,
+      heroHeight: heroHeight + safeHeroGrowth,
+      carouselHeight: heroHeight + bodyHeight + safeHeroGrowth + safeBodyGrowth,
     );
   }
 
@@ -1223,18 +1237,29 @@ class _RouteCard extends StatelessWidget {
                       const Spacer(),
                       Text(
                         route.theme,
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: AppColors.gold,
-                                ),
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 8,
+                          height: 1.3,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 1,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 7),
                       Text(
                         route.title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(color: AppColors.white),
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontFamily: 'Songti SC',
+                          fontFamilyFallback: [
+                            'STSong',
+                            'Noto Serif CJK SC',
+                            'serif',
+                          ],
+                          fontSize: 23,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -1250,13 +1275,15 @@ class _RouteCard extends StatelessWidget {
                         route.subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              height: 1.6,
-                            ),
+                        style: const TextStyle(
+                          color: Color(0xFF4E5F60),
+                          fontSize: 11,
+                          height: 1.6,
+                        ),
                       ),
                       if ((route.pretrip?.companionTags ?? const <String>[])
                           .isNotEmpty) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 11),
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
@@ -1266,7 +1293,7 @@ class _RouteCard extends StatelessWidget {
                                 (tag) => Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 9,
-                                    vertical: 5,
+                                    vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
                                     color: AppColors.paperDeep,
@@ -1274,8 +1301,11 @@ class _RouteCard extends StatelessWidget {
                                   ),
                                   child: Text(
                                     tag,
-                                    style:
-                                        Theme.of(context).textTheme.labelSmall,
+                                    style: const TextStyle(
+                                      color: Color(0xFF4A5B55),
+                                      fontSize: 8,
+                                      height: 1.2,
+                                    ),
                                   ),
                                 ),
                               )
@@ -1289,10 +1319,12 @@ class _RouteCard extends StatelessWidget {
                             icon: Icons.schedule_rounded,
                             text: '${route.durationMinutes} 分钟',
                           ),
+                          const SizedBox(width: 13),
                           _Metric(
                             icon: Icons.route_rounded,
                             text: '${route.distanceKm} km',
                           ),
+                          const SizedBox(width: 13),
                           _Metric(
                             icon: Icons.flag_outlined,
                             text: '${route.numberOfStops} 站',
@@ -1300,7 +1332,12 @@ class _RouteCard extends StatelessWidget {
                           const Spacer(),
                           Text(
                             '打开城市手册 →',
-                            style: Theme.of(context).textTheme.labelMedium,
+                            style: const TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 9,
+                              height: 1.3,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
@@ -1339,7 +1376,7 @@ class _GlassPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.ink.withValues(alpha: 0.48),
         borderRadius: BorderRadius.circular(999),
@@ -1347,10 +1384,11 @@ class _GlassPill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context)
-            .textTheme
-            .labelMedium
-            ?.copyWith(color: AppColors.white),
+        style: const TextStyle(
+          color: AppColors.white,
+          fontSize: 9,
+          height: 1.2,
+        ),
       ),
     );
   }
@@ -1364,16 +1402,20 @@ class _Metric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Row(
-        children: [
-          Icon(icon, size: 17, color: AppColors.moss),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(text, style: Theme.of(context).textTheme.labelMedium),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: AppColors.moss),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF52625E),
+            fontSize: 9,
+            height: 1.3,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -67,11 +67,11 @@ Public editorial image ingestion normalizes PNG/JPEG inputs to JPEG quality 85 b
 
 Alternative considered: keep local storage for developer convenience or give test full write access to shared canonical keys. Rejected because local mode recreates environment drift, while unrestricted test writes could corrupt live media. An in-memory fake and reserved OSS test prefix preserve testability without a second canonical asset set.
 
-### 6. Make discovery layout intrinsic and ordered
+### 6. Match the approved discovery-card proportion and keep layout ordered
 
-The scenic/manual carousel is rendered before city stories. The existing default visual baseline remains 505 logical pixels for the carousel and 276 logical pixels for its hero image; those values are minimums, not a viewport-derived replacement ratio. Card internals measure bounded copy and may only grow above that baseline for accessibility scaling. The page indicator remains in the same normal-flow column, and a normal sliver gap separates its measured end from city stories. Golden/widget tests lock the default baseline and cover compact height, narrow width, long allowed copy, and 200% text scaling.
+The scenic/manual carousel is rendered before city stories. Its approved reference is a 368-pixel-wide card with a 220-pixel photographic hero, 18-pixel page gutters, intrinsic content height, 23-pixel over-image title, 11-pixel summary, 8-pixel tags, and 9-pixel metrics/actions. The implementation scales that reference proportion for supported widths and grows only where bounded content or accessibility requires it; it does not retain the former 505/276 card baseline. The page indicator remains in the same normal-flow column, and a normal sliver gap separates its measured end from city stories. Widget tests lock the reference ratio, component typography, compact labels, narrow width, long allowed copy, and 200% text scaling.
 
-Alternative considered: replace the established card dimensions with a viewport-width formula. Rejected because this compresses the complete scenic card on common phones and can hide its lower content. A larger fixed top/bottom section offset is also rejected because it reproduces the overlap on another screen or font scale.
+Alternative considered: preserve the former fixed 505/276 card dimensions. Rejected because they do not match the approved design and make the photo and typography oversized on common phones. A larger fixed top/bottom section offset is also rejected because it reproduces the overlap on another screen or font scale.
 
 ### 7. Keep module and API failure boundaries explicit
 
@@ -85,9 +85,9 @@ If pre-departure fails, the manual remains readable. If story compatibility migr
 
 ### 8. Treat the final client design components as structural contracts
 
-The discovery scenic-manual card keeps its photographic hero, distance/status pill, title overlay, descriptive copy, server-driven tags, compact metrics, and one trailing manual action in the same card. The manual detail uses the designed paper-over-hero composition and distinct white information cards rather than generic list tiles. During a journey, one connected row of circular node controls is the only node selector: each circle includes its useful state/position content, is directly tappable, and updates the single node-introduction card below it. A second numeric row is prohibited. The current narration appears in one dark player card with a 48-pixel primary control, title/status copy, progress, and compact speed/voice/transcript controls. Real-walk and simulated-preview modes remain a separate two-column segmented surface after the node content.
+The discovery scenic-manual card keeps its photographic hero, distance/status pill, title overlay, descriptive copy, server-driven tags, compact metrics, and one trailing manual action in the same card. The manual detail uses the designed paper-over-hero composition and distinct white information cards rather than generic list tiles. During a journey, the small route points already drawn on the connected path in the upper map/header are the only node selector. Each point has a safe tap target, exposes useful state/position semantics, and updates the single node-introduction card below; the journey body contains no 1–5 node rail or numbered circles. The current narration appears in one dark player card with a 48-pixel primary control, title/status copy, progress, and compact speed/voice/transcript controls. Real-walk and simulated-preview modes remain a separate two-column segmented surface after the node content.
 
-Alternative considered: keep the old rail labels and add the designed circles above them. Rejected because it duplicates the same navigation, weakens hierarchy, and caused the implementation to diverge from the approved design.
+Alternative considered: keep a second numbered node rail in the body. Rejected because the upper route points already provide that navigation, duplicating the five nodes weakens hierarchy and caused the implementation to diverge from the approved design.
 
 ## Risks / Trade-offs
 
