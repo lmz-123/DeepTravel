@@ -13,6 +13,7 @@ import 'experience_providers.dart';
 import 'home_story_controller.dart';
 import 'location_mode_controller.dart';
 import 'offline_package_controller.dart';
+import 'route_preview_location_provider.dart';
 import 'widgets/location_mode_selector.dart';
 import 'widgets/route_canvas.dart';
 import 'widgets/favorite_button.dart';
@@ -557,49 +558,21 @@ class _PreparationCard extends ConsumerWidget {
   }
 }
 
-class _RouteStoryCard extends StatelessWidget {
+class _RouteStoryCard extends ConsumerWidget {
   const _RouteStoryCard({required this.route});
 
   final RouteExperience route;
 
   @override
-  Widget build(BuildContext context) => Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.ink,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            RouteCanvas(stops: route.stops, height: 174, dark: true),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 21),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '路线不是命令，是一张故事地图',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(color: AppColors.white, fontSize: 17),
-                  ),
-                  const SizedBox(height: 9),
-                  Text(
-                    route.audioTour?.centralQuestion ?? route.description,
-                    style: TextStyle(
-                      color: AppColors.white.withValues(alpha: .75),
-                      fontSize: 9,
-                      height: 1.6,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final points = routeCanvasPointsFor(route);
+    return RouteCanvas(
+      points: points,
+      userLocation: points.isEmpty
+          ? null
+          : ref.watch(routePreviewLocationProvider).asData?.value,
+    );
+  }
 }
 
 class _ClueSurface extends StatelessWidget {

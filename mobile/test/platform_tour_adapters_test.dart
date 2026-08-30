@@ -8,7 +8,8 @@ import 'package:jiandi/features/experience/data/platform_tour_adapters.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('Android journey stream uses LocationManager directly', () async {
+  test('Android journey stream stays continuous with LocationManager',
+      () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final settings = <LocationSettings>[];
@@ -31,7 +32,30 @@ void main() {
     expect(settings.first, isA<AndroidSettings>());
     expect((settings.single as AndroidSettings).forceLocationManager, isTrue);
     expect(settings.single.distanceFilter, 3);
+    expect(settings.single.timeLimit, isNull);
     expect(diagnostics, contains('journey_location_stream_started'));
+  });
+
+  test('foreground-only preview does not enable background tracking', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final settings = <LocationSettings>[];
+    final tracker = GeolocatorTracker(
+      backgroundUpdatesEnabled: false,
+      positionStreamFactory: (locationSettings) {
+        settings.add(locationSettings);
+        return Stream.value(_position());
+      },
+    );
+    addTearDown(tracker.stop);
+
+    await tracker.samples().first;
+
+    expect(
+      (settings.single as AndroidSettings).foregroundNotificationConfig,
+      isNull,
+    );
+    expect(settings.single.timeLimit, isNull);
   });
 }
 

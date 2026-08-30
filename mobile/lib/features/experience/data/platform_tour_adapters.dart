@@ -24,15 +24,15 @@ typedef PositionStreamFactory = Stream<Position> Function(
 class GeolocatorTracker implements LocationTracker {
   GeolocatorTracker({
     this.onDiagnostic,
+    this.backgroundUpdatesEnabled = true,
     PositionStreamFactory? positionStreamFactory,
   }) : _positionStreamFactory = positionStreamFactory ??
             ((settings) => Geolocator.getPositionStream(
                   locationSettings: settings,
                 ));
 
-  static const _androidUpdateTimeout = Duration(seconds: 12);
-
   final TourLocationDiagnosticCallback? onDiagnostic;
+  final bool backgroundUpdatesEnabled;
   final PositionStreamFactory _positionStreamFactory;
   StreamSubscription<Position>? _subscription;
   StreamController<LocationSample>? _controller;
@@ -127,13 +127,14 @@ class GeolocatorTracker implements LocationTracker {
         distanceFilter: 3,
         intervalDuration: const Duration(seconds: 3),
         forceLocationManager: true,
-        timeLimit: _androidUpdateTimeout,
-        foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: '见地正在陪你行走',
-          notificationText: '靠近线索时会自动播放故事，点按可回到旅程。',
-          enableWakeLock: true,
-          setOngoing: true,
-        ),
+        foregroundNotificationConfig: backgroundUpdatesEnabled
+            ? const ForegroundNotificationConfig(
+                notificationTitle: '见地正在陪你行走',
+                notificationText: '靠近线索时会自动播放故事，点按可回到旅程。',
+                enableWakeLock: true,
+                setOngoing: true,
+              )
+            : null,
       );
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -142,8 +143,8 @@ class GeolocatorTracker implements LocationTracker {
           activityType: ActivityType.fitness,
           distanceFilter: 8,
           pauseLocationUpdatesAutomatically: false,
-          showBackgroundLocationIndicator: true,
-          allowBackgroundLocationUpdates: true);
+          showBackgroundLocationIndicator: backgroundUpdatesEnabled,
+          allowBackgroundLocationUpdates: backgroundUpdatesEnabled);
     }
     return const LocationSettings(
         accuracy: LocationAccuracy.high, distanceFilter: 8);
