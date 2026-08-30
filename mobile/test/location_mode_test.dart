@@ -100,7 +100,13 @@ void main() {
     );
     expect(find.byKey(const ValueKey('selected-node-detail-fragment-1')),
         findsOneWidget);
-    expect(find.text('第一条线索'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('selected-node-detail-fragment-1')),
+        matching: find.text('第一条线索'),
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('潮汐里的旧城'), findsOneWidget);
     expect(find.text('约 3 分钟'), findsOneWidget);
     expect(find.text('等待定位'), findsOneWidget);
@@ -750,6 +756,8 @@ void main() {
 
     var state = container.read(activeTourControllerProvider);
     expect(location.sampleSubscriptions, 1);
+    expect(state.latestLocationSample?.recordedAt,
+        time.add(const Duration(seconds: 5)));
     expect(state.queue.map((fragment) => fragment.id), ['fragment-2']);
     expect(repository.acknowledgeCalls, 0);
 
@@ -763,6 +771,8 @@ void main() {
     await controller.stopTour();
     expect(container.read(activeTourControllerProvider).nearbyStoryPoints,
         isEmpty);
+    expect(container.read(activeTourControllerProvider).latestLocationSample,
+        isNull);
   });
 
   test(

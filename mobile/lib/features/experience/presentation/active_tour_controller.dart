@@ -152,6 +152,7 @@ class ActiveTourState {
     this.current,
     this.queue = const [],
     this.nearbyStoryPoints = const [],
+    this.latestLocationSample,
     this.preparedPaths = const {},
     this.isBusy = false,
     this.isPlaying = false,
@@ -178,6 +179,7 @@ class ActiveTourState {
   final StoryFragment? current;
   final List<StoryFragment> queue;
   final List<NearbyStoryPoint> nearbyStoryPoints;
+  final LocationSample? latestLocationSample;
   final Map<String, String> preparedPaths;
   final bool isBusy;
   final bool isPlaying;
@@ -205,6 +207,8 @@ class ActiveTourState {
           bool clearCurrent = false,
           List<StoryFragment>? queue,
           List<NearbyStoryPoint>? nearbyStoryPoints,
+          LocationSample? latestLocationSample,
+          bool clearLatestLocationSample = false,
           Map<String, String>? preparedPaths,
           bool? isBusy,
           bool? isPlaying,
@@ -236,6 +240,9 @@ class ActiveTourState {
         current: clearCurrent ? null : current ?? this.current,
         queue: queue ?? this.queue,
         nearbyStoryPoints: nearbyStoryPoints ?? this.nearbyStoryPoints,
+        latestLocationSample: clearLatestLocationSample
+            ? null
+            : latestLocationSample ?? this.latestLocationSample,
         preparedPaths: preparedPaths ?? this.preparedPaths,
         isBusy: isBusy ?? this.isBusy,
         isPlaying: isPlaying ?? this.isPlaying,
@@ -692,6 +699,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     final ledger = state.ledger;
     if (manifest == null || ledger == null) return;
     _latestLocationSample = sample;
+    state = state.copyWith(latestLocationSample: sample);
     final candidate = _triggerEngine.process(
         sample,
         manifest.fragments,
@@ -1688,6 +1696,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           locationMode: mode,
           status: paused ? 'paused' : 'simulated',
           nearbyStoryPoints: const [],
+          clearLatestLocationSample: true,
           locationMessage: paused
               ? '已切换为模拟定位；继续导览后可手动模拟到达。'
               : '模拟定位已开启：不会读取真实位置，请手动模拟到达下一条线索。',
@@ -1728,6 +1737,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         isPlaying: false,
         queue: const [],
         nearbyStoryPoints: const [],
+        clearLatestLocationSample: true,
         clearPlaybackOwner: true,
         generation: _playbackGeneration,
         locationMessage: '本次自动导览已停止，已收集线索仍会保留。');
@@ -1966,12 +1976,14 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         _listenToRealLocation();
       } else {
         _latestLocationSample = null;
+        state = state.copyWith(clearLatestLocationSample: true);
         _refreshNearbyStoryPoints();
       }
     } catch (error) {
       _latestLocationSample = null;
       state = state.copyWith(
           status: 'recoverable_error',
+          clearLatestLocationSample: true,
           errorMessage: _message(error),
           locationMessage: '真实定位暂时无法启动，请稍后重试。');
       _refreshNearbyStoryPoints();
@@ -1984,7 +1996,9 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       onError: (_) {
         _latestLocationSample = null;
         state = state.copyWith(
-            status: 'recoverable_error', locationMessage: '定位暂时中断，回到应用后会继续尝试');
+            status: 'recoverable_error',
+            clearLatestLocationSample: true,
+            locationMessage: '定位暂时中断，回到应用后会继续尝试');
         _refreshNearbyStoryPoints();
       },
     );

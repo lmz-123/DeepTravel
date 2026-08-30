@@ -14,6 +14,10 @@ class RouteCanvasPoint {
     required this.latitude,
     required this.longitude,
     required this.triggerRadiusM,
+    this.enabled = true,
+    this.semanticsLabel,
+    this.tooltip,
+    this.markerColor,
   });
 
   final String id;
@@ -21,6 +25,10 @@ class RouteCanvasPoint {
   final double latitude;
   final double longitude;
   final double triggerRadiusM;
+  final bool enabled;
+  final String? semanticsLabel;
+  final String? tooltip;
+  final Color? markerColor;
 }
 
 /// Resolves the spatial data shown by [RouteCanvas] from the route payload.
@@ -169,12 +177,18 @@ class RouteCanvas extends StatefulWidget {
     super.key,
     this.userLocation,
     this.height = 300,
+    this.selectedPointId,
+    this.nodeKeyPrefix = 'route-canvas-node-',
+    this.nodeDotKeyPrefix,
     this.onPointSelected,
   });
 
   final List<RouteCanvasPoint> points;
   final LocationSample? userLocation;
-  final double height;
+  final double? height;
+  final String? selectedPointId;
+  final String nodeKeyPrefix;
+  final String? nodeDotKeyPrefix;
   final ValueChanged<RouteCanvasPoint>? onPointSelected;
 
   @override
@@ -187,14 +201,19 @@ class _RouteCanvasState extends State<RouteCanvas> {
   @override
   void initState() {
     super.initState();
-    _selectedPointId = widget.points.firstOrNull?.id;
+    _selectedPointId = widget.selectedPointId ?? widget.points.firstOrNull?.id;
   }
 
   @override
   void didUpdateWidget(covariant RouteCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.selectedPointId != oldWidget.selectedPointId &&
+        widget.points.any((point) => point.id == widget.selectedPointId)) {
+      _selectedPointId = widget.selectedPointId;
+    }
     if (!widget.points.any((point) => point.id == _selectedPointId)) {
-      _selectedPointId = widget.points.firstOrNull?.id;
+      _selectedPointId =
+          widget.selectedPointId ?? widget.points.firstOrNull?.id;
     }
   }
 
@@ -279,10 +298,16 @@ class _RouteCanvasState extends State<RouteCanvas> {
             point: point,
             position: projection.project(point.latitude, point.longitude),
             selected: point.id == _selectedPointId,
-            onTap: () {
-              setState(() => _selectedPointId = point.id);
-              widget.onPointSelected?.call(point);
-            },
+            nodeKey: ValueKey('${widget.nodeKeyPrefix}${point.id}'),
+            dotKey: widget.nodeDotKeyPrefix == null
+                ? null
+                : ValueKey('${widget.nodeDotKeyPrefix}${point.id}'),
+            onTap: point.enabled
+                ? () {
+                    setState(() => _selectedPointId = point.id);
+                    widget.onPointSelected?.call(point);
+                  }
+                : null,
           ),
         if (location != null && userPoint != null)
           _AnimatedUserLocation(
@@ -359,13 +384,17 @@ class _NodeButton extends StatelessWidget {
     required this.point,
     required this.position,
     required this.selected,
+    required this.nodeKey,
+    required this.dotKey,
     required this.onTap,
   });
 
   final RouteCanvasPoint point;
   final Offset position;
   final bool selected;
-  final VoidCallback onTap;
+  final Key nodeKey;
+  final Key? dotKey;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Positioned(
@@ -374,25 +403,35 @@ class _NodeButton extends StatelessWidget {
         width: 48,
         height: 48,
         child: Semantics(
-          key: ValueKey('route-canvas-node-${point.id}'),
+          key: nodeKey,
           button: true,
+          enabled: point.enabled,
           selected: selected,
-          label: point.label,
+          label: point.semanticsLabel ?? point.label,
           child: Tooltip(
-            message: point.label,
+            message: point.tooltip ?? point.label,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onTap,
               child: Center(
                 child: AnimatedContainer(
+                  key: dotKey,
                   duration: const Duration(milliseconds: 180),
                   width: selected ? 28 : 24,
                   height: selected ? 28 : 24,
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.terracotta : AppColors.white,
+                    color: selected
+                        ? AppColors.terracotta
+                        : point.enabled
+                            ? point.markerColor ?? AppColors.white
+                            : AppColors.ink.withValues(alpha: .16),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: selected ? AppColors.terracotta : AppColors.ink,
+                      color: selected
+                          ? AppColors.terracotta
+                          : point.enabled
+                              ? AppColors.ink
+                              : AppColors.ink.withValues(alpha: .3),
                       width: 1.7,
                     ),
                     boxShadow: [
@@ -409,7 +448,11 @@ class _NodeButton extends StatelessWidget {
                       width: 7,
                       height: 7,
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.white : AppColors.ink,
+                        color: selected
+                            ? AppColors.white
+                            : point.enabled
+                                ? AppColors.ink
+                                : AppColors.white.withValues(alpha: .7),
                         shape: BoxShape.circle,
                       ),
                     ),

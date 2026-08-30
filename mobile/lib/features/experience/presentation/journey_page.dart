@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +14,7 @@ import 'widgets/evidence_photo_widgets.dart';
 import 'widgets/location_mode_selector.dart';
 import 'widgets/narration_voice_selector.dart';
 import 'widgets/node_community_section.dart';
+import 'widgets/route_canvas.dart';
 import 'widgets/traveler_bottom_navigation.dart';
 
 class JourneyPage extends ConsumerStatefulWidget {
@@ -127,6 +127,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                 fragments: manifest.fragments,
                 ledger: ledger,
                 points: state.nearbyStoryPoints,
+                userLocation: state.latestLocationSample,
                 selectedFragmentId: selectedFragmentId,
                 collectedCount: ledger?.collectedCount ?? 0,
                 onBack: () => context.go('/'),
@@ -503,6 +504,7 @@ class _JourneyMapHeader extends StatelessWidget {
     required this.fragments,
     required this.ledger,
     required this.points,
+    required this.userLocation,
     required this.selectedFragmentId,
     required this.collectedCount,
     required this.onBack,
@@ -514,6 +516,7 @@ class _JourneyMapHeader extends StatelessWidget {
   final List<StoryFragment> fragments;
   final StoryLedger? ledger;
   final List<NearbyStoryPoint> points;
+  final LocationSample? userLocation;
   final String? selectedFragmentId;
   final int collectedCount;
   final VoidCallback onBack;
@@ -522,14 +525,14 @@ class _JourneyMapHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 286 + MediaQuery.paddingOf(context).top,
+        height: 390 + MediaQuery.paddingOf(context).top,
         padding: EdgeInsets.fromLTRB(
           16,
           MediaQuery.paddingOf(context).top + 10,
           16,
-          30,
+          24,
         ),
-        color: AppColors.ink,
+        color: AppColors.paper,
         child: Column(
           children: [
             Row(
@@ -538,41 +541,29 @@ class _JourneyMapHeader extends StatelessWidget {
                   tooltip: '返回首页',
                   onPressed: onBack,
                   style: IconButton.styleFrom(
-                    backgroundColor: AppColors.white.withValues(alpha: .1),
-                    foregroundColor: AppColors.white,
+                    backgroundColor: AppColors.paperDeep,
+                    foregroundColor: AppColors.ink,
                   ),
                   icon: const Icon(Icons.arrow_back_rounded),
                 ),
                 Expanded(
-                  child: Column(
-                    children: [
-                      Text(
-                        '$routeTitle · 自由漫游',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppColors.gold,
-                              fontSize: 8,
-                              letterSpacing: 1.2,
-                            ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '行走中的故事',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(color: AppColors.white, fontSize: 16),
-                      ),
-                    ],
+                  child: Text(
+                    routeTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(color: AppColors.ink, fontSize: 16),
                   ),
                 ),
                 IconButton.filledTonal(
                   tooltip: '故事线索簿',
                   onPressed: onLedger,
                   style: IconButton.styleFrom(
-                    backgroundColor: AppColors.white.withValues(alpha: .1),
-                    foregroundColor: AppColors.white,
+                    backgroundColor: AppColors.paperDeep,
+                    foregroundColor: AppColors.ink,
                   ),
                   icon: Badge(
                     label: Text('$collectedCount'),
@@ -587,37 +578,9 @@ class _JourneyMapHeader extends StatelessWidget {
                 fragments: fragments,
                 ledger: ledger,
                 points: points,
+                userLocation: userLocation,
                 selectedFragmentId: selectedFragmentId,
                 onSelectNode: onSelectNode,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: .09),
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox.square(
-                    dimension: 7,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: AppColors.gold,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '正在寻找附近的历史线索',
-                    style: TextStyle(
-                      color: AppColors.white.withValues(alpha: .82),
-                      fontSize: 8,
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -630,6 +593,7 @@ class _JourneyRouteSelector extends StatelessWidget {
     required this.fragments,
     required this.ledger,
     required this.points,
+    required this.userLocation,
     required this.selectedFragmentId,
     required this.onSelectNode,
   });
@@ -637,174 +601,73 @@ class _JourneyRouteSelector extends StatelessWidget {
   final List<StoryFragment> fragments;
   final StoryLedger? ledger;
   final List<NearbyStoryPoint> points;
+  final LocationSample? userLocation;
   final String? selectedFragmentId;
   final ValueChanged<String> onSelectNode;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final size = constraints.biggest;
-          final path = _journeyRoutePath(size);
-          final metrics = path.computeMetrics().toList(growable: false);
-          if (metrics.isEmpty || fragments.isEmpty) {
-            return CustomPaint(
-              painter: const _JourneyRoutePainter(),
-              child: const SizedBox.expand(),
-            );
-          }
-          final metric = metrics.first;
-          final revealedIds = ledger?.entries
-                  .where((entry) => entry.isRevealed)
-                  .map((entry) => entry.id)
-                  .toSet() ??
-              const <String>{};
-          final selectedId = revealedIds.contains(selectedFragmentId)
-              ? selectedFragmentId
-              : fragments
-                  .where((fragment) => revealedIds.contains(fragment.id))
-                  .firstOrNull
-                  ?.id;
-          return CustomPaint(
-            painter: const _JourneyRoutePainter(),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                for (final indexed in fragments.indexed)
-                  if (metric.getTangentForOffset(
-                    metric.length *
-                        (indexed.$1 / math.max(1, fragments.length - 1)),
-                  )
-                      case final tangent?)
-                    _positionedNode(
-                      context,
-                      fragment: indexed.$2,
-                      center: tangent.position,
-                      selected: indexed.$2.id == selectedId,
-                    ),
-              ],
-            ),
-          );
-        },
-      );
-
-  Widget _positionedNode(
-    BuildContext context, {
-    required StoryFragment fragment,
-    required Offset center,
-    required bool selected,
-  }) {
-    final ledgerEntry =
-        ledger?.entries.where((entry) => entry.id == fragment.id).firstOrNull;
-    final point = points
-        .where((candidate) => candidate.fragment.id == fragment.id)
-        .firstOrNull;
-    final collected = ledgerEntry?.isCollected ?? false;
-    final revealed = ledgerEntry?.isRevealed ?? false;
-    final nearby = point?.status == NearbyStoryPointStatus.inRange ||
-        point?.status == NearbyStoryPointStatus.approaching;
-    final stateLabel = collected
-        ? '已听过'
-        : nearby
-            ? '已接近'
-            : revealed
-                ? '已触发'
-                : '未解锁';
-    final dotSize = selected ? 18.0 : (collected || nearby ? 14.0 : 12.0);
-    final dotColor = collected
-        ? AppColors.moss
-        : nearby
-            ? AppColors.terracotta
-            : revealed
-                ? AppColors.gold
-                : AppColors.white.withValues(alpha: .28);
-    return Positioned(
-      left: center.dx - 22,
-      top: center.dy - 22,
-      width: 44,
-      height: 44,
-      child: Semantics(
-        button: true,
+  Widget build(BuildContext context) {
+    final revealedIds = ledger?.entries
+            .where((entry) => entry.isRevealed)
+            .map((entry) => entry.id)
+            .toSet() ??
+        const <String>{};
+    final effectiveSelectedId = revealedIds.contains(selectedFragmentId)
+        ? selectedFragmentId
+        : fragments
+            .where((fragment) => revealedIds.contains(fragment.id))
+            .firstOrNull
+            ?.id;
+    final canvasPoints = fragments.map((fragment) {
+      final ledgerEntry =
+          ledger?.entries.where((entry) => entry.id == fragment.id).firstOrNull;
+      final nearbyPoint = points
+          .where((candidate) => candidate.fragment.id == fragment.id)
+          .firstOrNull;
+      final collected = ledgerEntry?.isCollected ?? false;
+      final revealed = ledgerEntry?.isRevealed ?? false;
+      final nearby = nearbyPoint?.status == NearbyStoryPointStatus.inRange ||
+          nearbyPoint?.status == NearbyStoryPointStatus.approaching;
+      final stateLabel = collected
+          ? '已听过'
+          : nearby
+              ? '已接近'
+              : revealed
+                  ? '已触发'
+                  : '未解锁';
+      return RouteCanvasPoint(
+        id: fragment.id,
+        label: fragment.title ?? fragment.safePreview,
+        latitude: fragment.triggerRegion.latitude,
+        longitude: fragment.triggerRegion.longitude,
+        triggerRadiusM: fragment.triggerRegion.entryRadiusM.toDouble(),
         enabled: revealed,
-        selected: selected,
-        label:
+        semanticsLabel:
             '第 ${fragment.position} 个节点，${fragment.title ?? fragment.safePreview}，$stateLabel',
-        child: Tooltip(
-          message: revealed
-              ? '查看第 ${fragment.position} 个节点'
-              : '第 ${fragment.position} 个节点尚未解锁',
-          child: InkResponse(
-            key: ValueKey('journey-node-${fragment.id}'),
-            onTap: revealed ? () => onSelectNode(fragment.id) : null,
-            radius: 22,
-            child: Center(
-              child: AnimatedContainer(
-                key: ValueKey('journey-node-dot-${fragment.id}'),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                width: dotSize,
-                height: dotSize,
-                decoration: BoxDecoration(
-                  color: dotColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected ? AppColors.white : AppColors.ink,
-                    width: selected ? 3 : 2,
-                  ),
-                  boxShadow: selected
-                      ? [
-                          const BoxShadow(
-                            color: AppColors.gold,
-                            spreadRadius: 3,
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+        tooltip: revealed
+            ? '查看第 ${fragment.position} 个节点'
+            : '第 ${fragment.position} 个节点尚未解锁',
+        markerColor: collected
+            ? AppColors.moss
+            : nearby
+                ? AppColors.terracotta
+                : revealed
+                    ? AppColors.gold
+                    : null,
+      );
+    }).toList(growable: false);
+
+    return RouteCanvas(
+      points: canvasPoints,
+      height: null,
+      userLocation: userLocation,
+      selectedPointId: effectiveSelectedId,
+      nodeKeyPrefix: 'journey-node-',
+      nodeDotKeyPrefix: 'journey-node-dot-',
+      onPointSelected: (point) => onSelectNode(point.id),
     );
   }
 }
-
-class _JourneyRoutePainter extends CustomPainter {
-  const _JourneyRoutePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = _journeyRoutePath(size);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = AppColors.gold.withValues(alpha: .34)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_JourneyRoutePainter oldDelegate) => false;
-}
-
-Path _journeyRoutePath(Size size) => Path()
-  ..moveTo(24, size.height * .72)
-  ..cubicTo(
-    size.width * .18,
-    size.height * .08,
-    size.width * .36,
-    size.height * .92,
-    size.width * .5,
-    size.height * .42,
-  )
-  ..cubicTo(
-    size.width * .66,
-    size.height * -.02,
-    size.width * .8,
-    size.height * .15,
-    size.width - 24,
-    size.height * .55,
-  );
 
 class _LegacyJourneyView extends ConsumerWidget {
   const _LegacyJourneyView({required this.state});

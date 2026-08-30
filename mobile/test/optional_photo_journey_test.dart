@@ -67,19 +67,24 @@ void main() {
 
     final collected = find.byTooltip('查看第 1 个节点');
     final untriggered = find.byTooltip('第 2 个节点尚未解锁');
-    expect(tester.getSize(collected), const Size(44, 44));
-    expect(tester.getSize(untriggered), const Size(44, 44));
+    expect(tester.getSize(collected), const Size(48, 48));
+    expect(tester.getSize(untriggered), const Size(48, 48));
     expect(
       tester.getSize(
         find.byKey(const ValueKey('journey-node-dot-fragment-photo')),
       ),
-      const Size(18, 18),
+      const Size(28, 28),
     );
     expect(
       tester.getSize(
         find.byKey(const ValueKey('journey-node-dot-fragment-locked')),
       ),
-      const Size(12, 12),
+      const Size(24, 24),
+    );
+    expect(find.byKey(const ValueKey('route-spatial-canvas')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('route-canvas-user-location')),
+      findsOneWidget,
     );
     expect(
         find.byKey(const ValueKey('fragment-node-rail-scroll')), findsNothing);
@@ -131,7 +136,17 @@ void main() {
         safePreview: '密集节点 ${index + 1}',
         interactionType: 'passive',
         reviewState: 'reviewed',
-        triggerRegion: _region,
+        triggerRegion: TriggerRegion(
+          latitude: 22.5 + (index ~/ 4) * .001,
+          longitude: 114 + (index % 4) * .001,
+          entryRadiusM: 50,
+          exitRadiusM: 80,
+          maxAccuracyM: 35,
+          qualifyingSamples: 2,
+          sampleWindowSeconds: 15,
+          cooldownSeconds: 120,
+          auditState: 'reviewed',
+        ),
         audio: _photoFragment.audio,
         title: '密集节点 ${index + 1}',
         transcript: '密集节点 ${index + 1} 的正文',
@@ -204,7 +219,13 @@ void main() {
     await tester.tap(find.byTooltip('查看第 8 个节点'));
     await tester.pump();
     expect(controller.selectedFragmentId, 'dense-8');
-    expect(find.text('密集节点 8'), findsNWidgets(2));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('selected-node-detail-dense-8')),
+        matching: find.text('密集节点 8'),
+      ),
+      findsWidgets,
+    );
   });
 }
 
@@ -235,6 +256,18 @@ class _StaticTourController extends ActiveTourController {
 const _region = TriggerRegion(
   latitude: 22.5,
   longitude: 114,
+  entryRadiusM: 50,
+  exitRadiusM: 80,
+  maxAccuracyM: 35,
+  qualifyingSamples: 2,
+  sampleWindowSeconds: 15,
+  cooldownSeconds: 120,
+  auditState: 'reviewed',
+);
+
+const _lockedRegion = TriggerRegion(
+  latitude: 22.501,
+  longitude: 114.001,
   entryRadiusM: 50,
   exitRadiusM: 80,
   maxAccuracyM: 35,
@@ -335,7 +368,7 @@ const _lockedFragment = StoryFragment(
   safePreview: '尚未发现的线索',
   interactionType: 'passive',
   reviewState: 'reviewed',
-  triggerRegion: _region,
+  triggerRegion: _lockedRegion,
   audio: NarrationAsset(
     url: 'https://example.test/locked.m4a',
     mimeType: 'audio/mp4',
@@ -372,7 +405,7 @@ const _railRoute = RouteExperience(
   ),
 );
 
-const _railState = ActiveTourState(
+final _railState = ActiveTourState(
   status: 'simulated',
   route: _railRoute,
   session: JourneySession(
@@ -395,4 +428,10 @@ const _railState = ActiveTourState(
   liveFragmentId: 'fragment-photo',
   selectedFragmentId: 'fragment-photo',
   locationMode: TourLocationMode.simulated,
+  latestLocationSample: LocationSample(
+    latitude: 22.5004,
+    longitude: 114.0003,
+    accuracyM: 12,
+    recordedAt: DateTime.utc(2026, 8, 31),
+  ),
 );
