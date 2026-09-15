@@ -56,7 +56,9 @@ For `.env` and equivalent runtime configuration changes, do not merely list vari
 
 Before every new APK package, increment `version:` in `mobile/pubspec.yaml`. Treat `major.minor.patch+build` as the source of truth: increment the build number by at least one for every APK, never reuse or decrease a published build number, and increment the semantic patch/minor/major component as appropriate for a named product release. Commit this version bump with the mobile change before pushing. Pass the exact full pubspec value through `APP_VERSION`; Android `versionName` and `versionCode` continue to come from Flutter's pubspec integration.
 
-Build only the production API flavor, copy a delivery APK to `dist/jiandi-<full-version>-release.apk`, and verify both manifest version and signature. Do not commit `dist/` unless explicitly requested. If a required production build secret such as `RUNTIME_LOG_TOKEN` is unavailable, do not invent it or claim a final distributable package; report the packaging blocker while still completing safe source validation and push when appropriate.
+For an explicitly requested test APK, use the test path in the release-build section below: still increment the build number, build an installable debug APK against the API with `TEST_AUTH_ENABLED=false`, and explicitly disable runtime-log upload with empty `RUNTIME_LOG_ENDPOINT` and `RUNTIME_LOG_TOKEN` defines. A test APK must not require, retrieve, or invent `RUNTIME_LOG_TOKEN`, and must be named `dist/jiandi-<full-version>-test.apk` rather than being described as a production release.
+
+For a production APK, build only the production API flavor, copy a delivery APK to `dist/jiandi-<full-version>-release.apk`, and verify both manifest version and signature. Do not commit `dist/` unless explicitly requested. If a required production build secret such as `RUNTIME_LOG_TOKEN` is unavailable, do not invent it or claim a final production distributable package; report the packaging blocker while still completing safe source validation and push when appropriate.
 
 ## Production server topology
 
@@ -169,9 +171,34 @@ export COCOAPODS_DISABLE_STATS=true
 
 Do not invoke Xcode's `xcodebuild -downloadPlatform` automatically. As of the last verified build, Xcode reported version 26.3, showed an iPhoneOS 26.2 SDK at `/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk`, but reported the iOS platform as not installed for generic device destinations; `security find-identity -v -p codesigning` reported zero valid identities. This means a signed device IPA is not guaranteed on this machine. The user explicitly rejected unrequested SDK installation; explain this blocker and ask before installing Apple components. iPhone 16 compatibility is covered by the universal iOS target and deployment target 15.0 once Xcode signing/platform state is valid.
 
-## Release builds
+## Release and test builds
 
 Read the current version from `mobile/pubspec.yaml`, increment it before each APK as described above, and use that same full value for the build define and artifact name. Always build the API production flavor with the server endpoint, not demo data:
+
+### Test APK
+
+When the user asks for a test APK, use a debug build. It is installable for testing but is not a production release and does not need `RUNTIME_LOG_TOKEN`; pass empty runtime-log defines so test sessions do not queue or upload client logs:
+
+```bash
+cd /Users/li/Downloads/Project/Travel/mobile
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export PUB_HOSTED_URL=https://mirrors.tuna.tsinghua.edu.cn/dart-pub/
+export FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
+/Users/li/tools/flutter-3.47.1/bin/flutter build apk --debug \
+  --dart-define=APP_MODE=api \
+  --dart-define=API_BASE_URL=http://115.29.221.190:5001/api/v1 \
+  --dart-define=DEFAULT_CITY_SLUG=shenzhen \
+  --dart-define=RUNTIME_LOG_ENDPOINT= \
+  --dart-define=RUNTIME_LOG_TOKEN= \
+  --dart-define=APP_VERSION=<FULL_VERSION_FROM_PUBSPEC> \
+  --dart-define=TEST_AUTH_ENABLED=false
+```
+
+Copy `mobile/build/app/outputs/flutter-apk/app-debug.apk` to `dist/jiandi-<full-version>-test.apk`. Verify its manifest version and debug signature with the same `aapt`/`apksigner` commands below. Do not commit `dist/` unless explicitly requested.
+
+### Production APK
+
+For a production APK, use the release build and the real runtime-log endpoint. Fail early if the production `RUNTIME_LOG_TOKEN` is not already available in the shell or approved secret store; never substitute a test value:
 
 ```bash
 cd /Users/li/Downloads/Project/Travel/mobile
