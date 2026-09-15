@@ -33,6 +33,14 @@ class RouteCanvasPoint {
   final Color? markerColor;
 }
 
+/// Converts compass readings to the clockwise 0..360 degree range used by the
+/// map. Android's rotation-vector sensor can report azimuths in -180..180.
+double? normalizeHeadingDegrees(double? heading) {
+  if (heading == null || !heading.isFinite) return null;
+  final normalized = heading % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 /// Resolves the spatial data shown by [RouteCanvas] from the route payload.
 ///
 /// Audio-tour trigger regions are authoritative because they are also used by
@@ -63,7 +71,7 @@ List<RouteCanvasPoint> routeCanvasPointsFor(RouteExperience route) {
           label: stop.title,
           latitude: stop.latitude,
           longitude: stop.longitude,
-          triggerRadiusM: 50,
+          triggerRadiusM: stop.arrivalRadiusM.toDouble(),
         ),
       )
       .toList(growable: false);
@@ -490,11 +498,6 @@ class _AnimatedUserLocation extends StatelessWidget {
     return FlutterCompass.events;
   }
 
-  double? _validHeading(double? heading) =>
-      heading != null && heading.isFinite && heading >= 0 && heading <= 360
-          ? heading
-          : null;
-
   @override
   Widget build(BuildContext context) {
     final diameter = accuracyRadius * 2;
@@ -509,8 +512,8 @@ class _AnimatedUserLocation extends StatelessWidget {
       child: StreamBuilder<CompassEvent>(
         stream: _compassEvents,
         builder: (context, snapshot) {
-          final heading =
-              _validHeading(snapshot.data?.heading) ?? location.headingDegrees;
+          final heading = normalizeHeadingDegrees(snapshot.data?.heading) ??
+              normalizeHeadingDegrees(location.headingDegrees);
           return Semantics(
             key: const ValueKey('route-canvas-user-location'),
             label: '你的位置，定位精度约 ${location.accuracyM.round()} 米'
@@ -519,37 +522,6 @@ class _AnimatedUserLocation extends StatelessWidget {
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
-                if (heading != null)
-                  Positioned(
-                    key: const ValueKey('route-canvas-user-heading'),
-                    top: -5,
-                    left: accuracyRadius - 14,
-                    width: 28,
-                    height: 28,
-                    child: IgnorePointer(
-                      child: Transform.rotate(
-                        angle: heading * math.pi / 180,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.ink.withValues(alpha: .16),
-                                blurRadius: 5,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.navigation_rounded,
-                            color: _blue,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: _blue.withValues(alpha: .13),
@@ -618,6 +590,39 @@ class _AnimatedUserLocation extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (heading != null)
+                  Positioned(
+                    key: const ValueKey('route-canvas-user-heading'),
+                    top: -5,
+                    left: accuracyRadius - 14,
+                    width: 28,
+                    height: 28,
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.ink.withValues(alpha: .16),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Transform.rotate(
+                            angle: heading * math.pi / 180,
+                            child: const Icon(
+                              Icons.navigation_rounded,
+                              color: _blue,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           );

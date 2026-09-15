@@ -73,6 +73,7 @@ class ExperienceStop {
     required this.address,
     required this.latitude,
     required this.longitude,
+    this.arrivalRadiusM = 100,
     required this.storyTitle,
     required this.storyBody,
     required this.image,
@@ -88,6 +89,7 @@ class ExperienceStop {
   final String address;
   final double latitude;
   final double longitude;
+  final int arrivalRadiusM;
   final String storyTitle;
   final String storyBody;
   final String image;
@@ -103,6 +105,7 @@ class ExperienceStop {
         address: json['address'] as String,
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
+        arrivalRadiusM: (json['arrival_radius_m'] as num?)?.toInt() ?? 100,
         storyTitle: json['story_title'] as String,
         storyBody: json['story_body'] as String,
         image: json['image'] as String,

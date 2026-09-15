@@ -59,6 +59,48 @@ void main() {
     );
   });
 
+  test('heading normalization accepts Android negative azimuths', () {
+    expect(normalizeHeadingDegrees(-90), 270);
+    expect(normalizeHeadingDegrees(-180), 180);
+    expect(normalizeHeadingDegrees(360), 0);
+    expect(normalizeHeadingDegrees(null), isNull);
+  });
+
+  test('legacy canvas points use the backend arrival radius', () {
+    final route = RouteExperience.fromJson({
+      'id': 'legacy-route',
+      'slug': 'legacy-route',
+      'title': '旧路线',
+      'subtitle': '',
+      'description': '',
+      'duration_minutes': 10,
+      'distance_km': 1,
+      'difficulty': '轻松',
+      'theme': '',
+      'hero_image': '',
+      'content_status': 'published',
+      'stops': [
+        {
+          'id': 'legacy-stop',
+          'position': 1,
+          'title': '旧节点',
+          'kicker': '',
+          'address': '',
+          'latitude': 22.54,
+          'longitude': 114,
+          'arrival_radius_m': 100,
+          'story_title': '',
+          'story_body': '',
+          'image': '',
+          'insight': '',
+          'challenge': null,
+        },
+      ],
+    });
+
+    expect(routeCanvasPointsFor(route).single.triggerRadiusM, 100);
+  });
+
   testWidgets('nodes switch selection without rendering a selected-node footer',
       (tester) async {
     RouteCanvasPoint? selected;
@@ -129,6 +171,7 @@ void main() {
       find.byKey(const ValueKey('route-canvas-user-heading')),
       findsOneWidget,
     );
+    expect(find.byIcon(Icons.navigation_rounded), findsOneWidget);
     final motion = tester.widget<AnimatedPositioned>(
       find.byKey(const ValueKey('route-canvas-user-motion')),
     );
