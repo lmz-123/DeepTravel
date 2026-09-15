@@ -140,7 +140,7 @@ Known installed paths on the development Mac:
 - Flutter 3.47.1: `/Users/li/tools/flutter-3.47.1/bin/flutter`
 - Flutter engine artifacts, including iOS release framework: `/Users/li/tools/flutter-3.47.1/bin/cache/artifacts/engine/ios-release/Flutter.xcframework`
 - Android SDK: `/opt/homebrew/share/android-commandlinetools`
-- Android SDK platforms: `/opt/homebrew/share/android-commandlinetools/platforms/android-35` and `android-36`
+- Android SDK platforms: `/opt/homebrew/share/android-commandlinetools/platforms/android-34`, `android-35`, and `android-36` (all verified installed on 2026-09-15)
 - Android NDK: `/opt/homebrew/share/android-commandlinetools/ndk/28.2.13676358`
 - Android build tools: `/opt/homebrew/share/android-commandlinetools/build-tools/36.0.0`
 - Android `aapt`/`apksigner`: same build-tools directory
@@ -159,6 +159,8 @@ export FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
 export HOMEBREW_API_DOMAIN=https://mirrors.aliyun.com/homebrew/homebrew-bottles/api
 export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.aliyun.com/homebrew/homebrew-bottles
 ```
+
+Before an Android build, check that the required platform directory is present; do not invoke `sdkmanager` or trigger SDK installation on every build. Android SDK Platform 34 was installed and verified locally on 2026-09-15, so reuse `/opt/homebrew/share/android-commandlinetools/platforms/android-34`. Only investigate or install a platform when a build explicitly reports that it is missing and the user has authorized the environment change.
 
 For CocoaPods installed in the known local Gem directory:
 
