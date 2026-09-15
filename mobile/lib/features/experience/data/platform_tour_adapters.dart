@@ -90,6 +90,8 @@ class GeolocatorTracker implements LocationTracker {
             longitude: position.longitude,
             accuracyM: position.accuracy,
             recordedAt: position.timestamp,
+            headingDegrees:
+                position.hasHeading ? _validHeading(position.heading) : null,
           ));
         },
         onError: (Object error, StackTrace stackTrace) {
@@ -172,6 +174,9 @@ class GeolocatorTracker implements LocationTracker {
         <= 100 => 'lte_100m',
         _ => 'gt_100m',
       };
+
+  double? _validHeading(double heading) =>
+      heading.isFinite && heading >= 0 && heading <= 360 ? heading : null;
 
   @override
   Future<void> stop() async {

@@ -110,6 +110,7 @@ void main() {
       longitude: 113.9506,
       accuracyM: 18,
       recordedAt: DateTime.utc(2026, 8, 30),
+      headingDegrees: 90,
     );
     await tester.pumpWidget(
       MaterialApp(
@@ -124,6 +125,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('你'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('route-canvas-user-heading')),
+      findsOneWidget,
+    );
     final motion = tester.widget<AnimatedPositioned>(
       find.byKey(const ValueKey('route-canvas-user-motion')),
     );

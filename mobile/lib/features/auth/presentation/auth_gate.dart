@@ -130,7 +130,7 @@ class _AuthPageState extends ConsumerState<_AuthPage> {
                               key: const ValueKey('auth-password'),
                               obscureText: true,
                               decoration: const InputDecoration(
-                                labelText: '密码（至少 8 位）',
+                                labelText: '密码',
                               ),
                               onSaved: (value) => _password = value ?? '',
                               onFieldSubmitted: (_) => _submit(),

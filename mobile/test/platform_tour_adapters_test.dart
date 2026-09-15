@@ -28,6 +28,7 @@ void main() {
         );
 
     expect(sample.latitude, 22.54);
+    expect(sample.headingDegrees, 0);
     expect(settings, hasLength(1));
     expect(settings.first, isA<AndroidSettings>());
     expect((settings.single as AndroidSettings).forceLocationManager, isTrue);
@@ -68,6 +69,7 @@ Position _position() => Position(
       altitudeAccuracy: 0,
       heading: 0,
       headingAccuracy: 0,
+      hasHeading: true,
       speed: 0,
       speedAccuracy: 0,
     );

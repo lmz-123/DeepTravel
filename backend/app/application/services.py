@@ -132,8 +132,9 @@ class AuthenticationService:
 
     @staticmethod
     def validate_password(value: str) -> str:
-        if len(value) < 8 or len(value) > 72:
-            raise ValidationError("密码长度须为 8–72 个字符")
+        # Password length is intentionally unrestricted. The API layer already
+        # validates that credentials arrive as strings, and only the hash is
+        # persisted.
         return value
 
     def register(self, username: str, password: str) -> tuple[User, str, datetime]:

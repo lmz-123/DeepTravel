@@ -40,6 +40,21 @@ def test_register_login_me_and_password_hash(app, client):
     session.close()
 
 
+def test_passwords_do_not_have_a_minimum_length(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": "short-password", "password": "a"},
+    )
+
+    assert response.status_code == 201
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": "short-password", "password": "a"},
+    )
+    assert login.status_code == 200
+    assert login.get_json()["data"]["user"] == response.get_json()["data"]["user"]
+
+
 def test_duplicate_and_invalid_login_are_generic(client):
     _register(client, "duplicate-user")
     duplicate = client.post(

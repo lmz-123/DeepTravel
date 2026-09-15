@@ -7,11 +7,13 @@ class LocationSample {
       {required this.latitude,
       required this.longitude,
       required this.accuracyM,
-      required this.recordedAt});
+      required this.recordedAt,
+      this.headingDegrees});
   final double latitude;
   final double longitude;
   final double accuracyM;
   final DateTime recordedAt;
+  final double? headingDegrees;
 }
 
 enum TourLocationPermission { granted, denied, deniedForever, serviceDisabled }

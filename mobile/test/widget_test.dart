@@ -35,7 +35,7 @@ void main() {
             ),
           )
           .height,
-      220,
+      250,
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('route-carousel'))).height,
@@ -260,30 +260,14 @@ void main() {
     expect(find.text('被打开的海湾'), findsNothing);
   });
 
-  testWidgets('archived active journey resumes the legacy answer flow',
+  testWidgets('home does not show an archived active journey card',
       (tester) async {
     appRouter.go('/');
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           experienceRepositoryProvider.overrideWithValue(
-            _ArchivedResumeRepository(),
-          ),
-          archivedActiveJourneysProvider.overrideWith(
-            (ref) async => const [
-              ResumableJourney(
-                route: _archivedQuizRoute,
-                session: JourneySession(
-                  id: 'archived-journey',
-                  routeId: 'archived-route',
-                  status: 'active',
-                  currentStopPosition: 1,
-                  arrivedStopId: null,
-                  answeredStopIds: {},
-                  progress: 0,
-                ),
-              ),
-            ],
+            DemoExperienceRepository(latency: Duration.zero),
           ),
         ],
         child: const JiandiApp(),
@@ -291,16 +275,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('继续未完成的旧路线'), findsOneWidget);
-    await tester.tap(find.text('旧版上海观察路线'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('我已到达，开始观察'), findsOneWidget);
-    await tester.tap(find.text('我已到达，开始观察'));
-    await tester.pumpAndSettle();
-    expect(find.text('观察一下'), findsOneWidget);
-    expect(find.text('旧版问题'), findsOneWidget);
-    expect(find.text('A'), findsOneWidget);
+    expect(find.text('继续未完成的旧路线'), findsNothing);
+    expect(find.textContaining('已定位到'), findsNothing);
+    expect(find.byKey(const ValueKey('route-carousel')), findsOneWidget);
   });
 }
 
@@ -387,21 +364,6 @@ class _EmptyCatalogRepository extends _TwoRouteRepository {
       const CityDiscoveryCatalog(routes: []);
 }
 
-class _ArchivedResumeRepository extends DemoExperienceRepository {
-  _ArchivedResumeRepository() : super(latency: Duration.zero);
-
-  @override
-  Future<JourneySession> arrive(String journeyId) async => const JourneySession(
-        id: 'archived-journey',
-        routeId: 'archived-route',
-        status: 'active',
-        currentStopPosition: 1,
-        arrivedStopId: 'old-stop',
-        answeredStopIds: {},
-        progress: 0,
-      );
-}
-
 const _oldHarborRoute = RouteExperience(
   id: 'route-old-harbor',
   slug: 'old-harbor',
@@ -467,39 +429,4 @@ const _mountainCoastNode = ExperienceStop(
   image: '',
   insight: '节点观察',
   challenge: Challenge(id: '', prompt: '', hint: '', options: []),
-);
-
-const _archivedQuizRoute = RouteExperience(
-  id: 'archived-route',
-  slug: 'archived-shanghai-quiz',
-  title: '旧版上海观察路线',
-  subtitle: '仅供已有旅程继续',
-  description: '已归档路线',
-  durationMinutes: 30,
-  distanceKm: 1,
-  difficulty: '轻松',
-  theme: '城市观察',
-  heroImage: '',
-  contentStatus: 'archived',
-  stops: [
-    ExperienceStop(
-      id: 'old-stop',
-      position: 1,
-      title: '旧站点',
-      kicker: '继续观察',
-      address: '上海',
-      latitude: 31.2,
-      longitude: 121.4,
-      storyTitle: '旧版故事',
-      storyBody: '旧版故事正文',
-      image: '',
-      insight: '旧版观察',
-      challenge: Challenge(
-        id: 'old-question',
-        prompt: '旧版问题',
-        hint: '提示',
-        options: ['A', 'B'],
-      ),
-    ),
-  ],
 );

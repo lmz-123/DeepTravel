@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/models.dart';
@@ -283,7 +285,6 @@ class _RouteCanvasState extends State<RouteCanvas> {
             painter: _SpatialBackgroundPainter(
               points: widget.points,
               projection: projection,
-              selectedPointId: _selectedPointId,
             ),
           ),
         ),
@@ -480,6 +481,20 @@ class _AnimatedUserLocation extends StatelessWidget {
   final double accuracyRadius;
   final Duration duration;
 
+  Stream<CompassEvent>? get _compassEvents {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      return null;
+    }
+    return FlutterCompass.events;
+  }
+
+  double? _validHeading(double? heading) =>
+      heading != null && heading.isFinite && heading >= 0 && heading <= 360
+          ? heading
+          : null;
+
   @override
   Widget build(BuildContext context) {
     final diameter = accuracyRadius * 2;
@@ -491,82 +506,122 @@ class _AnimatedUserLocation extends StatelessWidget {
       top: position.dy - accuracyRadius,
       width: diameter,
       height: diameter,
-      child: Semantics(
-        key: const ValueKey('route-canvas-user-location'),
-        label: '你的位置，定位精度约 ${location.accuracyM.round()} 米',
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: _blue.withValues(alpha: .13),
-                shape: BoxShape.circle,
-                border: Border.all(color: _blue.withValues(alpha: .75)),
-              ),
-              child: const SizedBox.expand(),
-            ),
-            TweenAnimationBuilder<double>(
-              key: ValueKey(location.recordedAt),
-              tween: Tween(begin: 0, end: 1),
-              duration: duration == Duration.zero
-                  ? Duration.zero
-                  : const Duration(milliseconds: 1100),
-              builder: (context, value, _) => Opacity(
-                opacity: 1 - value,
-                child: Transform.scale(
-                  scale: 1 + value * 1.6,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _blue, width: 1.5),
+      child: StreamBuilder<CompassEvent>(
+        stream: _compassEvents,
+        builder: (context, snapshot) {
+          final heading =
+              _validHeading(snapshot.data?.heading) ?? location.headingDegrees;
+          return Semantics(
+            key: const ValueKey('route-canvas-user-location'),
+            label: '你的位置，定位精度约 ${location.accuracyM.round()} 米'
+                '${heading == null ? '' : '，朝向约 ${heading.round()}°'}',
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                if (heading != null)
+                  Positioned(
+                    key: const ValueKey('route-canvas-user-heading'),
+                    top: -5,
+                    left: accuracyRadius - 14,
+                    width: 28,
+                    height: 28,
+                    child: IgnorePointer(
+                      child: Transform.rotate(
+                        angle: heading * math.pi / 180,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.ink.withValues(alpha: .16),
+                                blurRadius: 5,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.navigation_rounded,
+                            color: _blue,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _blue.withValues(alpha: .13),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _blue.withValues(alpha: .75)),
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+                TweenAnimationBuilder<double>(
+                  key: ValueKey(location.recordedAt),
+                  tween: Tween(begin: 0, end: 1),
+                  duration: duration == Duration.zero
+                      ? Duration.zero
+                      : const Duration(milliseconds: 1100),
+                  builder: (context, value, _) => Opacity(
+                    opacity: 1 - value,
+                    child: Transform.scale(
+                      scale: 1 + value * 1.6,
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: _blue, width: 1.5),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: _blue, width: 2.5),
-              ),
-              child: Center(
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: _blue,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: accuracyRadius + 10,
-              top: accuracyRadius - 24,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _blue,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  '你',
-                  style: TextStyle(
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
                     color: AppColors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _blue, width: 2.5),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: _blue,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                Positioned(
+                  left: accuracyRadius + 10,
+                  top: accuracyRadius - 24,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _blue,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      '你',
+                      style: TextStyle(
+                        color: AppColors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -576,12 +631,10 @@ class _SpatialBackgroundPainter extends CustomPainter {
   const _SpatialBackgroundPainter({
     required this.points,
     required this.projection,
-    required this.selectedPointId,
   });
 
   final List<RouteCanvasPoint> points;
   final RouteCanvasProjection projection;
-  final String? selectedPointId;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -631,7 +684,6 @@ class _SpatialBackgroundPainter extends CustomPainter {
       final position = projection.project(point.latitude, point.longitude);
       final radius =
           projection.radiusPixels(point.triggerRadiusM).clamp(8, 82).toDouble();
-      final selected = point.id == selectedPointId;
       canvas.drawCircle(
         position,
         radius,
@@ -639,22 +691,10 @@ class _SpatialBackgroundPainter extends CustomPainter {
           ..color = AppColors.terracotta.withValues(alpha: .13)
           ..style = PaintingStyle.fill,
       );
-      if (selected) {
-        canvas.drawCircle(
-          position,
-          radius,
-          Paint()
-            ..color = AppColors.terracotta
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.2,
-        );
-      }
     }
   }
 
   @override
   bool shouldRepaint(covariant _SpatialBackgroundPainter oldDelegate) =>
-      oldDelegate.points != points ||
-      oldDelegate.projection != projection ||
-      oldDelegate.selectedPointId != selectedPointId;
+      oldDelegate.points != points || oldDelegate.projection != projection;
 }

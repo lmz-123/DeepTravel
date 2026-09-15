@@ -141,6 +141,8 @@ class PlatformCurrentLocationSource implements CurrentLocationSource {
         latitude: position.latitude,
         longitude: position.longitude,
         recordedAt: position.timestamp,
+        headingDegrees:
+            position.hasHeading ? _validHeading(position.heading) : null,
         locality: localities.firstOrNull,
         localityCandidates: List.unmodifiable(localities),
         accuracyMeters: position.accuracy,
@@ -250,6 +252,9 @@ class PlatformCurrentLocationSource implements CurrentLocationSource {
         <= 100 => 'lte_100m',
         _ => 'gt_100m',
       };
+
+  double? _validHeading(double heading) =>
+      heading.isFinite && heading >= 0 && heading <= 360 ? heading : null;
 
   DiscoveryPermissionState _permissionState(LocationPermission permission) =>
       switch (permission) {

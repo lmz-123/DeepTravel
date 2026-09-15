@@ -8,7 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/editorial_image.dart';
 import '../../../core/widgets/fade_slide_in.dart';
-import '../domain/discovery_location.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
 import 'active_tour_controller.dart';
@@ -78,7 +77,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   @override
   Widget build(BuildContext context) {
     final discovery = ref.watch(discoveryControllerProvider);
-    final archivedJourneys = ref.watch(archivedActiveJourneysProvider);
     return Scaffold(
       bottomNavigationBar: const TravelerBottomNavigation(
         active: TravelerSection.discovery,
@@ -89,7 +87,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
             bottom: false,
             child: RefreshIndicator(
               onRefresh: () async {
-                ref.invalidate(archivedActiveJourneysProvider);
                 await ref
                     .read(discoveryControllerProvider.notifier)
                     .refreshDiscovery();
@@ -134,17 +131,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    sliver: SliverToBoxAdapter(
-                      child: archivedJourneys.maybeWhen(
-                        data: (items) => items.isEmpty
-                            ? const SizedBox.shrink()
-                            : _ArchivedJourneyCard(journey: items.first),
-                        orElse: () => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
                     key: const ValueKey('route-selection-section'),
                     padding: const EdgeInsets.symmetric(horizontal: 0),
                     sliver: SliverToBoxAdapter(
@@ -172,22 +158,16 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                             );
                           }
                           if (state.cards.isEmpty) {
-                            return Column(
-                              children: [
-                                _LocationStatus(state: state),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 20),
-                                  child: _EmptyCatalog(
-                                    title: '这座城市还没有开放景区',
-                                    message: '可以先切换城市，或稍后再来看看。',
-                                  ),
-                                ),
-                              ],
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 20),
+                              child: _EmptyCatalog(
+                                title: '这座城市还没有开放景区',
+                                message: '可以先切换城市，或稍后再来看看。',
+                              ),
                             );
                           }
                           return Column(
                             children: [
-                              _LocationStatus(state: state),
                               _RouteCarousel(
                                 key: ValueKey(
                                   '${state.city?.slug}-${state.revision}',
@@ -483,53 +463,6 @@ class _PrimaryStoryRow extends StatelessWidget {
       );
 }
 
-class _ArchivedJourneyCard extends ConsumerWidget {
-  const _ArchivedJourneyCard({required this.journey});
-
-  final ResumableJourney journey;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return FadeSlideIn(
-      child: Material(
-        color: AppColors.paperDeep,
-        borderRadius: BorderRadius.circular(22),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: () {
-            final id = ref
-                .read(journeyControllerProvider.notifier)
-                .resume(journey.route, journey.session);
-            context.go('/journey/$id');
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                const Icon(Icons.history_rounded, color: AppColors.moss),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('继续未完成的旧路线',
-                          style: Theme.of(context).textTheme.labelLarge),
-                      const SizedBox(height: 3),
-                      Text(journey.route.title,
-                          style: Theme.of(context).textTheme.titleMedium),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_rounded),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HeaderPlaceholder extends StatelessWidget {
   const _HeaderPlaceholder();
 
@@ -820,86 +753,6 @@ class _CitySelectionSheetState extends State<_CitySelectionSheet> {
 String _normalizeCitySearch(String value) =>
     value.toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
-class _LocationStatus extends StatelessWidget {
-  const _LocationStatus({required this.state});
-
-  final DiscoveryState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final message = state.isLocating
-        ? '正在获取当前位置，景区顺序稍后更新…'
-        : _failureMessage(state.locationFailure);
-    final success = message == null &&
-        state.cards.any((card) => card.distanceMeters != null);
-    final displayMessage =
-        success ? '已定位到${state.cards.first.route.title}附近' : message;
-    if (displayMessage == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.ink.withValues(alpha: .06),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(
-              success
-                  ? Icons.location_on_outlined
-                  : state.isLocating
-                      ? Icons.my_location_rounded
-                      : Icons.location_off_outlined,
-              size: 18,
-              color: success ? AppColors.terracotta : AppColors.moss,
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    displayMessage,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  if (success) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      '当前位置只用于排列附近手册，不会保存连续轨迹。',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String? _failureMessage(DiscoveryLocationFailureReason? reason) =>
-      switch (reason) {
-        null => null,
-        DiscoveryLocationFailureReason.denied ||
-        DiscoveryLocationFailureReason.deniedForever =>
-          '未获得定位权限，当前按后台推荐顺序展示。',
-        DiscoveryLocationFailureReason.serviceDisabled =>
-          '系统定位已关闭，当前按后台推荐顺序展示。',
-        DiscoveryLocationFailureReason.timeout ||
-        DiscoveryLocationFailureReason.unavailable =>
-          '暂时无法获得当前位置，当前按后台推荐顺序展示。',
-      };
-}
-
 class _RouteCarousel extends ConsumerStatefulWidget {
   const _RouteCarousel({super.key, required this.cards});
 
@@ -911,7 +764,7 @@ class _RouteCarousel extends ConsumerStatefulWidget {
 
 class _RouteCarouselState extends ConsumerState<_RouteCarousel> {
   static const _referenceCardWidth = 368.0;
-  static const _referenceHeroHeight = 220.0;
+  static const _referenceHeroHeight = 250.0;
   static const _bodyHeightWithTags = 126.0;
   static const _bodyHeightWithoutTags = 94.0;
 

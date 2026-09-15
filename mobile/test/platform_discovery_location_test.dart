@@ -33,6 +33,7 @@ void main() {
 
     expect(sample.latitude, 22.54);
     expect(sample.longitude, 114.06);
+    expect(sample.headingDegrees, 0);
     expect(sample.localityCandidates, isEmpty);
     expect(sample.providerStrategy, 'android_location_manager');
     expect(sample.isCached, isFalse);
@@ -73,6 +74,7 @@ Position _position({DateTime? timestamp}) => Position(
       altitudeAccuracy: 0,
       heading: 0,
       headingAccuracy: 0,
+      hasHeading: true,
       speed: 0,
       speedAccuracy: 0,
     );

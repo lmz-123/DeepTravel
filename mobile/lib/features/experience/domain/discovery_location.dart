@@ -24,6 +24,7 @@ class DiscoveryLocationSample {
     required this.latitude,
     required this.longitude,
     required this.recordedAt,
+    this.headingDegrees,
     this.locality,
     this.localityCandidates = const [],
     this.accuracyMeters,
@@ -34,6 +35,7 @@ class DiscoveryLocationSample {
   final double latitude;
   final double longitude;
   final DateTime recordedAt;
+  final double? headingDegrees;
   final String? locality;
   final List<String> localityCandidates;
   final double? accuracyMeters;
