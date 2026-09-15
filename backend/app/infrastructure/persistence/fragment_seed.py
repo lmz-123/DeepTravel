@@ -416,8 +416,8 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
                     fragment_id=item["id"],
                     latitude=lat,
                     longitude=lon,
-                    entry_radius_m=14,
-                    exit_radius_m=35,
+                    entry_radius_m=100,
+                    exit_radius_m=150,
                     max_accuracy_m=20,
                     qualifying_samples=2,
                     sample_window_seconds=15,
@@ -459,8 +459,8 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
         )
         if region is not None and (fragment_was_created or apply_conversational_revision):
             region_values = {
-                "entry_radius_m": 14,
-                "exit_radius_m": 35,
+                "entry_radius_m": 100,
+                "exit_radius_m": 150,
                 "max_accuracy_m": 20,
                 "coordinate_system": "WGS84",
                 "source_coordinate_system": "WGS84",

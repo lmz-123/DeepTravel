@@ -71,7 +71,56 @@ def test_managed_content_migration_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260915_0016"
+    assert version == "20260915_0017"
+
+
+def test_global_trigger_radius_migration_updates_every_node(tmp_path, monkeypatch):
+    database_path = tmp_path / "global-trigger-radius.db"
+    engine = create_engine(f"sqlite:///{database_path}")
+    migration_path = (
+        Path(__file__).parents[1]
+        / "migrations"
+        / "versions"
+        / "20260915_0017_set_global_trigger_radius.py"
+    )
+    spec = importlib.util.spec_from_file_location("global_trigger_radius_migration", migration_path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE trigger_regions ("
+                "id TEXT PRIMARY KEY, entry_radius_m INTEGER NOT NULL, "
+                "exit_radius_m INTEGER NOT NULL)"
+            )
+        )
+        connection.execute(
+            text("CREATE TABLE stops (id TEXT PRIMARY KEY, arrival_radius_m INTEGER NOT NULL)")
+        )
+        connection.execute(
+            text(
+                "INSERT INTO trigger_regions "
+                "(id, entry_radius_m, exit_radius_m) VALUES "
+                "('first', 60, 90), ('second', 25, 40)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO stops (id, arrival_radius_m) VALUES "
+                "('first-stop', 60), ('second-stop', 25)"
+            )
+        )
+        monkeypatch.setattr(migration.op, "get_bind", lambda: connection)
+        migration.upgrade()
+
+        assert connection.execute(
+            text("SELECT entry_radius_m, exit_radius_m FROM trigger_regions ORDER BY id")
+        ).all() == [(100, 150), (100, 150)]
+        assert connection.execute(
+            text("SELECT arrival_radius_m FROM stops ORDER BY id")
+        ).scalars().all() == [100, 100]
 
 
 def test_city_story_catalog_migration_round_trips(tmp_path):
@@ -373,7 +422,7 @@ def test_traveler_library_migration_preserves_journey_and_evidence_rows(tmp_path
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert version == "20260915_0016"
+        assert version == "20260915_0017"
 
 
 def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
@@ -403,7 +452,7 @@ def test_scenic_point_tag_migration_backfills_and_round_trips(tmp_path):
     command.upgrade(config, "head")
     with engine.begin() as connection:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert version == "20260915_0016"
+    assert version == "20260915_0017"
 
 
 def test_private_footprint_migration_has_no_location_or_voice_columns(tmp_path):
