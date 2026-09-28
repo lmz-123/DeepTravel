@@ -15,7 +15,11 @@ final appRouter = GoRouter(
     ShellRoute(
       builder: (context, state, child) => TravelerShell(child: child),
       routes: [
-        GoRoute(path: '/', builder: (context, state) => const DiscoveryPage()),
+        GoRoute(
+          path: '/',
+          builder: (context, state) =>
+              DiscoveryPage(initialTab: state.uri.queryParameters['tab']),
+        ),
         GoRoute(
           path: '/route/:slug',
           builder: (context, state) =>

@@ -13,6 +13,8 @@ import 'package:jiandi/features/experience/presentation/discovery_controller.dar
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 import 'package:jiandi/features/experience/presentation/route_detail_page.dart';
+import 'package:jiandi/features/experience/presentation/route_manual/chapter_directory.dart';
+import 'package:jiandi/features/experience/presentation/route_manual/chapter_prelude.dart';
 
 void main() {
   test('home modules preserve backend labels and actionable empty metadata',
@@ -129,39 +131,21 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('继续我的足迹'), findsNothing);
-    final scrollView = tester.widget<CustomScrollView>(
-      find.byType(CustomScrollView),
-    );
-    final sliverKeys = scrollView.slivers.map((sliver) => sliver.key).toList();
-    expect(
-      sliverKeys.indexOf(const ValueKey('route-selection-section')),
-      lessThan(sliverKeys.indexOf(const ValueKey('city-story-section'))),
-    );
-    await tester.drag(
-      find.byType(CustomScrollView),
-      const Offset(0, -900),
-    );
+    final shortStories =
+        find.byKey(const ValueKey('city-short-stories-action'));
+    await tester.ensureVisible(shortStories);
     await tester.pumpAndSettle();
-    expect(find.text('城市故事'), findsOneWidget);
-    final storyCard = find.bySemanticsLabel(RegExp('未来类型.*街角的旧砖'));
+    await tester.tap(shortStories);
+    await tester.pumpAndSettle();
+    final storyCard = find.byKey(const ValueKey('city-short-story-catalog-a'));
     expect(storyCard, findsOneWidget);
-    await tester.scrollUntilVisible(
-      storyCard,
-      300,
-      scrollable: find.byWidgetPredicate(
-        (widget) =>
-            widget is Scrollable && widget.axisDirection == AxisDirection.down,
-      ),
-    );
-    await tester.pumpAndSettle();
     await tester.tap(storyCard);
     await tester.pumpAndSettle();
     expect(find.text('story:catalog-a'), findsOneWidget);
   });
 
   testWidgets(
-      'manual starts with compact predeparture and renders server tags at large text',
+      'manual opens a quiet complete directory and remains usable with large text',
       (tester) async {
     tester.view.physicalSize = const Size(320, 700);
     tester.view.devicePixelRatio = 1;
@@ -182,23 +166,21 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('predeparture-surface')), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('predeparture-play-pause')), findsOneWidget);
     expect(find.byType(Slider), findsNothing);
     expect(find.byType(LinearProgressIndicator), findsNothing);
-    await tester.scrollUntilVisible(
-      find.text('老建筑'),
-      360,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('老建筑'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('适合一个人'),
-      360,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('适合一个人'), findsOneWidget);
+    await tester.ensureVisible(find.text('翻开这段旅程'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('翻开这段旅程'));
+    await tester.pumpAndSettle();
+    expect(find.byType(RouteChapterDirectory), findsOneWidget);
+    expect(find.text('旧砖故事'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('directory-chapter-stop-a')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ChapterPrelude), findsOneWidget);
+    expect(find.byKey(const ValueKey('manual-read-chapter')), findsOneWidget);
+    await tester.tap(find.text('返回目录'));
+    await tester.pumpAndSettle();
+    expect(find.byType(RouteChapterDirectory), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

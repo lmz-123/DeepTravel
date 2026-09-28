@@ -1,209 +1,821 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/editorial_image.dart';
-import '../../../core/widgets/primary_action.dart';
 import '../domain/tour_runtime.dart';
 import '../domain/models.dart';
-import '../domain/fragment_models.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'home_story_controller.dart';
 import 'location_mode_controller.dart';
 import 'offline_package_controller.dart';
-import 'route_preview_location_provider.dart';
+import 'route_manual/chapter_directory.dart';
+import 'route_manual/chapter_focus.dart';
+import 'route_manual/chapter_prelude.dart';
+import 'route_manual/manual_chapter.dart';
+import 'route_manual/manual_session.dart';
+import 'route_manual/manual_visuals.dart';
 import 'widgets/location_mode_selector.dart';
-import 'widgets/route_canvas.dart';
 import 'widgets/favorite_button.dart';
+import 'widgets/editorial_listening.dart' show EditorialPageArrival;
 
 class RouteDetailPage extends ConsumerWidget {
   const RouteDetailPage({required this.slug, super.key});
   final String slug;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final route = ref.watch(offlineAwareRouteProvider(slug));
-    return route.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: FilledButton.tonal(
-            onPressed: () => ref.invalidate(routeProvider(slug)),
-            child: const Text('重新加载路线'),
-          ),
-        ),
-      ),
-      data: (value) => _RouteDetail(route: value),
-    );
-  }
+  Widget build(BuildContext context, WidgetRef ref) =>
+      ref.watch(offlineAwareRouteProvider(slug)).when(
+            loading: () => const Scaffold(
+              backgroundColor: manualPaper,
+              body: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => Scaffold(
+              backgroundColor: manualPaper,
+              appBar: AppBar(),
+              body: Center(
+                child: TextButton(
+                  onPressed: () =>
+                      ref.invalidate(offlineAwareRouteProvider(slug)),
+                  child: const Text('重新加载路线'),
+                ),
+              ),
+            ),
+            data: (route) => _RouteDetail(
+              key: ValueKey('${ref.watch(currentUserIdProvider)}:${route.id}'),
+              route: route,
+            ),
+          );
 }
 
-class _RouteDetail extends ConsumerWidget {
-  const _RouteDetail({required this.route});
+class _RouteDetail extends ConsumerStatefulWidget {
+  const _RouteDetail({required this.route, super.key});
   final RouteExperience route;
+  @override
+  ConsumerState<_RouteDetail> createState() => _RouteDetailState();
+}
+
+class _RouteDetailState extends ConsumerState<_RouteDetail> {
+  final _scroll = ScrollController();
+  final _opening = GlobalKey();
+  final _allChapters = GlobalKey();
+  final _bookmarks = GlobalKey();
+  ManualChapterChoice? _focus;
+  bool _dock = false;
+  bool _bookmarksLit = false;
+  bool _overlay = false;
+  Timer? _highlightTimer;
+  late HomeStoryPlaybackController _playback;
+  late ManualSessionController _session;
+
+  List<ManualChapter> get chapters => routeManualChapters(widget.route);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final journey = ref.watch(journeyControllerProvider);
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final heroHeight = 330.0 + ((textScale - 1).clamp(0.0, 1.0) * 110.0);
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8),
-          child: IconButton.filledTonal(
-            tooltip: '返回',
-            onPressed: context.pop,
-            icon: const Icon(Icons.arrow_back_rounded),
-            style: IconButton.styleFrom(
-              backgroundColor: AppColors.white.withValues(alpha: 0.88),
-            ),
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: .88),
-                shape: BoxShape.circle,
-              ),
-              child: FavoriteButton(kind: 'route', targetId: route.id),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-        child: PrimaryAction(
-          label: route.audioTour == null ? '开始这段探索' : '戴上耳机，开始行走',
-          busy: journey.isBusy,
-          icon: Icons.directions_walk_rounded,
-          onPressed: () async {
-            final id = await _startRoute(ref);
-            if (id != null && context.mounted) context.go('/journey/$id');
-          },
-        ),
-      ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: EditorialImage(
-              source: route.heroImage,
-              height: heroHeight,
-              heroTag: 'route-${route.slug}',
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(22, 100, 22, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      route.theme.toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.gold,
-                        fontSize: 9,
-                        height: 1.3,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      route.title,
-                      style: const TextStyle(
-                        color: AppColors.white,
-                        fontFamily: 'Songti SC',
-                        fontFamilyFallback: [
-                          'STSong',
-                          'Noto Serif CJK SC',
-                          'serif',
-                        ],
-                        fontSize: 27,
-                        height: 1.2,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      route.subtitle,
-                      style: TextStyle(
-                        color: AppColors.white.withValues(alpha: .76),
-                        fontSize: 10,
-                        height: 1.55,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -16),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 40),
-                decoration: const BoxDecoration(
-                  color: AppColors.paper,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _ManualTabs(),
-                    const SizedBox(height: 22),
-                    if (route.predeparture?.available ?? false) ...[
-                      _PredepartureSurface(route: route),
-                      const SizedBox(height: 18),
-                    ],
-                    _Metrics(route: route),
-                    const SizedBox(height: 25),
-                    _HowToWalkCard(route: route),
-                    const SizedBox(height: 16),
-                    _PreparationCard(route: route),
-                    const SizedBox(height: 16),
-                    _RouteStoryCard(route: route),
-                    const SizedBox(height: 28),
-                    Text(
-                      route.audioTour == null ? '这一路，你会看见什么' : '故事方向',
-                      style:
-                          Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontSize: 19,
+  void initState() {
+    super.initState();
+    _playback = ref.read(homeStoryPlaybackControllerProvider.notifier);
+    _session = ref.read(manualSessionProvider(widget.route.id).notifier);
+    _scroll.addListener(_measureDock);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    _highlightTimer?.cancel();
+    // Invalidate any in-flight explicit play before this route leaves the tree.
+    if (_focus != null) unawaited(_playback.pause());
+    super.dispose();
+  }
+
+  Future<void> _pause() async {
+    final state = ref.read(homeStoryPlaybackControllerProvider);
+    final chapter = _focus?.chapter;
+    if (state.source == ListeningSource.manualChapter &&
+        (state.story?.id.startsWith('manual:${widget.route.id}:') ?? false)) {
+      if (chapter != null) {
+        await _session.remember(chapter.id, position: state.position);
+      }
+      await _playback.pause();
+    }
+  }
+
+  Future<void> _directory() async {
+    await _pause();
+    if (!mounted) return;
+    setState(() => _overlay = true);
+    final session =
+        ref.read(manualSessionProvider(widget.route.id)).asData?.value ??
+            const ManualReadingSession();
+    final choice = await showChapterDirectory(
+      context,
+      chapters: chapters,
+      routeName: widget.route.title,
+      visited: session.visited,
+      currentId:
+          _focus?.chapter.id ?? session.currentId ?? chapters.firstOrNull?.id,
+      positions: session.positions,
+    );
+    if (!mounted) return;
+    setState(() => _overlay = false);
+    if (choice != null) await _enter(choice);
+    _measureDock();
+  }
+
+  Future<void> _prelude(ManualChapter chapter) async {
+    await _pause();
+    if (!mounted) return;
+    setState(() => _overlay = true);
+    final session =
+        ref.read(manualSessionProvider(widget.route.id)).asData?.value ??
+            const ManualReadingSession();
+    final mode = await showChapterPrelude(
+      context,
+      chapter: chapter,
+      routeName: widget.route.title,
+      count: chapters.length,
+      resumeAt: session.positions[chapter.id] ?? Duration.zero,
+    );
+    if (!mounted) return;
+    setState(() => _overlay = false);
+    if (mode == ManualChapterMode.directory) {
+      await _directory();
+    } else if (mode != null) {
+      await _enter(ManualChapterChoice(chapter, mode));
+    }
+  }
+
+  Future<void> _enter(ManualChapterChoice choice) async {
+    await _pause();
+    if (!mounted) return;
+    await _session.remember(choice.chapter.id, opened: true);
+    if (!mounted) return;
+    setState(() => _focus = choice);
+    if (choice.mode == ManualChapterMode.audio) {
+      final session =
+          ref.read(manualSessionProvider(widget.route.id)).asData?.value;
+      final asset = choice.chapter.fragment!.audio;
+      String? preparedPath;
+      try {
+        preparedPath = await ref
+            .read(tourStoreProvider)
+            .preparedAsset(asset.url, asset.scriptVersion, asset.sizeBytes);
+      } catch (_) {
+        // A missing local cache can still play the original published URL.
+      }
+      if (!mounted ||
+          _overlay ||
+          _focus?.chapter.id != choice.chapter.id ||
+          _focus?.mode != ManualChapterMode.audio) {
+        return;
+      }
+      await _playback.loadManualChapter(
+        widget.route,
+        choice.chapter.fragment!,
+        coverImage: choice.chapter.image,
+        place: choice.chapter.place,
+        preparedPath: preparedPath,
+        resumePosition: session?.positions[choice.chapter.id] ?? Duration.zero,
+      );
+      if (mounted &&
+          !_overlay &&
+          _focus?.chapter.id == choice.chapter.id &&
+          _focus?.mode == ManualChapterMode.audio) {
+        await _playback.play();
+      }
+    }
+  }
+
+  Future<void> _toggle() async {
+    final chapter = _focus?.chapter;
+    if (chapter == null || !chapter.hasAudio) return;
+    final state = ref.read(homeStoryPlaybackControllerProvider);
+    if (state.source == ListeningSource.manualChapter &&
+        (state.story?.id.startsWith(
+              'manual:${widget.route.id}:${chapter.id}:',
+            ) ??
+            false)) {
+      await _playback.toggle();
+    } else {
+      await _enter(ManualChapterChoice(chapter, ManualChapterMode.audio));
+    }
+  }
+
+  Future<void> _leaveFocus() async {
+    await _pause();
+    if (!mounted) return;
+    setState(() => _focus = null);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureDock());
+  }
+
+  void _measureDock() {
+    if (!mounted || _focus != null) return;
+    final opening = _opening.currentContext?.findRenderObject() as RenderBox?;
+    final ending =
+        _allChapters.currentContext?.findRenderObject() as RenderBox?;
+    final startTop = opening?.localToGlobal(Offset.zero).dy;
+    final endTop = ending?.localToGlobal(Offset.zero).dy;
+    final height = MediaQuery.sizeOf(context).height;
+    final endVisible =
+        endTop != null && endTop < height && endTop + ending!.size.height > 0;
+    final next = startTop != null &&
+        startTop + opening!.size.height < MediaQuery.paddingOf(context).top &&
+        !endVisible;
+    if (_dock != next) setState(() => _dock = next);
+  }
+
+  Future<void> _revealBookmarks() async {
+    final target = _bookmarks.currentContext;
+    if (target == null) return;
+    await Scrollable.ensureVisible(
+      target,
+      alignment: 0,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 600),
+      curve: Curves.easeInOutCubic,
+    );
+    if (!mounted) return;
+    setState(() => _bookmarksLit = true);
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _bookmarksLit = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final route = widget.route;
+    final items = chapters;
+    final canStart = items.isNotEmpty;
+    final hasAudio = items.any((chapter) => chapter.hasAudio);
+    final session = ref.watch(manualSessionProvider(route.id)).asData?.value ??
+        const ManualReadingSession();
+    ref.listen(homeStoryPlaybackControllerProvider, (previous, next) {
+      final selected = _focus?.chapter;
+      if (selected != null &&
+          next.source == ListeningSource.manualChapter &&
+          (next.story?.id.startsWith('manual:${route.id}:${selected.id}:') ??
+              false) &&
+          (previous?.position.inSeconds ?? -1) ~/ 5 !=
+              next.position.inSeconds ~/ 5) {
+        unawaited(_session.remember(selected.id, position: next.position));
+      }
+    });
+    final narrow = MediaQuery.sizeOf(context).width <= 375;
+    final side = narrow ? 18.0 : 22.0;
+    final focus = _focus;
+    return PopScope(
+      canPop: focus == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _focus != null) unawaited(_leaveFocus());
+      },
+      child: Scaffold(
+        backgroundColor: focus == null ? manualPaper : manualInk,
+        body: Stack(
+          children: [
+            Offstage(
+              offstage: focus != null,
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  controller: _scroll,
+                  padding: EdgeInsets.fromLTRB(side, 0, side, 116),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 76,
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: Color(0x35252824)),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () async {
+                                await _pause();
+                                if (context.mounted) context.pop();
+                              },
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(100, 48),
+                                foregroundColor: manualInk,
                               ),
-                    ),
-                    const SizedBox(height: 12),
-                    _ClueSurface(route: route),
-                    const SizedBox(height: 20),
-                    _AboutManualCard(route: route),
-                    if (!route.isPublished) ...[
-                      const SizedBox(height: 18),
-                      const _EditorialNotice(),
-                    ],
-                    if (journey.errorMessage != null) ...[
-                      const SizedBox(height: 16),
+                              icon: const Icon(Icons.arrow_back, size: 19),
+                              label: Text(
+                                route.cityName.isEmpty
+                                    ? '回到城市'
+                                    : '回到${route.cityName}',
+                                style: manualType(13, weight: FontWeight.w500),
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0x45252824),
+                                ),
+                              ),
+                              child: FavoriteButton(
+                                kind: 'route',
+                                targetId: route.id,
+                                color: manualInk,
+                                filledWhenSelected: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      Row(
+                        children: [
+                          Text(
+                            route.cityName.isEmpty
+                                ? '见地 / 城市手册'
+                                : route.cityName,
+                            style: manualType(
+                              10,
+                              weight: FontWeight.w600,
+                              spacing: .6,
+                            ),
+                          ),
+                          const SizedBox(width: 13),
+                          Flexible(
+                            child: Text(
+                              route.theme,
+                              style: manualType(
+                                10,
+                                color: manualRed,
+                                weight: FontWeight.w600,
+                                spacing: .6,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 20, bottom: 17),
+                        child: Text(
+                          route.title.replaceAll(' · ', '\n'),
+                          style: manualType(
+                            narrow ? 55 : 62,
+                            serif: true,
+                            weight: FontWeight.w600,
+                            height: 1.1,
+                            spacing: narrow ? -3 : -3.4,
+                          ),
+                        ),
+                      ),
+                      Text(route.subtitle, style: manualType(17, height: 1.55)),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 13, bottom: 12),
+                        child: Text(
+                          '${route.durationMinutes} 分钟   /   ${route.distanceKm} km   /   ${items.length} 段${hasAudio ? '声音' : '文字'}',
+                          style: manualType(
+                            11,
+                            color: manualRed,
+                            weight: FontWeight.w500,
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 310),
+                        child: Text(
+                          hasAudio
+                              ? '把城市翻成一页页故事。选一篇，听见眼前，也读懂沿途。'
+                              : '把城市翻成一页页故事。从感兴趣的地方开始，按自己的节奏慢慢读。',
+                          style: manualType(
+                            13,
+                            color: const Color(0xFF62635C),
+                            height: 1.8,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      if (canStart)
+                        ManualPaperAction(
+                          key: _opening,
+                          folio: items.length.toString().padLeft(2, '0'),
+                          label:
+                              session.visited.isEmpty ? '翻开这段旅程' : '继续翻阅这段旅程',
+                          subtitle: hasAudio ? '先选一篇，再听或读' : '先选一篇，慢慢读',
+                          onPressed: _directory,
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Text('这份手册，正在写给你。', style: manualType(14)),
+                        ),
+                      const SizedBox(height: 11),
                       Text(
-                        journey.errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                        canStart
+                            ? (hasAudio
+                                ? '${items.length} 篇声音 · 可听，也可读'
+                                : '${items.length} 段文字 · 按自己的节奏')
+                            : '可以先收藏，留给下次',
+                        style: manualType(11, color: const Color(0xFF61645B)),
+                      ),
+                      if (route.audioTour?.productionReady == false &&
+                          (route.audioTour?.demoLabel?.isNotEmpty ?? false))
+                        Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Text(route.audioTour!.demoLabel!,
+                                style: manualType(10,
+                                    color: manualMuted, height: 1.7))),
+                      const SizedBox(height: 30),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 25),
+                        child: SizedBox(
+                          height: narrow ? 335 : 360,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            fit: StackFit.expand,
+                            children: [
+                              ManualPhoto(source: route.heroImage),
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Color(0x99162217),
+                                    ],
+                                    stops: [.6, 1],
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 18,
+                                bottom: 17,
+                                right: 18,
+                                child: Text(
+                                  '一份写给行走者的城市手册',
+                                  style: manualType(
+                                    9,
+                                    color: Colors.white,
+                                    spacing: .27,
+                                  ),
+                                ),
+                              ),
+                              if (canStart)
+                                Positioned(
+                                  left: -25,
+                                  bottom: 28,
+                                  child: Transform.rotate(
+                                    angle: -math.pi / 15,
+                                    child: Semantics(
+                                      button: true,
+                                      label: '慢慢走，才看得见：看看沿途书签',
+                                      child: Material(
+                                        color: const Color(0xFFE1E8B4),
+                                        shape: const CircleBorder(
+                                          side: BorderSide(
+                                            color: Color(0x35596044),
+                                          ),
+                                        ),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: InkWell(
+                                          onTap: _revealBookmarks,
+                                          child: SizedBox(
+                                            width: 98 *
+                                                MediaQuery.textScalerOf(context)
+                                                    .scale(1),
+                                            height: 98 *
+                                                MediaQuery.textScalerOf(context)
+                                                    .scale(1),
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  '慢慢走\n才看得见',
+                                                  textAlign: TextAlign.center,
+                                                  style: manualType(
+                                                    12,
+                                                    weight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Container(
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                    border: Border(
+                                                      bottom: BorderSide(
+                                                        color: Color(
+                                                          0x70525944,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    '看看沿途',
+                                                    style: manualType(
+                                                      10,
+                                                      color: const Color(
+                                                        0xFF525944,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const Icon(
+                                                  Icons.south,
+                                                  size: 17,
+                                                  color: manualInk,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        decoration: const BoxDecoration(
+                          border: Border.symmetric(
+                            horizontal: BorderSide(color: manualInk),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            _Fact(
+                              number: '${route.durationMinutes}',
+                              label: '分钟 / 留一点时间',
+                              narrow: narrow,
+                            ),
+                            _Fact(
+                              number: '${route.distanceKm}',
+                              suffix: 'km',
+                              label: '路线长度 / 从容慢行',
+                              narrow: narrow,
+                            ),
+                            _Fact(
+                              number: items.length.toString().padLeft(2, '0'),
+                              label: hasAudio ? '段声音 / 关于眼前' : '段文字 / 认识这里',
+                              narrow: narrow,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 41),
+                      Text(
+                        '01 / WHY THIS WALK',
+                        style: manualType(
+                          9,
+                          color: const Color(0xFF686B61),
+                          weight: FontWeight.w600,
+                          spacing: 1.08,
+                        ),
+                      ),
+                      const SizedBox(height: 13),
+                      Text(
+                        '把脚步放慢，\n让城市展开。',
+                        style: manualType(
+                          31,
+                          serif: true,
+                          weight: FontWeight.w500,
+                          spacing: -.93,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Text(route.description, style: manualType(14, height: 2)),
+                      const SizedBox(height: 15),
+                      Text(
+                        hasAudio ? '到现场听，也可以先在这里认识它。' : '这条路线当前提供文字手册，暂不提供音频。',
+                        style: manualType(
+                          11,
+                          color: const Color(0xFF686B61),
+                          height: 1.8,
+                        ),
+                      ),
+                      const SizedBox(height: 44),
+                      if (canStart) ...[
+                        Container(
+                          key: _bookmarks,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '02 / BOOKMARKS ALONG THE WAY',
+                                style: manualType(
+                                  9,
+                                  color: const Color(0xFF686B61),
+                                  weight: FontWeight.w600,
+                                  spacing: 1.08,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              IntrinsicWidth(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          const TextSpan(text: '沿途书签'),
+                                          TextSpan(
+                                            text: '，',
+                                            style: manualType(
+                                              32,
+                                              serif: true,
+                                              color: manualRed,
+                                            ),
+                                          ),
+                                          const TextSpan(text: '\n先翻几页。'),
+                                        ],
+                                      ),
+                                      style: manualType(
+                                        32,
+                                        serif: true,
+                                        weight: FontWeight.w500,
+                                        height: 1.5,
+                                        spacing: -1.6,
+                                      ),
+                                    ),
+                                    AnimatedContainer(
+                                      duration: MediaQuery.disableAnimationsOf(
+                                        context,
+                                      )
+                                          ? Duration.zero
+                                          : const Duration(milliseconds: 600),
+                                      height: 1,
+                                      width: _bookmarksLit ? 200 : 0,
+                                      color: manualRed,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '预览 ${math.min(3, items.length)} 篇 · 共 ${items.length} 篇',
+                                style: manualType(
+                                  10,
+                                  color: const Color(0xFF686B61),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              const Divider(height: 1, color: manualInk),
+                              for (final chapter in items.take(3))
+                                _Bookmark(
+                                  chapter: chapter,
+                                  onTap: () => _prelude(chapter),
+                                ),
+                              Container(
+                                key: _allChapters,
+                                decoration: const BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: Color(0x66252824),
+                                    ),
+                                  ),
+                                ),
+                                child: TextButton(
+                                  onPressed: _directory,
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(
+                                      double.infinity,
+                                      68,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                          child: Wrap(
+                                              spacing: 12,
+                                              crossAxisAlignment:
+                                                  WrapCrossAlignment.center,
+                                              children: [
+                                            Text('翻开全部目录',
+                                                style: manualType(17,
+                                                    serif: true,
+                                                    color: manualRed)),
+                                            Text('${items.length} 篇',
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontFamily: 'Georgia',
+                                                    fontStyle: FontStyle.italic,
+                                                    color: Color(0xFF827662))),
+                                          ])),
+                                      const Icon(
+                                        Icons.format_list_bulleted,
+                                        size: 20,
+                                        color: manualRed,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 15),
+                              Text(
+                                '不必按顺序，停在你感兴趣的那一页。',
+                                style: manualType(
+                                  11,
+                                  color: const Color(0xFF837B69),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 36),
+                      ],
+                      if (route.audioTour != null ||
+                          route.stops.isNotEmpty) ...[
+                        _FieldPreparation(route: route, onStart: _startField),
+                        const SizedBox(height: 30),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.only(top: 27, bottom: 32),
+                        decoration: const BoxDecoration(
+                          border: Border(top: BorderSide(color: manualInk)),
+                        ),
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          runSpacing: 12,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '见地',
+                                  style: manualType(
+                                    26,
+                                    serif: true,
+                                    weight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'JIAN DI',
+                                  style: manualType(8, spacing: 1.2),
+                                ),
+                              ],
+                            ),
+                            TextButton(
+                              onPressed: () => context.pop(),
+                              child: Text('回到城市  →', style: manualType(12)),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+            if (focus != null)
+              EditorialPageArrival(
+                key: ValueKey('${focus.chapter.id}:${focus.mode}'),
+                child: ManualChapterFocus(
+                  route: route,
+                  chapter: focus.chapter,
+                  chapters: items,
+                  mode: focus.mode,
+                  onBack: _leaveFocus,
+                  onDirectory: _directory,
+                  onSelect: _prelude,
+                  onListen: _toggle,
+                  onRead: () => _enter(
+                    ManualChapterChoice(focus.chapter, ManualChapterMode.text),
+                  ),
+                ),
+              ),
+            if (focus == null && _dock && !_overlay && canStart)
+              Positioned(
+                left: narrow ? 17 : 20,
+                right: narrow ? 17 : 20,
+                bottom: 14 + MediaQuery.paddingOf(context).bottom,
+                child: _DirectoryDock(count: items.length, onTap: _directory),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  Future<String?> _startRoute(WidgetRef ref) async {
+  Future<void> _startField() async {
+    await _pause();
+    if (!mounted) return;
+    final id = await _startRoute();
+    if (id != null && mounted) context.go('/journey/$id');
+  }
+
+  Future<String?> _startRoute() async {
+    final route = widget.route;
     final controller = ref.read(journeyControllerProvider.notifier);
     final onlineId = await controller.start(route);
     if (onlineId != null) return onlineId;
@@ -226,14 +838,13 @@ class _RouteDetail extends ConsumerWidget {
       updatedAt: now,
     );
     final store = ref.read(tourStoreProvider);
-    await store.enqueue(OutboxEvent(
-      id: 'start_journey:$localId',
-      type: 'start_journey',
-      payload: {
-        'local_journey_id': localId,
-        'route_id': route.id,
-      },
-    ));
+    await store.enqueue(
+      OutboxEvent(
+        id: 'start_journey:$localId',
+        type: 'start_journey',
+        payload: {'local_journey_id': localId, 'route_id': route.id},
+      ),
+    );
     await store.saveJson('offline_session_$localId', {
       'route_slug': route.slug,
       'created_at': now.toIso8601String(),
@@ -242,671 +853,270 @@ class _RouteDetail extends ConsumerWidget {
   }
 }
 
-class _PredepartureSurface extends ConsumerWidget {
-  const _PredepartureSurface({required this.route});
-
-  final RouteExperience route;
-
+class _Fact extends StatelessWidget {
+  const _Fact({
+    required this.number,
+    required this.label,
+    required this.narrow,
+    this.suffix,
+  });
+  final String number;
+  final String label;
+  final String? suffix;
+  final bool narrow;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final introduction = route.predeparture!;
-    final playback = ref.watch(homeStoryPlaybackControllerProvider);
-    final expectedPrefix = 'predeparture:${route.id}:';
-    final ownsPlayback = playback.source == ListeningSource.predeparture &&
-        (playback.story?.id.startsWith(expectedPrefix) ?? false);
-    final phase = ownsPlayback ? playback.phase : HomeStoryPhase.ready;
-    final icon = switch (phase) {
-      HomeStoryPhase.playing => Icons.pause_rounded,
-      HomeStoryPhase.ended => Icons.replay_rounded,
-      HomeStoryPhase.error => Icons.refresh_rounded,
-      _ => Icons.play_arrow_rounded,
-    };
-    final label = switch (phase) {
-      HomeStoryPhase.playing => '暂停出发前讲述',
-      HomeStoryPhase.ended => '重新播放出发前讲述',
-      HomeStoryPhase.error => '重试出发前讲述',
-      _ => '播放出发前讲述',
-    };
-    return Container(
-      key: const ValueKey('predeparture-surface'),
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 20),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.line)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '先认识这座城',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 22,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  introduction.text,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontFamily: 'Songti SC',
-                        fontSize: 13,
-                        height: 1.82,
-                      ),
-                ),
-                if (ownsPlayback && playback.message != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    playback.message!,
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          IconButton.filled(
-            key: const ValueKey('predeparture-play-pause'),
-            tooltip: label,
-            onPressed: () async {
-              final controller =
-                  ref.read(homeStoryPlaybackControllerProvider.notifier);
-              if (!ownsPlayback) {
-                await controller.loadPredeparture(route);
-                await controller.play();
-              } else {
-                await controller.toggle();
-              }
-            },
-            style: IconButton.styleFrom(
-              backgroundColor: phase == HomeStoryPhase.playing
-                  ? AppColors.terracotta
-                  : AppColors.ink,
-              foregroundColor: phase == HomeStoryPhase.playing
-                  ? AppColors.white
-                  : AppColors.gold,
-            ),
-            icon: Icon(icon),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ManualTabs extends StatelessWidget {
-  const _ManualTabs();
-
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
+  Widget build(BuildContext context) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _tab(context, '出发前', active: true),
-            const SizedBox(width: 18),
-            _tab(context, '故事方向'),
-            const SizedBox(width: 18),
-            _tab(context, '行走提示'),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: number),
+                  if (suffix != null)
+                    TextSpan(
+                      text: ' $suffix',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
+              ),
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: narrow ? 32 : 36,
+                height: 1,
+                color: manualInk,
+              ),
+            ),
+            const SizedBox(height: 9),
+            Text(label, style: manualType(9, height: 1.6)),
           ],
         ),
       );
+}
 
-  Widget _tab(BuildContext context, String label, {bool active = false}) =>
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: active ? AppColors.ink : AppColors.textMuted,
-                  fontSize: 9,
+class _Bookmark extends StatelessWidget {
+  const _Bookmark({required this.chapter, required this.onTap});
+  final ManualChapter chapter;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0x35252824))),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 22),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 35,
+                  child: Text(
+                    chapter.folio,
+                    style: const TextStyle(
+                      fontSize: 27,
+                      fontFamily: 'Georgia',
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFFB17661),
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chapter.place,
+                        style: manualType(10, color: const Color(0xFF696C62)),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        chapter.title,
+                        style: manualType(17,
+                            serif: true, weight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.north_east,
+                    size: 21, color: Color(0xFF61645B)),
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: active ? 20 : 0,
-            height: 2,
-            color: AppColors.terracotta,
-          ),
-        ],
+        ),
       );
 }
 
-class _Metrics extends StatelessWidget {
-  const _Metrics({required this.route});
-  final RouteExperience route;
-
+class _DirectoryDock extends StatelessWidget {
+  const _DirectoryDock({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) {
-    final values = <(IconData, String)>[
-      (Icons.schedule_rounded, '${route.durationMinutes} 分钟'),
-      (Icons.route_rounded, '${route.distanceKm} km'),
-      (
-        Icons.headphones_rounded,
-        '${route.audioTour?.fragments.length ?? route.stops.length} ${route.audioTour == null ? '站停留' : '段讲述'}'
-      ),
-      (Icons.alt_route_rounded, '自由顺序'),
-    ];
-    return Wrap(
-      runSpacing: 10,
-      children: values
-          .map(
-            (value) => Padding(
-              padding: const EdgeInsets.only(right: 17),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(value.$1, size: 13, color: AppColors.moss),
-                  const SizedBox(width: 5),
-                  Text(
-                    value.$2,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          fontSize: 9,
-                          letterSpacing: 0,
-                        ),
-                  ),
-                ],
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(18, 9, 10, 9),
+        decoration: BoxDecoration(
+          color: const Color(0xF5F7F2E8),
+          border: Border.all(color: const Color(0x6BB3A08C)),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(23),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(4),
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1830271C),
+              blurRadius: 32,
+              offset: Offset(0, 8),
+            ),
+            BoxShadow(color: Color(0xFFE6DFD2), offset: Offset(-3, 3)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Text(
+              count.toString().padLeft(2, '0'),
+              style: const TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 28,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF8D7258),
               ),
             ),
-          )
-          .toList(),
-    );
-  }
+            const SizedBox(width: 7),
+            Text('篇', style: manualType(10, color: const Color(0xFF776B59))),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  border: Border(left: BorderSide(color: Color(0x75B3A08C))),
+                ),
+                child: TextButton(
+                  onPressed: onTap,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.menu_book_outlined,
+                        size: 19,
+                        color: Color(0xFFAC3F2F),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '翻开目录',
+                        style: manualType(
+                          18,
+                          serif: true,
+                          color: const Color(0xFFAC3F2F),
+                          height: 1.4,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.arrow_forward,
+                        size: 20,
+                        color: Color(0xFFAC3F2F),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
-class _HowToWalkCard extends ConsumerWidget {
-  const _HowToWalkCard({required this.route});
-
+class _FieldPreparation extends ConsumerWidget {
+  const _FieldPreparation({required this.route, required this.onStart});
   final RouteExperience route;
-
+  final VoidCallback onStart;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final journey = ref.watch(journeyControllerProvider);
+    final key = OfflinePackageKey(route.slug, route.audioTour?.scriptVersion);
+    final package =
+        ref.watch(offlinePackageControllerProvider(key)).asData?.value ??
+            const OfflinePackageStatus.idle();
     final mode = ref.watch(locationModeControllerProvider).asData?.value ??
         TourLocationMode.real;
-    return _ManualCard(
-      title: '这一路，你会怎样行走',
-      child: Column(
-        children: [
-          _InstructionRow(
-            icon: Icons.alt_route_rounded,
-            title: '没有必须照走的固定路线',
-            body: '从任意景点开始都可以，故事会保留自己的阅读顺序。',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '03 / TAKE THIS WALK',
+          style: manualType(9, color: manualMuted, spacing: 1.08),
+        ),
+        const SizedBox(height: 10),
+        TextButton.icon(
+          onPressed: journey.isBusy ? null : onStart,
+          style: TextButton.styleFrom(
+            foregroundColor: manualRed,
+            minimumSize: const Size(48, 48),
+            padding: EdgeInsets.zero,
           ),
-          _InstructionRow(
-            icon: Icons.headphones_rounded,
-            title: '走近景点，听见讲述',
-            body: route.audioTour == null
-                ? '抵达每一次停留后，打开对应的城市故事。'
-                : '真实定位模式会在接近节点时准备讲述，也可以随时手动打开。',
+          icon: const Icon(Icons.directions_walk_outlined, size: 20),
+          label: Text(
+            journey.isBusy ? '正在准备行走…' : '到现场，开始行走',
+            style: manualType(18, serif: true, color: manualRed),
           ),
-          const _InstructionRow(
-            icon: Icons.visibility_outlined,
-            title: '观察与拍照都由你决定',
-            body: '现场任务只是邀请，不完成也不会阻断后面的内容。',
-            last: true,
+        ),
+        Text('到了现场，再让位置带你发现沿途。', style: manualType(11, color: manualMuted)),
+        const SizedBox(height: 12),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 12),
+          title: Text('行走准备', style: manualType(13)),
+          subtitle: Text(
+            '定位方式与离线内容',
+            style: manualType(10, color: manualMuted),
           ),
-          const SizedBox(height: 14),
-          LocationModeSelector(
-            keyPrefix: 'route-detail-mode',
-            value: mode,
-            onChanged: (next) =>
-                ref.read(locationModeControllerProvider.notifier).setMode(next),
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              mode == TourLocationMode.simulated
-                  ? '模拟预览已启用，开始导览后可手动推进线索'
-                  : '真实行走已启用，开始导览后会按位置发现线索',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.moss,
-                  ),
+          children: [
+            LocationModeSelector(
+              keyPrefix: 'route-detail-mode',
+              value: mode,
+              onChanged: (next) => ref
+                  .read(locationModeControllerProvider.notifier)
+                  .setMode(next),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PreparationCard extends ConsumerWidget {
-  const _PreparationCard({required this.route});
-
-  final RouteExperience route;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final key = OfflinePackageKey(route.slug, route.audioTour?.scriptVersion);
-    final status = ref.watch(offlinePackageControllerProvider(key));
-    final package = status.asData?.value ?? const OfflinePackageStatus.idle();
-    final downloading = package.phase == OfflinePackagePhase.downloading;
-    final label = switch (package.phase) {
-      OfflinePackagePhase.idle => '下载离线内容',
-      OfflinePackagePhase.downloading => package.total > 0
-          ? '正在准备 ${package.complete}/${package.total}'
-          : '正在准备…',
-      OfflinePackagePhase.complete => '离线内容已准备',
-      OfflinePackagePhase.stale => '更新离线内容',
-      OfflinePackagePhase.failed => '重试下载',
-    };
-    final tags = route.pretrip?.companionTags ?? const <String>[];
-    final tips = route.pretrip?.tips;
-    final preparationNotes = <String>[
-      ...?tips?.safety.take(1),
-      ...?tips?.rest.take(1),
-      ...?tips?.accessibility.take(1),
-      ...?tips?.weatherAdaptation.take(1),
-    ];
-    return _ManualCard(
-      title: '轻装出发，也留一点余量',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: (tags.isEmpty
-                    ? const ['建议佩戴耳机', '穿适合步行的鞋', '留意天气']
-                    : tags.take(4))
-                .map((tag) => _ManualTag(label: tag))
-                .toList(growable: false),
-          ),
-          const SizedBox(height: 13),
-          const Text('提前下载后，网络不稳定时仍可继续听讲述；位置触发是否可用取决于系统定位状态。'),
-          if (preparationNotes.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            ...preparationNotes.map(
-              (note) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text('· $note',
-                    style: Theme.of(context).textTheme.bodySmall),
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed:
-                  route.audioTour == null || downloading || package.isUsable
+            if (route.audioTour != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: package.phase == OfflinePackagePhase.downloading ||
+                          package.isUsable
                       ? null
                       : () => ref
-                          .read(offlinePackageControllerProvider(key).notifier)
+                          .read(
+                            offlinePackageControllerProvider(key).notifier,
+                          )
                           .download(route),
-              icon: downloading
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(package.isUsable
-                      ? Icons.download_done_rounded
-                      : Icons.download_outlined),
-              label: Text(route.audioTour == null ? '暂无离线音频' : label),
-            ),
-          ),
-          if (package.message != null) ...[
-            const SizedBox(height: 8),
-            Text(package.message!,
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _RouteStoryCard extends ConsumerWidget {
-  const _RouteStoryCard({required this.route});
-
-  final RouteExperience route;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final points = routeCanvasPointsFor(route);
-    return RouteCanvas(
-      points: points,
-      userLocation: points.isEmpty
-          ? null
-          : ref.watch(routePreviewLocationProvider).asData?.value,
-    );
-  }
-}
-
-class _ClueSurface extends StatelessWidget {
-  const _ClueSurface({required this.route});
-
-  final RouteExperience route;
-
-  @override
-  Widget build(BuildContext context) {
-    final children = route.audioTour == null
-        ? route.stops
-            .map((stop) => _StopRow(
-                  stop: stop,
-                  isLast: stop == route.stops.last,
-                ))
-            .toList(growable: false)
-        : route.audioTour!.fragments
-            .map((fragment) => _FragmentPreviewRow(
-                  fragment: fragment,
-                  isLast: fragment == route.audioTour!.fragments.last,
-                ))
-            .toList(growable: false);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 17),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink.withValues(alpha: .07),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(children: children),
-    );
-  }
-}
-
-class _AboutManualCard extends StatelessWidget {
-  const _AboutManualCard({required this.route});
-
-  final RouteExperience route;
-
-  @override
-  Widget build(BuildContext context) => _ManualCard(
-        title: '关于这条手册',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              route.description,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontSize: 10,
-                    height: 1.7,
-                    color: const Color(0xFF596965),
-                  ),
-            ),
-            const SizedBox(height: 15),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _ManualTag(label: route.difficulty),
-                _ManualTag(label: '${route.numberOfStops} 个故事节点'),
-                if (!route.isPublished) const _ManualTag(label: '内容预览中'),
-              ],
-            ),
-          ],
-        ),
-      );
-}
-
-class _ManualCard extends StatelessWidget {
-  const _ManualCard({
-    required this.title,
-    required this.child,
-  });
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(17),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.ink.withValues(alpha: .07),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontSize: 18,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
-      );
-}
-
-class _InstructionRow extends StatelessWidget {
-  const _InstructionRow({
-    required this.icon,
-    required this.title,
-    required this.body,
-    this.last = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-  final bool last;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(bottom: last ? 0 : 17),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 27,
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: Icon(icon, size: 17, color: AppColors.terracotta),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    body,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontSize: 9,
-                          height: 1.5,
-                          color: const Color(0xFF717B77),
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-}
-
-class _FragmentPreviewRow extends StatelessWidget {
-  const _FragmentPreviewRow({required this.fragment, required this.isLast});
-  final StoryFragment fragment;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) => _ClueRow(
-        number: fragment.position,
-        title: fragment.title ?? fragment.safePreview,
-        metadata: fragment.interactionType == 'photo'
-            ? '可选拍照线索 · 可稍后完成'
-            : '自动播放 · 可阅读文字稿',
-        tags: fragment.experienceTags,
-        isLast: isLast,
-      );
-}
-
-class _StopRow extends StatelessWidget {
-  const _StopRow({required this.stop, required this.isLast});
-  final ExperienceStop stop;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) => _ClueRow(
-        number: stop.position,
-        title: stop.title,
-        metadata: stop.kicker,
-        tags: stop.experienceTags,
-        isLast: isLast,
-      );
-}
-
-class _ClueRow extends StatelessWidget {
-  const _ClueRow({
-    required this.number,
-    required this.title,
-    required this.metadata,
-    required this.tags,
-    required this.isLast,
-  });
-
-  final int number;
-  final String title;
-  final String metadata;
-  final List<String> tags;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          border: isLast
-              ? null
-              : Border(
-                  bottom: BorderSide(
-                    color: AppColors.ink.withValues(alpha: .09),
-                  ),
-                ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 29,
-              child: Text(
-                number.toString().padLeft(2, '0'),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: AppColors.terracotta,
-                  fontFamily: 'Songti SC',
-                  fontSize: 15,
-                  letterSpacing: 0,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: Text(
+                      switch (package.phase) {
+                        OfflinePackagePhase.complete => '离线内容已准备',
+                        OfflinePackagePhase.downloading => package.total > 0
+                            ? '正在准备 ${package.complete}/${package.total}'
+                            : '正在准备…',
+                        OfflinePackagePhase.failed => '重试下载',
+                        OfflinePackagePhase.stale => '更新离线内容',
+                        _ => '下载离线内容',
+                      },
+                      style: const TextStyle(fontSize: 12)),
                 ),
               ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontSize: 11,
-                          height: 1.45,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    metadata,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontSize: 8,
-                          color: const Color(0xFF7C837E),
-                        ),
-                  ),
-                  if (tags.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    _ExperienceTags(tags: tags),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Padding(
-              padding: EdgeInsets.only(top: 2),
-              child: Icon(Icons.chevron_right_rounded, size: 18),
-            ),
+            if (package.message != null)
+              Text(package.message!, style: manualType(10, color: manualMuted)),
           ],
         ),
-      );
-}
-
-class _ManualTag extends StatelessWidget {
-  const _ManualTag({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.paperDeep,
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF4A5B55),
-            fontSize: 8,
-            height: 1.2,
-          ),
-        ),
-      );
-}
-
-class _ExperienceTags extends StatelessWidget {
-  const _ExperienceTags({required this.tags});
-
-  final List<String> tags;
-
-  @override
-  Widget build(BuildContext context) => Wrap(
-        spacing: 7,
-        runSpacing: 6,
-        children:
-            tags.map((tag) => _ManualTag(label: tag)).toList(growable: false),
-      );
-}
-
-class _EditorialNotice extends StatelessWidget {
-  const _EditorialNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-          color: AppColors.paperDeep, borderRadius: BorderRadius.circular(18)),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.fact_check_outlined, size: 20),
-          SizedBox(width: 12),
-          Expanded(child: Text('当前为 MVP 演示内容。公开发布前，地点史实、图片与讲述文本需经过来源标注和人工审核。')),
-        ],
-      ),
+        if (journey.errorMessage != null)
+          Text(journey.errorMessage!, style: manualType(12, color: manualRed)),
+      ],
     );
   }
 }

@@ -1,131 +1,160 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../active_tour_controller.dart';
+import 'discovery_art.dart';
 
-enum TravelerSection { discovery, journey, footprints }
+// Legacy destinations stay available to existing journey and footprint screens.
+enum TravelerSection { discovery, journey, footprints, journal, atlas, shelf }
 
 class TravelerBottomNavigation extends ConsumerWidget {
   const TravelerBottomNavigation({
     required this.active,
     super.key,
     this.journeyId,
+    this.onSelected,
   });
-
   final TravelerSection active;
   final String? journeyId;
+  final ValueChanged<TravelerSection>? onSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SafeArea(
-      minimum: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: .96),
-          borderRadius: BorderRadius.circular(23),
-          border: Border.all(color: AppColors.line),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.ink.withValues(alpha: .13),
-              blurRadius: 30,
-              offset: const Offset(0, 12),
+    final horizontal = MediaQuery.sizeOf(context).width <= 360 ? 20.0 : 23.0;
+    final entries = [
+      (TravelerSection.journal, DiscoveryMark.book, '随刊'),
+      (TravelerSection.atlas, DiscoveryMark.search, '路线'),
+      (TravelerSection.shelf, DiscoveryMark.bookmark, '书架'),
+    ];
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        horizontal,
+        0,
+        horizontal,
+        MediaQuery.paddingOf(context).bottom.clamp(15.0, double.infinity),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            height: 64,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0x4db9b7a8)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0a27291d),
+                  offset: Offset(0, 5),
+                  blurRadius: 26,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(5),
-          child: Row(
-            children: [
-              _Destination(
-                active: active == TravelerSection.discovery,
-                icon: Icons.explore_outlined,
-                label: '发现',
-                onTap: () => context.go('/'),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: ColoredBox(
+                  color: const Color(0xeff7f3ea),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: entries.map((entry) {
+                      final selected =
+                          active == entry.$1 ||
+                          active == TravelerSection.discovery &&
+                              entry.$1 == TravelerSection.journal;
+                      final color = selected
+                          ? AppColors.terracotta
+                          : const Color(0xff87806f);
+                      return Expanded(
+                        child: DiscoveryTouch(
+                          label: entry.$3,
+                          selected: selected,
+                          tint: true,
+                          onTap: () => _select(context, ref, entry.$1),
+                          child: SizedBox(
+                            height: 56,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    DiscoveryIcon(
+                                      entry.$2,
+                                      size: 19,
+                                      color: color,
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Text(
+                                      entry.$3,
+                                      style: discoverySans(12, color: color),
+                                    ),
+                                  ],
+                                ),
+                                if (selected)
+                                  Positioned(
+                                    bottom: 7,
+                                    child: Container(
+                                      width: 4,
+                                      height: 4,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.terracotta,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
-              _Destination(
-                active: active == TravelerSection.journey,
-                icon: Icons.radar_rounded,
-                label: '行走',
-                onTap: () => _openJourney(context, ref),
-              ),
-              _Destination(
-                active: active == TravelerSection.footprints,
-                icon: Icons.auto_stories_outlined,
-                label: '足迹',
-                onTap: () => context.go('/footprints'),
-              ),
-            ],
+            ),
           ),
-        ),
+          Positioned(
+            top: -1,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: const Color(0xffdbe782),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  void _openJourney(BuildContext context, WidgetRef ref) {
-    final id = journeyId ?? ref.read(activeTourControllerProvider).session?.id;
-    if (id != null) {
-      context.go('/journey/$id');
+  void _select(BuildContext context, WidgetRef ref, TravelerSection section) {
+    if (onSelected != null) {
+      onSelected!(section);
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('先打开一本城市手册，再开始行走')),
+    if (section == TravelerSection.journey) {
+      final id =
+          journeyId ?? ref.read(activeTourControllerProvider).session?.id;
+      if (id != null) context.go('/journey/$id');
+      return;
+    }
+    if (section == TravelerSection.footprints) {
+      context.go('/footprints');
+      return;
+    }
+    context.go(
+      section == TravelerSection.journal ? '/' : '/?tab=${section.name}',
     );
   }
-}
-
-class _Destination extends StatelessWidget {
-  const _Destination({
-    required this.active,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final bool active;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: Semantics(
-          selected: active,
-          button: true,
-          label: label,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              height: 52,
-              decoration: BoxDecoration(
-                color: active ? AppColors.ink : Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    size: 19,
-                    color: active ? AppColors.white : AppColors.textMuted,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: active ? AppColors.white : AppColors.textMuted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
 }

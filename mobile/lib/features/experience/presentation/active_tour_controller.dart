@@ -14,7 +14,7 @@ import '../data/platform_tour_adapters.dart';
 import '../data/prepared_route_service.dart';
 import '../data/route_offline_package_service.dart';
 import '../data/user_preferences_repository.dart';
-import '../data/home_story_audio_player.dart';
+import 'home_story_controller.dart';
 import '../domain/experience_repository.dart';
 import '../domain/fragment_models.dart';
 import '../domain/models.dart';
@@ -289,6 +289,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   String? _loadedProfileId;
   int _transitionGeneration = 0;
   int _playbackGeneration = 0;
+  int? _preparingPlaybackGeneration;
   int? _audioOwnershipGeneration;
   LocationSample? _latestLocationSample;
   int _lastOfflineCheckpointBucket = -1;
@@ -1105,78 +1106,87 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> _playNarration(StoryFragment fragment) async {
     final generation = ++_playbackGeneration;
-    _lastOfflineCheckpointBucket = -1;
-    await _cancelPlayerBindings();
-    await ref.read(homeStoryAudioPlayerProvider).stop();
-    await _player.stop();
-    if (generation != _playbackGeneration) return;
-    final route = state.route;
-    final session = state.session;
-    if (route == null || session == null) return;
-    final ownership = ref.read(audioOwnershipProvider.notifier).acquire(
-          kind: AudioOwnerKind.onSite,
-          destination: '/journey/${session.id}',
-          title: fragment.title ?? '第 ${fragment.position} 条线索',
-          subtitle: route.title,
-          artwork: route.heroImage,
-          duration: state.duration,
-        );
-    _audioOwnershipGeneration = ownership;
-    state = state.copyWith(
-      current: fragment,
-      selectedFragmentId: fragment.id,
-      playbackOwner: PlaybackOwner(
-        userId:
-            ref.read(authRepositoryProvider).session?.user.id ?? 'anonymous',
-        routeId: route.id,
-        journeyId: session.id,
-        fragmentId: fragment.id,
-        generation: generation,
-      ),
-      generation: generation,
-      isPlaying: false,
-      position: Duration.zero,
-      queue: state.playbackMode == TourPlaybackMode.revisit
-          ? const []
-          : state.queue,
-    );
+    _preparingPlaybackGeneration = generation;
     try {
-      _loadedFragmentId = fragment.id;
-      _loadedProfileId = state.narrationProfileId;
-      await _player.play(
-        fragment.withNarrationProfile(state.narrationProfileId),
-        preparedPath: state.preparedPaths[fragment.id],
-      );
-      if (!_isPlaybackCurrent(generation)) return;
-      // Bind only after the replacement source has loaded. This leaves the
-      // stop/load seam without listeners, so a late completion from the old
-      // attraction cannot collect or advance the new attraction.
-      await _bindPlayer(generation);
-      if (!_isPlaybackCurrent(generation)) return;
-      state = state.copyWith(isPlaying: true);
-      ref.read(audioOwnershipProvider.notifier).playing(ownership, true);
-    } catch (error, stackTrace) {
-      if (!_isPlaybackCurrent(generation)) return;
-      if (_loadedFragmentId == fragment.id) _loadedFragmentId = null;
-      _loadedProfileId = null;
+      _lastOfflineCheckpointBucket = -1;
+      await _cancelPlayerBindings();
+      if (generation != _playbackGeneration) return;
+      await ref.read(homeStoryPlaybackControllerProvider.notifier).pause();
+      if (generation != _playbackGeneration) return;
+      await _player.stop();
+      if (generation != _playbackGeneration) return;
+      final route = state.route;
+      final session = state.session;
+      if (route == null || session == null) return;
+      final ownership = ref.read(audioOwnershipProvider.notifier).acquire(
+            kind: AudioOwnerKind.onSite,
+            destination: '/journey/${session.id}',
+            title: fragment.title ?? '第 ${fragment.position} 条线索',
+            subtitle: route.title,
+            artwork: route.heroImage,
+            duration: state.duration,
+          );
+      _audioOwnershipGeneration = ownership;
       state = state.copyWith(
+        current: fragment,
+        selectedFragmentId: fragment.id,
+        playbackOwner: PlaybackOwner(
+          userId:
+              ref.read(authRepositoryProvider).session?.user.id ?? 'anonymous',
+          routeId: route.id,
+          journeyId: session.id,
+          fragmentId: fragment.id,
+          generation: generation,
+        ),
+        generation: generation,
         isPlaying: false,
-        errorMessage: '故事音频暂时无法播放，可以先查看文字稿后重试。',
+        position: Duration.zero,
+        queue: state.playbackMode == TourPlaybackMode.revisit
+            ? const []
+            : state.queue,
       );
-      ref.read(audioOwnershipProvider.notifier).clear(ownership);
-      if (_audioOwnershipGeneration == ownership) {
-        _audioOwnershipGeneration = null;
+      try {
+        _loadedFragmentId = fragment.id;
+        _loadedProfileId = state.narrationProfileId;
+        await _player.play(
+          fragment.withNarrationProfile(state.narrationProfileId),
+          preparedPath: state.preparedPaths[fragment.id],
+        );
+        if (!_isPlaybackCurrent(generation)) return;
+        // Bind only after the replacement source has loaded. This leaves the
+        // stop/load seam without listeners, so a late completion from the old
+        // attraction cannot collect or advance the new attraction.
+        await _bindPlayer(generation);
+        if (!_isPlaybackCurrent(generation)) return;
+        state = state.copyWith(isPlaying: true);
+        ref.read(audioOwnershipProvider.notifier).playing(ownership, true);
+      } catch (error, stackTrace) {
+        if (!_isPlaybackCurrent(generation)) return;
+        if (_loadedFragmentId == fragment.id) _loadedFragmentId = null;
+        _loadedProfileId = null;
+        state = state.copyWith(
+          isPlaying: false,
+          errorMessage: '故事音频暂时无法播放，可以先查看文字稿后重试。',
+        );
+        ref.read(audioOwnershipProvider.notifier).clear(ownership);
+        if (_audioOwnershipGeneration == ownership) {
+          _audioOwnershipGeneration = null;
+        }
+        unawaited(ref.read(runtimeLogReporterProvider)?.error(
+          'audio',
+          'narration_playback_failed',
+          error: error,
+          stackTrace: stackTrace,
+          context: {
+            'fragment_id': fragment.id,
+            'fragment_position': fragment.position,
+          },
+        ));
       }
-      unawaited(ref.read(runtimeLogReporterProvider)?.error(
-        'audio',
-        'narration_playback_failed',
-        error: error,
-        stackTrace: stackTrace,
-        context: {
-          'fragment_id': fragment.id,
-          'fragment_position': fragment.position,
-        },
-      ));
+    } finally {
+      if (_preparingPlaybackGeneration == generation) {
+        _preparingPlaybackGeneration = null;
+      }
     }
   }
 
@@ -1617,6 +1627,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> pauseTour() async {
+    _cancelPendingPlayback();
     await _player.pause();
     state = state.copyWith(
       status: 'paused',
@@ -1630,13 +1641,24 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<void> pauseForExternalAudio() async {
-    if (!state.isPlaying) return;
+    if (!state.isPlaying && _preparingPlaybackGeneration == null) return;
+    _cancelPendingPlayback();
     await _player.pause();
     state = state.copyWith(isPlaying: false);
     final token = _audioOwnershipGeneration;
     if (token != null) {
       ref.read(audioOwnershipProvider.notifier).playing(token, false);
     }
+  }
+
+  void _cancelPendingPlayback() {
+    if (_preparingPlaybackGeneration == null) return;
+    // A loading source must not start after quiet browsing or a new player
+    // takes ownership. Resuming will prepare and bind this fragment again.
+    _playbackGeneration += 1;
+    _preparingPlaybackGeneration = null;
+    _loadedFragmentId = null;
+    _loadedProfileId = null;
   }
 
   Future<void> resumeTour() async {

@@ -945,6 +945,13 @@ def reconstruct_story(journey_id: str):
 
 def _route_payload(route, *, include_stops: bool = True, include_center: bool = False) -> dict:
     payload = route_to_dict(route, include_stops=include_stops)
+    if include_stops:
+        city = next(
+            (item for item in _services()["catalog"].list_cities() if item.id == route.city_id),
+            None,
+        )
+        if city is not None:
+            payload["city"] = {"id": city.id, "slug": city.slug, "name": city.name}
     tour = _services()["fragment_tours"].public_manifest(route.id)
     if tour is not None:
         payload["audio_tour"] = tour
@@ -954,6 +961,8 @@ def _route_payload(route, *, include_stops: bool = True, include_center: bool = 
     if include_center:
         payload["center"] = _route_center(route, tour)
     if route.content_status.value == "published":
+        if include_stops:
+            payload["manual_chapters"] = _services()["fragment_tours"].manual_chapters(route.id)
         payload["pretrip"] = _services()["city_stories"].pretrip(route.slug)
         payload["predeparture"] = payload["pretrip"].get("predeparture")
         payload["companion_tags"] = payload["pretrip"]["companion_tags"]

@@ -8,12 +8,14 @@ class FavoriteButton extends ConsumerStatefulWidget {
     required this.kind,
     required this.targetId,
     this.color,
+    this.filledWhenSelected = false,
     super.key,
   });
 
   final String kind;
   final String targetId;
   final Color? color;
+  final bool filledWhenSelected;
 
   @override
   ConsumerState<FavoriteButton> createState() => _FavoriteButtonState();
@@ -33,11 +35,22 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton> {
                 ) ??
             false);
     return IconButton(
-      tooltip: selected ? '取消收藏' : '收藏',
+      tooltip: selected ? '移出书架' : '放入书架',
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       onPressed: _busy ? null : () => _toggle(userId, selected),
-      color: widget.color,
+      color: selected && widget.filledWhenSelected
+          ? const Color(0xFFF5F0E7)
+          : widget.color,
+      style: selected && widget.filledWhenSelected
+          ? IconButton.styleFrom(backgroundColor: const Color(0xFF252824))
+          : null,
       icon: Icon(
-          selected ? Icons.favorite_rounded : Icons.favorite_border_rounded),
+        selected
+            ? widget.filledWhenSelected
+                ? Icons.check_rounded
+                : Icons.bookmark_rounded
+            : Icons.bookmark_border_rounded,
+      ),
     );
   }
 

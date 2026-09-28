@@ -39,3 +39,23 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/NotoSerifSC-OFL.txt
+    - assets/fonts/NotoSansSC-OFL.txt
+    - assets/fonts/Inter-OFL.txt
+    - assets/fonts/Gelasio-OFL.txt
+  fonts:
+    - family: Noto Serif SC
+      fonts:
+        - asset: assets/fonts/NotoSerifSC.ttf
+    - family: Noto Sans SC
+      fonts:
+        - asset: assets/fonts/NotoSansSC.ttf
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf
+    - family: Georgia
+      fonts:
+        - asset: assets/fonts/Gelasio.ttf
+        - asset: assets/fonts/Gelasio-Italic.ttf
+          style: italic

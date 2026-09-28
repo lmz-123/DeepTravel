@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
-import 'home_story_controller.dart';
 import 'discovery_controller.dart';
+import 'home_story_controller.dart';
+import 'widgets/editorial_listening.dart';
 import 'widgets/favorite_button.dart';
-import 'widgets/traveler_bottom_navigation.dart';
 
 class HomeStoryPage extends ConsumerStatefulWidget {
   const HomeStoryPage({this.catalogId, super.key});
-
   final String? catalogId;
 
   @override
@@ -18,419 +16,434 @@ class HomeStoryPage extends ConsumerStatefulWidget {
 }
 
 class _HomeStoryPageState extends ConsumerState<HomeStoryPage> {
+  bool _reading = false;
+  bool _showDock = false;
+  final _playerKey = GlobalKey();
+  final _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_updateDock);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final city = ref.read(discoveryControllerProvider).asData?.value.city;
+      final controller = ref.read(homeStoryPlaybackControllerProvider.notifier);
       if (widget.catalogId case final catalogId?) {
-        ref
-            .read(homeStoryPlaybackControllerProvider.notifier)
-            .loadCatalog(catalogId);
+        controller.loadCatalog(catalogId);
         return;
       }
       final current = ref.read(homeStoryPlaybackControllerProvider);
-      if (current.story == null || current.citySlug != city?.slug) {
-        ref
-            .read(homeStoryPlaybackControllerProvider.notifier)
-            .load(citySlug: city?.slug);
+      if (current.story == null ||
+          current.citySlug != city?.slug ||
+          current.source != ListeningSource.cityStory) {
+        controller.load(citySlug: city?.slug);
+      } else if (current.isPlaying) {
+        controller.toggle();
       }
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(homeStoryPlaybackControllerProvider);
-    return Scaffold(
-      backgroundColor: AppColors.ink,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: AppColors.white,
-        leading: IconButton(
-          tooltip: '返回首页',
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-        actions: [
-          if (state.story case final story?)
-            FavoriteButton(kind: 'story', targetId: story.id),
-          const SizedBox(width: 10),
-        ],
-      ),
-      bottomNavigationBar: const TravelerBottomNavigation(
-        active: TravelerSection.discovery,
-      ),
-      body: switch (state.phase) {
-        HomeStoryPhase.loading => const Center(
-            child: CircularProgressIndicator(),
-          ),
-        HomeStoryPhase.empty || HomeStoryPhase.error => _StoryFailure(
-            message: state.message ?? '故事暂时没有加载出来。',
-            onRetry: () {
-              final controller =
-                  ref.read(homeStoryPlaybackControllerProvider.notifier);
-              if (widget.catalogId case final catalogId?) {
-                controller.loadCatalog(catalogId);
-              } else {
-                controller.load(
-                  citySlug: ref
-                      .read(discoveryControllerProvider)
-                      .asData
-                      ?.value
-                      .city
-                      ?.slug,
-                );
-              }
-            },
-          ),
-        _ when state.story != null => _StoryBody(state: state),
-        _ => const SizedBox.shrink(),
-      },
-    );
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
-}
 
-class _StoryBody extends ConsumerWidget {
-  const _StoryBody({required this.state});
-  final HomeStoryPlaybackState state;
+  void _updateDock() {
+    final box = _playerKey.currentContext?.findRenderObject();
+    final visible = !_reading &&
+        box is RenderBox &&
+        box.localToGlobal(Offset(0, box.size.height)).dy <
+            MediaQuery.paddingOf(context).top;
+    if (visible != _showDock && mounted) setState(() => _showDock = visible);
+  }
+
+  void _pause() {
+    ref.read(homeStoryPlaybackControllerProvider.notifier).pause();
+  }
+
+  void _switchMode() {
+    _pause();
+    setState(() {
+      _reading = !_reading;
+      _showDock = false;
+    });
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
+  void _nextStory() {
+    final story = ref.read(homeStoryPlaybackControllerProvider).story;
+    setState(() {
+      _reading = false;
+      _showDock = false;
+    });
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+    ref
+        .read(homeStoryPlaybackControllerProvider.notifier)
+        .load(citySlug: story?.citySlug, excludeCurrent: true);
+  }
+
+  void _retry() {
+    final controller = ref.read(homeStoryPlaybackControllerProvider.notifier);
+    if (widget.catalogId case final catalogId?) {
+      controller.loadCatalog(catalogId);
+    } else {
+      controller.load(
+        citySlug:
+            ref.read(discoveryControllerProvider).asData?.value.city?.slug,
+      );
+    }
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final story = state.story!;
-    final duration = state.duration ?? story.duration;
-    final durationMs = duration.inMilliseconds;
-    final positionMs = state.position.inMilliseconds.clamp(0, durationMs);
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        Semantics(
-          image: true,
-          label: '${story.title} 的故事封面',
-          child: SizedBox(
-            height: 430,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                story.coverImage.isEmpty
-                    ? const _StoryCoverFallback()
-                    : Image.network(
-                        story.coverImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const _StoryCoverFallback(),
-                      ),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0x22142B33),
-                        Color(0x11142B33),
-                        AppColors.ink,
-                      ],
-                      stops: [0, .42, 1],
+  Widget build(BuildContext context) {
+    final state = ref.watch(homeStoryPlaybackControllerProvider);
+    final story = state.story;
+    final padding = MediaQuery.sizeOf(context).width <= 375 ? 18.0 : 22.0;
+    final controller = ref.read(homeStoryPlaybackControllerProvider.notifier);
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _pause();
+      },
+      child: Scaffold(
+        backgroundColor: editorialInk,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              if (state.phase == HomeStoryPhase.loading)
+                const Center(
+                  child: CircularProgressIndicator(color: editorialLime),
+                )
+              else if (story == null)
+                _StoryFailure(
+                  message: state.message ?? '故事暂时没有加载出来。',
+                  onRetry: _retry,
+                )
+              else
+                EditorialPageArrival(
+                  child: ListView(
+                    controller: _scrollController,
+                    padding: EdgeInsets.fromLTRB(
+                      padding,
+                      0,
+                      padding,
+                      _reading ? 32 : 146,
                     ),
-                  ),
-                ),
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 28,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${story.cityName} · 城市故事 · ${_storyTime(duration)}',
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: AppColors.gold,
-                                  letterSpacing: 1.1,
+                      EditorialFocusHeader(
+                        backLabel: '返回首页',
+                        onBack: () {
+                          _pause();
+                          context.pop();
+                        },
+                        trailing: FavoriteButton(
+                          kind: 'story',
+                          targetId: story.id,
+                          color: editorialPaper,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 22),
+                        child: Text(
+                          [
+                            story.cityName,
+                            story.routeTitle,
+                          ].where((part) => part.isNotEmpty).join(' · '),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            height: 1.6,
+                            color: editorialMuted,
+                          ),
+                        ),
+                      ),
+                      if (!_reading) ...[
+                        const SizedBox(height: 7),
+                        EditorialRecordArtwork(
+                          imageUrl: story.coverImage,
+                          chapterNumber: 1,
+                          isPlaying: state.isPlaying,
+                          caption: '${story.narratorName} · 把城市，放进耳朵里',
+                        ),
+                        const SizedBox(height: 9),
+                      ] else
+                        const SizedBox(height: 39),
+                      EditorialChapterHeading(
+                        number: 1,
+                        total: 1,
+                        title: story.title,
+                        location: story.placeContext.isNotEmpty
+                            ? story.placeContext
+                            : story.routeTitle,
+                        isReading: _reading,
+                      ),
+                      if (_reading) ...[
+                        const SizedBox(height: 21),
+                        SelectableText(
+                          story.transcript,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 2,
+                            color: Color(0xffe4e3d7),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Divider(color: Color(0x33f5f0e7)),
+                        EditorialTextAction(
+                          label: '听这一篇',
+                          icon: Icons.headphones_outlined,
+                          onPressed: _switchMode,
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          story.introduction,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.8,
+                            color: Color(0xffd1d2c6),
+                          ),
+                        ),
+                        EditorialPlaybackControls(
+                          key: _playerKey,
+                          playKey: const ValueKey('home-story-play-pause'),
+                          playTooltip: state.isPlaying ? '暂停故事' : '播放故事',
+                          isPlaying: state.isPlaying,
+                          position: state.position,
+                          duration: state.duration ?? story.duration,
+                          onToggle: controller.toggle,
+                          onSeek: controller.seek,
+                          onNext: _nextStory,
+                          nextLabel: '换一篇',
+                          status: state.phase == HomeStoryPhase.ended
+                              ? '这一篇讲完了，再听一次也可以'
+                              : null,
+                        ),
+                        const SizedBox(height: 9),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: EditorialTextAction(
+                            label: '安静地读这一篇',
+                            icon: Icons.menu_book_outlined,
+                            onPressed: _switchMode,
+                          ),
+                        ),
+                      ],
+                      if (state.message != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          child: Text(
+                            state.message!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.7,
+                              color: Color(0xfff5af9e),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 28),
+                      if (story.observableDetail.isNotEmpty)
+                        _StoryMarginNote(
+                          label: '可以观察',
+                          text: story.observableDetail,
+                        ),
+                      if (story.attentionHint?.isNotEmpty ?? false)
+                        _StoryMarginNote(
+                          label: '走到现场',
+                          text: story.attentionHint!,
+                        ),
+                      Container(
+                        decoration: const BoxDecoration(
+                          border: Border.symmetric(
+                            horizontal: BorderSide(color: Color(0x33f5f0e7)),
+                          ),
+                        ),
+                        child: TextButton(
+                          onPressed: _nextStory,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            foregroundColor: editorialPaper,
+                            minimumSize: const Size(double.infinity, 72),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.auto_stories_outlined, size: 19),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  '再翻一篇城市故事',
+                                  style: TextStyle(fontSize: 14),
                                 ),
-                      ),
-                      const SizedBox(height: 9),
-                      Text(
-                        story.title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .displaySmall
-                            ?.copyWith(color: AppColors.white),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${story.narratorName} · ${story.routeTitle}',
-                        style: TextStyle(
-                          color: AppColors.white.withValues(alpha: .68),
+                              ),
+                              Icon(Icons.arrow_forward, size: 19),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 34),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                story.introduction,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.white.withValues(alpha: .82),
-                  height: 1.9,
-                  fontFamily: 'Songti SC',
-                  fontFamilyFallback: const ['STSong', 'serif'],
-                ),
-              ),
-              if (story.themes.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: story.themes
-                      .map(
-                        (theme) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: .08),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            theme,
-                            style: TextStyle(
-                              color: AppColors.white.withValues(alpha: .74),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-              ],
-              if (story.placeContext.isNotEmpty)
-                _StoryContextNote(
-                  icon: Icons.location_on_outlined,
-                  text: story.placeContext,
-                ),
-              if (story.observableDetail.isNotEmpty)
-                _StoryContextNote(
-                  icon: Icons.visibility_outlined,
-                  text: '可以观察：${story.observableDetail}',
-                ),
-              if (story.attentionHint?.isNotEmpty ?? false)
-                _StoryContextNote(
-                  icon: Icons.auto_awesome_outlined,
-                  text: '到现场时可以留意：${story.attentionHint}',
-                ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 34,
-                      offset: Offset(0, 14),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        IconButton.filled(
-                          key: const ValueKey('home-story-play-pause'),
-                          tooltip: state.isPlaying ? '暂停故事' : '播放故事',
-                          style: IconButton.styleFrom(
-                            backgroundColor: state.isPlaying
-                                ? AppColors.terracotta
-                                : AppColors.ink,
-                            foregroundColor: state.isPlaying
-                                ? AppColors.white
-                                : AppColors.gold,
-                            minimumSize: const Size.square(50),
-                          ),
-                          onPressed: () => ref
-                              .read(
-                                  homeStoryPlaybackControllerProvider.notifier)
-                              .toggle(),
-                          icon: Icon(
-                            state.isPlaying
-                                ? Icons.pause_rounded
-                                : state.phase == HomeStoryPhase.ended
-                                    ? Icons.replay_rounded
-                                    : Icons.play_arrow_rounded,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                state.isPlaying
-                                    ? '正在讲给你听'
-                                    : state.phase == HomeStoryPhase.ended
-                                        ? '故事讲完了，再听一次也可以'
-                                        : '准备好时，点一下开始',
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                story.narratorName,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.graphic_eq_rounded,
-                          color: state.isPlaying
-                              ? AppColors.terracotta
-                              : AppColors.textMuted,
-                        ),
-                      ],
-                    ),
-                    Slider(
-                      value: durationMs <= 0 ? 0 : positionMs.toDouble(),
-                      max: durationMs <= 0 ? 1 : durationMs.toDouble(),
-                      onChanged: durationMs <= 0
-                          ? null
-                          : (value) => ref
-                              .read(
-                                homeStoryPlaybackControllerProvider.notifier,
-                              )
-                              .seek(Duration(milliseconds: value.round())),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_storyTime(state.position)),
-                        Text(_storyTime(duration)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (state.message != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  state.message!,
-                  style: const TextStyle(color: AppColors.terracotta),
-                ),
-              ],
-              const SizedBox(height: 20),
-              Theme(
-                data: Theme.of(context).copyWith(
-                  dividerColor: Colors.transparent,
-                  unselectedWidgetColor: AppColors.white,
-                ),
-                child: ExpansionTile(
-                  tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-                  childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 18),
-                  iconColor: AppColors.gold,
-                  collapsedIconColor: AppColors.white,
-                  title: const Text(
-                    '完整文字稿',
-                    style: TextStyle(color: AppColors.white),
+              if (_showDock && story != null)
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  bottom: 12,
+                  child: _StoryListenDock(
+                    title: story.title,
+                    isPlaying: state.isPlaying,
+                    onToggle: controller.toggle,
+                    onRead: _switchMode,
+                    onNext: _nextStory,
                   ),
-                  children: [
-                    Text(
-                      story.transcript,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.white.withValues(alpha: .72),
-                            height: 1.85,
-                          ),
-                    ),
-                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.white,
-                    side: BorderSide(
-                      color: AppColors.white.withValues(alpha: .2),
-                    ),
+              if (story == null)
+                Positioned(
+                  top: 10,
+                  left: 12,
+                  child: IconButton(
+                    tooltip: '返回首页',
+                    onPressed: () => context.pop(),
+                    color: editorialPaper,
+                    icon: const Icon(Icons.arrow_back),
                   ),
-                  onPressed: state.phase == HomeStoryPhase.loading
-                      ? null
-                      : () => ref
-                          .read(homeStoryPlaybackControllerProvider.notifier)
-                          .load(
-                            citySlug: story.citySlug,
-                            excludeCurrent: true,
-                          ),
-                  icon: const Icon(Icons.shuffle_rounded),
-                  label: const Text('换一个故事'),
                 ),
-              ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
 
-class _StoryContextNote extends StatelessWidget {
-  const _StoryContextNote({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
+class _StoryListenDock extends StatelessWidget {
+  const _StoryListenDock({
+    required this.title,
+    required this.isPlaying,
+    required this.onToggle,
+    required this.onRead,
+    required this.onNext,
+  });
+  final String title;
+  final bool isPlaying;
+  final VoidCallback onToggle;
+  final VoidCallback onRead;
+  final VoidCallback onNext;
   @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: 12),
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: .07),
-          borderRadius: BorderRadius.circular(18),
+  Widget build(BuildContext context) => Material(
+        color: const Color(0xff2e332c),
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(25),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(4),
+          ),
+          side:
+              BorderSide(color: const Color(0xff8f947c).withValues(alpha: .43)),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: AppColors.gold, size: 18),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: AppColors.white.withValues(alpha: .8),
-                  height: 1.6,
-                ),
+        elevation: 8,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(17, 10, 17, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    '01',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontStyle: FontStyle.italic,
+                      fontSize: 17,
+                      color: editorialLime,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: editorialSerif(12),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const Divider(color: Color(0x29f5f0e7), height: 15),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  EditorialTextAction(
+                    label: '文字',
+                    icon: Icons.menu_book_outlined,
+                    onPressed: onRead,
+                  ),
+                  IconButton.filled(
+                    onPressed: onToggle,
+                    tooltip: isPlaying ? '暂停故事' : '播放故事',
+                    style: IconButton.styleFrom(
+                      backgroundColor: editorialLime,
+                      foregroundColor: editorialInk,
+                      fixedSize: const Size.square(56),
+                    ),
+                    icon: Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                    ),
+                  ),
+                  EditorialTextAction(
+                    label: '换一篇',
+                    icon: Icons.skip_next_outlined,
+                    onPressed: onNext,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       );
 }
 
-class _StoryCoverFallback extends StatelessWidget {
-  const _StoryCoverFallback();
+class _StoryMarginNote extends StatelessWidget {
+  const _StoryMarginNote({required this.label, required this.text});
+  final String label;
+  final String text;
   @override
-  Widget build(BuildContext context) => const DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xff284c3d), Color(0xff9a654c)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child:
-              Icon(Icons.graphic_eq_rounded, size: 70, color: AppColors.gold),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 2,
+              height: 32,
+              color: editorialLime.withValues(alpha: .5),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(color: editorialLime, fontSize: 10),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    text,
+                    style: const TextStyle(
+                      color: editorialMuted,
+                      fontSize: 12,
+                      height: 1.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
 }
@@ -443,19 +456,25 @@ class _StoryFailure extends StatelessWidget {
   Widget build(BuildContext context) => Center(
         child: Padding(
           padding: const EdgeInsets.all(28),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.library_music_outlined,
-                size: 54, color: AppColors.moss),
-            const SizedBox(height: 16),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
-            FilledButton(onPressed: onRetry, child: const Text('再试一次')),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('稍候，再翻一页', style: editorialSerif(28)),
+              const SizedBox(height: 18),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: editorialMuted, height: 1.8),
+              ),
+              const SizedBox(height: 24),
+              TextButton.icon(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(foregroundColor: editorialLime),
+                icon: const Icon(Icons.refresh),
+                label: const Text('再试一次'),
+              ),
+            ],
+          ),
         ),
       );
-}
-
-String _storyTime(Duration value) {
-  final seconds = value.inSeconds.clamp(0, 359999);
-  return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 }

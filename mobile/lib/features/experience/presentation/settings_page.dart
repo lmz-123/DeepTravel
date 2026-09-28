@@ -12,8 +12,10 @@ import '../domain/fragment_models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
+import 'home_story_controller.dart';
 import 'location_mode_controller.dart';
 import 'offline_package_controller.dart';
+import 'route_manual/manual_session.dart';
 import 'widgets/traveler_bottom_navigation.dart';
 
 final playbackSpeedPreferenceProvider = FutureProvider.family<double, String>(
@@ -455,7 +457,7 @@ class _ClearExplorationDataTile extends ConsumerWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('清除全部探索记录？'),
         content: const Text(
-          '所有旅程进度、已解锁节点、线索簿和故事拼合状态都会重置，便于重新测试上锁流程。'
+          '所有旅程进度、已解锁节点、线索簿、故事拼合状态和本机听读记录都会重置。'
           '\n\n账号、收藏、已上传照片、足迹、社区内容、离线包和音频缓存不会删除。',
         ),
         actions: [
@@ -475,12 +477,16 @@ class _ClearExplorationDataTile extends ConsumerWidget {
 
     try {
       await ref
+          .read(homeStoryPlaybackControllerProvider.notifier)
+          .clearForAccountExit();
+      await ref
           .read(activeTourControllerProvider.notifier)
           .clearForAccountExit();
       final result = await ref
           .read(experienceRepositoryProvider)
           .clearExplorationProgress();
       await ref.read(tourStoreProvider).clearPrivateData();
+      ref.invalidate(manualSessionProvider);
       ref.invalidate(journeyControllerProvider);
       ref.invalidate(activeTourControllerProvider);
       ref.invalidate(archivedActiveJourneysProvider);

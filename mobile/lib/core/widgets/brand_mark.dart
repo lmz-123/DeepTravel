@@ -27,8 +27,8 @@ class BrandMark extends StatelessWidget {
             '见',
             style: TextStyle(
               color: light ? color : AppColors.gold,
-              fontFamily: 'Songti SC',
-              fontFamilyFallback: const ['STSong', 'serif'],
+              fontFamily: 'Noto Serif SC',
+              fontFamilyFallback: const ['serif'],
               fontSize: 17,
               fontWeight: FontWeight.w500,
             ),
@@ -43,8 +43,8 @@ class BrandMark extends StatelessWidget {
               '见地',
               style: TextStyle(
                 color: color,
-                fontFamily: 'Songti SC',
-                fontFamilyFallback: const ['STSong', 'serif'],
+                fontFamily: 'Noto Serif SC',
+                fontFamilyFallback: const ['serif'],
                 fontSize: 17,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 3,

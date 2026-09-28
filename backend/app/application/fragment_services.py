@@ -153,6 +153,37 @@ class FragmentTourService:
                 "fragments": fragments,
             }
 
+    def manual_chapters(self, route_id: str) -> list[dict]:
+        """Published chapters for deliberate reading/listening, without journey writes.
+
+        Location-triggered discovery still uses the restricted public manifest.
+        Reuse the canonical media serializer so existing OSS references survive.
+        Online reading does not require the offline package checksum gate.
+        """
+        if not self.enabled:
+            return []
+        with self._session() as session:
+            arc = session.scalar(
+                select(StoryArcModel)
+                .where(StoryArcModel.route_id == route_id)
+                .options(
+                    selectinload(StoryArcModel.fragments).joinedload(
+                        StoryFragmentModel.trigger_region
+                    ),
+                    selectinload(StoryArcModel.fragments).joinedload(
+                        StoryFragmentModel.photo_mission
+                    ),
+                    selectinload(StoryArcModel.route),
+                )
+            )
+            if arc is None or arc.route.content_status != "published":
+                return []
+            narration = self._narration_context(session, arc)
+            return [
+                self._offline_fragment(item, session, narration)
+                for item in sorted(arc.fragments, key=lambda fragment: fragment.position)
+            ]
+
     def offline_manifest(self, route_id: str) -> dict | None:
         """Return the published manifest with the text needed for offline use.
 

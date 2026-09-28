@@ -138,6 +138,10 @@ class RouteExperience {
     this.isFeatured = false,
     this.stopCount,
     this.audioTour,
+    this.manualChapters = const [],
+    this.district = '',
+    this.cityName = '',
+    this.citySlug = '',
     this.pretrip,
     this.predeparture,
     this.centerLatitude,
@@ -159,6 +163,12 @@ class RouteExperience {
   final bool isFeatured;
   final int? stopCount;
   final AudioTourManifest? audioTour;
+
+  /// Published reading content; opening it never records a physical arrival.
+  final List<StoryFragment> manualChapters;
+  final String district;
+  final String cityName;
+  final String citySlug;
   final PretripExperience? pretrip;
   final PredepartureIntroduction? predeparture;
   final double? centerLatitude;
@@ -183,6 +193,9 @@ class RouteExperience {
         contentStatus: json['content_status'] as String,
         isFeatured: json['is_featured'] as bool? ?? false,
         stopCount: json['stop_count'] as int?,
+        district: json['district'] as String? ?? '',
+        cityName: (json['city'] as Map?)?['name'] as String? ?? '',
+        citySlug: (json['city'] as Map?)?['slug'] as String? ?? '',
         centerLatitude: json['center'] is Map<String, dynamic> &&
                 (json['center'] as Map<String, dynamic>)['latitude'] is num
             ? ((json['center'] as Map<String, dynamic>)['latitude'] as num)
@@ -202,6 +215,11 @@ class RouteExperience {
                 json['audio_tour'] as Map<String, dynamic>,
               )
             : null,
+        manualChapters: (json['manual_chapters'] as List<dynamic>? ?? const [])
+            .map((item) => StoryFragment.fromJson(
+                  Map<String, dynamic>.from(item as Map),
+                ))
+            .toList(),
         pretrip: json['pretrip'] is Map<String, dynamic>
             ? PretripExperience.fromJson(
                 json['pretrip'] as Map<String, dynamic>,

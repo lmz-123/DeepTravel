@@ -5,290 +5,164 @@ import 'package:jiandi/app.dart';
 import 'package:jiandi/core/router/app_router.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
+import 'package:jiandi/features/experience/domain/discovery_location.dart';
+import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 
 void main() {
-  testWidgets('featured route can start in two taps', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(404, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    appRouter.go('/');
-    final repository = DemoExperienceRepository(latency: Duration.zero);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
-        child: const JiandiApp(),
-      ),
-    );
+  testWidgets('journal route opens a quiet full chapter directory',
+      (tester) async {
+    await _pumpApp(tester);
+    await _openFeatured(tester);
+    await tester.tap(find.text('翻开这段旅程'));
     await tester.pumpAndSettle();
-
-    final firstScenicArea = find.byKey(
-      const ValueKey('route-card-wukang-urban-slices'),
-    );
-    expect(firstScenicArea, findsOneWidget);
-    await _scrollToScenic(tester);
-    expect(tester.getSize(firstScenicArea).width, 368);
-    expect(
-      tester
-          .getSize(
-            find.byKey(
-              const ValueKey('route-hero-wukang-urban-slices'),
-            ),
-          )
-          .height,
-      250,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('route-carousel'))).height,
-      lessThan(400),
-    );
-    await tester.tap(firstScenicArea);
-    await tester.pumpAndSettle();
-
-    expect(find.text('开始这段探索'), findsOneWidget);
-    await tester.tap(find.text('开始这段探索'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('我已到达，开始观察'), findsOneWidget);
+    expect(find.text('本刊目录'), findsOneWidget);
+    expect(find.text('我已到达，开始观察'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('home story action opens reviewed story without autoplay',
+  testWidgets('city short stories remain reachable without autoplay',
       (tester) async {
-    appRouter.go('/');
-    final repository = DemoExperienceRepository(latency: Duration.zero);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
-        child: const JiandiApp(),
-      ),
-    );
+    await _pumpApp(tester);
+    final entrance = find.byKey(const ValueKey('city-short-stories-action'));
+    await tester.scrollUntilVisible(entrance, 420,
+        scrollable: _verticalScrollable().first);
+    await tester.tap(entrance);
     await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('home-random-story-action')),
-      420,
-      scrollable: _verticalScrollable(),
-    );
-    await tester.drag(_verticalScrollable(), const Offset(0, -120));
+    await tester
+        .tap(find.byKey(const ValueKey('city-short-story-demo-home-story')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('home-random-story-action')));
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-      find.text('城墙今天想说点什么'),
-      320,
-      scrollable: find.byType(Scrollable).last,
-    );
     expect(find.text('城墙今天想说点什么'), findsOneWidget);
-    expect(find.text('给自己三分钟，听一阵海风如何吹进一座老城。'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('home-story-play-pause')),
-      180,
-      scrollable: find.byType(Scrollable).last,
-    );
     expect(find.byTooltip('播放故事'), findsOneWidget);
   });
 
-  testWidgets('arrival reveals story and observation challenge',
+  testWidgets('explicit on-site entry preserves legacy arrival and observation',
       (tester) async {
-    appRouter.go('/');
-    final repository = DemoExperienceRepository(latency: Duration.zero);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
-        child: const JiandiApp(),
-      ),
-    );
+    await _pumpApp(tester);
+    await _openFeatured(tester);
+    final field = find.text('到现场，开始行走');
+    await tester.ensureVisible(field);
+    await tester.tap(field);
     await tester.pumpAndSettle();
-    final firstScenicArea = find.byKey(
-      const ValueKey('route-card-wukang-urban-slices'),
-    );
-    await _scrollToScenic(tester);
-    await tester.tap(firstScenicArea);
+    final arrive = find.text('我已到达，开始观察');
+    await tester.ensureVisible(arrive);
+    await tester.tap(arrive);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('开始这段探索'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('我已到达，开始观察'));
-    await tester.tap(find.text('我已到达，开始观察'));
-    await tester.pumpAndSettle();
-
     expect(find.text('一栋顺着街角生长的建筑'), findsOneWidget);
     expect(find.text('观察一下'), findsOneWidget);
     expect(find.textContaining('一艘停靠街角的船'), findsOneWidget);
   });
 
-  testWidgets('system back from a journey returns to discovery',
+  testWidgets('system back from a field journey returns to journal',
       (tester) async {
-    appRouter.go('/');
-    final repository = DemoExperienceRepository(latency: Duration.zero);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
-        child: const JiandiApp(),
-      ),
-    );
+    await _pumpApp(tester);
+    await _openFeatured(tester);
+    await tester.ensureVisible(find.text('到现场，开始行走'));
+    await tester.tap(find.text('到现场，开始行走'));
     await tester.pumpAndSettle();
-    final firstScenicArea = find.byKey(
-      const ValueKey('route-card-wukang-urban-slices'),
-    );
-    await _scrollToScenic(tester);
-    await tester.tap(firstScenicArea);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('开始这段探索'));
-    await tester.pumpAndSettle();
-
     expect(find.text('我已到达，开始观察'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-
     expect(find.text('深圳'), findsOneWidget);
-    expect(find.byKey(const ValueKey('route-carousel')), findsOneWidget);
+    expect(find.text('城市随刊'), findsOneWidget);
   });
 
   testWidgets('defaults to configured Shenzhen and reloads after city change',
       (tester) async {
-    appRouter.go('/');
     final repository = _RecordingRepository();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
-        child: const JiandiApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
+    await _pumpApp(tester, repository: repository);
     expect(find.text('深圳'), findsOneWidget);
     expect(repository.requestedCity, 'shenzhen');
-
     await tester.tap(find.byTooltip('选择城市'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('上海').last);
     await tester.pumpAndSettle();
-
     expect(find.text('上海'), findsOneWidget);
     expect(repository.requestedCity, 'shanghai');
   });
 
-  testWidgets('large backend city catalog filters immediately', (tester) async {
-    appRouter.go('/');
+  testWidgets('large backend city catalogue can be searched before selection',
+      (tester) async {
     final repository = _ManyCityRepository();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
-        child: const JiandiApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
+    await _pumpApp(tester, repository: repository);
     await tester.tap(find.byTooltip('选择城市'));
     await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsOneWidget);
-
     await tester.enterText(find.byType(TextField), '第 19 城');
     await tester.pump();
     expect(find.text('第 19 城'), findsNWidgets(2));
     expect(find.text('第 18 城'), findsNothing);
-
     await tester.tap(find.text('第 19 城').last);
     await tester.pumpAndSettle();
     expect(repository.requestedCity, 'city-19');
   });
 
-  testWidgets('swipes between scenic areas without surfacing their nodes',
+  testWidgets('all backend routes remain selectable through the city index',
       (tester) async {
-    appRouter.go('/');
     final repository = _TwoRouteRepository();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [experienceRepositoryProvider.overrideWithValue(repository)],
-        child: const JiandiApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('route-card-old-harbor')), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('route-card-mountain-coast')), findsNothing);
+    await _pumpApp(tester, repository: repository);
     expect(find.text('旧港码头'), findsNothing);
     expect(find.text('山海栈道'), findsNothing);
-
-    await _scrollToScenic(tester);
-
-    await tester.fling(
-      find.byKey(const ValueKey('route-carousel')),
-      const Offset(-700, 0),
-      1200,
-    );
+    await tester.tap(find.text('路线'));
     await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('route-card-mountain-coast')),
-        findsOneWidget);
-
-    final firstIndicator = tester.widget<AnimatedContainer>(
-      find.byKey(const ValueKey('route-indicator-0')),
-    );
-    final secondIndicator = tester.widget<AnimatedContainer>(
-      find.byKey(const ValueKey('route-indicator-1')),
-    );
-    expect(firstIndicator.constraints?.maxWidth, 5);
-    expect(secondIndicator.constraints?.maxWidth, 24);
-
-    await tester.tap(
-      find.byKey(const ValueKey('route-card-mountain-coast')),
-    );
+    expect(find.text('收录 2 条路线'), findsOneWidget);
+    final second =
+        find.byKey(const ValueKey('atlas-route-route-mountain-coast'));
+    await tester.ensureVisible(second);
+    await tester
+        .tap(find.descendant(of: second, matching: find.text('山海之间的故事')));
     await tester.pumpAndSettle();
-
     expect(repository.requestedRouteSlug, 'mountain-coast');
     expect(find.text('山海之间的故事'), findsWidgets);
   });
 
-  testWidgets('empty backend catalog stays neutral without route fallback',
+  testWidgets('empty backend catalogue never inserts a fallback route',
       (tester) async {
-    appRouter.go('/');
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          experienceRepositoryProvider
-              .overrideWithValue(_EmptyCatalogRepository()),
-        ],
-        child: const JiandiApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('这座城市还没有开放景区'), findsOneWidget);
+    await _pumpApp(tester, repository: _EmptyCatalogRepository());
+    expect(find.text('下一本随刊，\n正在慢慢生长。'), findsOneWidget);
     expect(find.text('南头古城的时间叠层'), findsNothing);
     expect(find.text('被打开的海湾'), findsNothing);
   });
 
-  testWidgets('home does not show an archived active journey card',
-      (tester) async {
-    appRouter.go('/');
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          experienceRepositoryProvider.overrideWithValue(
-            DemoExperienceRepository(latency: Duration.zero),
-          ),
-        ],
-        child: const JiandiApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
+  testWidgets('journal does not revive archived journey cards', (tester) async {
+    await _pumpApp(tester);
     expect(find.text('继续未完成的旧路线'), findsNothing);
     expect(find.textContaining('已定位到'), findsNothing);
-    expect(find.byKey(const ValueKey('route-carousel')), findsOneWidget);
+    expect(find.text('城市随刊'), findsOneWidget);
   });
 }
 
-Finder _verticalScrollable() => find.byWidgetPredicate(
-      (widget) =>
-          widget is Scrollable && widget.axisDirection == AxisDirection.down,
-    );
-
-Future<void> _scrollToScenic(WidgetTester tester) async {
-  await tester.drag(_verticalScrollable(), const Offset(0, -300));
+Future<void> _pumpApp(WidgetTester tester,
+    {DemoExperienceRepository? repository}) async {
+  await tester.binding.setSurfaceSize(const Size(390, 844));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  appRouter.go('/');
+  await tester.pumpWidget(ProviderScope(overrides: [
+    experienceRepositoryProvider.overrideWithValue(
+        repository ?? DemoExperienceRepository(latency: Duration.zero)),
+    currentLocationSourceProvider.overrideWithValue(_NoLocation()),
+  ], child: const JiandiApp()));
   await tester.pumpAndSettle();
+}
+
+Future<void> _openFeatured(WidgetTester tester) async {
+  final card = find.byKey(const ValueKey('route-card-wukang-urban-slices'));
+  await tester.ensureVisible(card);
+  await tester.tap(card);
+  await tester.pumpAndSettle();
+}
+
+Finder _verticalScrollable() => find.byWidgetPredicate((widget) =>
+    widget is Scrollable && widget.axisDirection == AxisDirection.down);
+
+class _NoLocation implements CurrentLocationSource {
+  @override
+  Future<DiscoveryPermissionState> permissionState() async =>
+      DiscoveryPermissionState.serviceDisabled;
+  @override
+  Future<DiscoveryLocationSample> currentPosition(
+          {required bool requestPermission}) async =>
+      throw const DiscoveryLocationFailure(
+          DiscoveryLocationFailureReason.serviceDisabled);
 }
 
 class _RecordingRepository extends DemoExperienceRepository {

@@ -188,7 +188,11 @@ class GeolocatorTracker implements LocationTracker {
 }
 
 class JustAudioNarrationPlayer implements NarrationPlayer {
-  final AudioPlayer _player = AudioPlayer();
+  JustAudioNarrationPlayer({AudioPlayer? player})
+      : _player = player ?? AudioPlayer();
+
+  final AudioPlayer _player;
+  int _commandGeneration = 0;
   StreamSubscription<void>? _noisy;
   StreamSubscription<AudioInterruptionEvent>? _interruptions;
 
@@ -217,15 +221,17 @@ class JustAudioNarrationPlayer implements NarrationPlayer {
 
   @override
   Future<void> play(StoryFragment fragment, {String? preparedPath}) async {
+    final generation = ++_commandGeneration;
     final uri = preparedPath != null
         ? Uri.file(preparedPath)
         : Uri.parse(fragment.audio.url);
     await _player.setAudioSource(AudioSource.uri(uri,
         tag: MediaItem(
             id: fragment.id,
-            album: '见地 · ${fragment.position}/5',
+            album: '见地 · 第 ${fragment.position} 篇',
             title: fragment.title ?? fragment.safePreview,
-            artist: '南头古城碎片导览')));
+            artist: '见地 · 沿途故事')));
+    if (generation != _commandGeneration) return;
     // just_audio's play Future completes when playback pauses, stops, or
     // finishes. Do not await that lifecycle Future here: callers need control
     // back as soon as playback has started so they can bind live state.
@@ -233,24 +239,38 @@ class JustAudioNarrationPlayer implements NarrationPlayer {
   }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() {
+    _commandGeneration += 1;
+    return _player.pause();
+  }
+
   @override
-  Future<void> resume() => _player.play();
+  Future<void> resume() async {
+    _commandGeneration += 1;
+    unawaited(_player.play().catchError((Object _, StackTrace __) {}));
+  }
+
   @override
   Future<void> seek(Duration position) => _player.seek(position);
   @override
   Future<void> replay() async {
+    final generation = ++_commandGeneration;
     await _player.seek(Duration.zero);
-    await _player.play();
+    if (generation != _commandGeneration) return;
+    unawaited(_player.play().catchError((Object _, StackTrace __) {}));
   }
 
   @override
   Future<void> setSpeed(double speed) => _player.setSpeed(speed);
   @override
-  Future<void> stop() => _player.stop();
+  Future<void> stop() {
+    _commandGeneration += 1;
+    return _player.stop();
+  }
 
   @override
   Future<void> dispose() async {
+    _commandGeneration += 1;
     await _noisy?.cancel();
     await _interruptions?.cancel();
     await _player.dispose();

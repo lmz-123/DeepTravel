@@ -11,7 +11,6 @@ import '../data/demo_experience_repository.dart';
 import '../data/footprint_photo_picker.dart';
 import '../data/footprint_share_service.dart';
 import '../data/narration_voice_preference_repository.dart';
-import '../data/pretrip_preparation_service.dart';
 import '../data/user_preferences_repository.dart';
 import '../domain/experience_repository.dart';
 import '../domain/community_models.dart';
@@ -21,6 +20,7 @@ import '../domain/footprint_models.dart';
 import '../domain/models.dart';
 import '../../auth/presentation/auth_provider.dart';
 import 'location_mode_controller.dart';
+import 'route_manual/manual_session.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final reporter = ref.watch(runtimeLogReporterProvider);
@@ -62,10 +62,6 @@ final experienceRepositoryProvider = Provider<ExperienceRepository>((ref) {
 
 final footprintPhotoPickerProvider =
     Provider<FootprintPhotoPicker>((ref) => ImagePickerFootprintPhotoPicker());
-
-final pretripPreparationServiceProvider = Provider<PretripPreparationService>(
-  (ref) => PretripPreparationService(ref.watch(dioProvider)),
-);
 
 final currentUserIdProvider = Provider<String?>(
     (ref) => ref.watch(authControllerProvider).asData?.value?.user.id);
@@ -974,6 +970,7 @@ final routeJourneyIndexProvider =
 });
 
 void invalidatePrivateExperience(Ref ref) {
+  ref.invalidate(manualSessionProvider);
   ref.invalidate(journeyLibraryProvider);
   ref.invalidate(journeyContextProvider);
   ref.invalidate(journeyEvidenceProvider);
@@ -994,6 +991,7 @@ void invalidatePrivateExperience(Ref ref) {
 }
 
 void invalidatePrivateExperienceFromWidget(WidgetRef ref) {
+  ref.invalidate(manualSessionProvider);
   ref.invalidate(journeyLibraryProvider);
   ref.invalidate(journeyContextProvider);
   ref.invalidate(journeyEvidenceProvider);

@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/features/experience/data/prepared_route_service.dart';
+import 'package:jiandi/features/experience/data/home_story_audio_player.dart';
+import 'package:jiandi/features/experience/domain/home_story.dart';
+import 'package:jiandi/features/experience/presentation/home_story_controller.dart';
+import 'package:jiandi/features/experience/presentation/audio_ownership_controller.dart';
+import 'package:jiandi/features/experience/presentation/route_manual/manual_session.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/data/route_offline_package_service.dart';
 import 'package:jiandi/features/experience/data/user_preferences_repository.dart';
@@ -26,6 +33,8 @@ void main() {
     final cache = _CacheService();
     final offlineCache = _OfflineCacheService();
     final player = _Player();
+    final storyPlayer = _StoryPlayer();
+    addTearDown(storyPlayer.dispose);
     final tourStore = _Store();
     final repository = _ResetRepository();
     await tester.pumpWidget(ProviderScope(
@@ -49,6 +58,7 @@ void main() {
         preparedRouteServiceProvider.overrideWithValue(cache),
         routeOfflinePackageServiceProvider.overrideWithValue(offlineCache),
         narrationPlayerProvider.overrideWithValue(player),
+        homeStoryAudioPlayerProvider.overrideWithValue(storyPlayer),
         tourStoreProvider.overrideWithValue(tourStore),
         experienceRepositoryProvider.overrideWithValue(repository),
         locationTrackerProvider.overrideWithValue(_Tracker()),
@@ -146,15 +156,50 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(SettingsPage)));
+    await container.read(manualSessionProvider('route-a').future);
+    await container.read(manualSessionProvider('route-a').notifier).remember(
+        'manual-chapter',
+        opened: true,
+        position: const Duration(seconds: 19));
+    final readingBefore =
+        await container.read(manualSessionProvider('route-a').future);
+    expect(readingBefore.visited, {'manual-chapter'});
+    expect(
+        readingBefore.positions['manual-chapter'], const Duration(seconds: 19));
+    final listening =
+        container.read(homeStoryPlaybackControllerProvider.notifier);
+    await listening.loadManualChapter(_installedPackage.route, _manualChapter,
+        coverImage: '', resumePosition: const Duration(seconds: 19));
+    await listening.play();
+    expect(
+        container.read(homeStoryPlaybackControllerProvider).isPlaying, isTrue);
+    expect(container.read(audioOwnershipProvider).kind,
+        AudioOwnerKind.manualChapter);
+    final stopsBeforeReset = storyPlayer.stopCalls;
     await tester.tap(find.text('清除探索记录'));
     await tester.pumpAndSettle();
     expect(find.text('清除全部探索记录？'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '确认清除'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(const Duration(milliseconds: 350));
     expect(repository.clearCalls, 1);
     expect(tourStore.clearCalls, 1);
+    expect(storyPlayer.stopCalls, stopsBeforeReset + 1);
+    expect(storyPlayer.playing, isFalse);
+    expect(container.read(homeStoryPlaybackControllerProvider).story, isNull);
+    expect(container.read(audioOwnershipProvider).isActive, isFalse);
+    final readingAfter =
+        await container.read(manualSessionProvider('route-a').future);
+    expect(readingAfter.currentId, isNull);
+    expect(readingAfter.visited, isEmpty);
+    expect(readingAfter.positions, isEmpty);
+    expect(tourStore.records, isEmpty);
     expect(find.textContaining('已重置 2 段旅程、10 个节点'), findsOneWidget);
   });
 }
@@ -300,12 +345,16 @@ class _Tracker implements LocationTracker {
 
 class _Store implements TourStore {
   int clearCalls = 0;
+  final records = <String, Map<String, dynamic>>{};
 
   @override
   Future<void> acknowledge(String id) async {}
 
   @override
-  Future<void> clearPrivateData() async => clearCalls += 1;
+  Future<void> clearPrivateData() async {
+    clearCalls += 1;
+    records.clear();
+  }
 
   @override
   Future<void> enqueue(OutboxEvent event) async {}
@@ -325,12 +374,78 @@ class _Store implements TourStore {
   Future<void> removePreparedAsset(String url) async {}
 
   @override
-  Future<Map<String, dynamic>?> readJson(String key) async => null;
+  Future<Map<String, dynamic>?> readJson(String key) async => records[key];
 
   @override
-  Future<void> saveJson(String key, Map<String, dynamic> value) async {}
+  Future<void> saveJson(String key, Map<String, dynamic> value) async {
+    records[key] = value;
+  }
 
   @override
   Future<void> savePreparedAsset(
       String url, String path, String version, int sizeBytes) async {}
 }
+
+class _StoryPlayer extends Fake implements HomeStoryAudioPlayer {
+  int stopCalls = 0;
+  bool playing = false;
+  final _positions = StreamController<Duration>.broadcast();
+  final _durations = StreamController<Duration?>.broadcast();
+  final _playing = StreamController<bool>.broadcast();
+  final _completed = StreamController<bool>.broadcast();
+  @override
+  Stream<Duration> get positionStream => _positions.stream;
+  @override
+  Stream<Duration?> get durationStream => _durations.stream;
+  @override
+  Stream<bool> get playingStream => _playing.stream;
+  @override
+  Stream<bool> get completedStream => _completed.stream;
+  @override
+  Future<Duration?> prepare(HomeStory story) async =>
+      const Duration(minutes: 2);
+  @override
+  Future<void> play() async => playing = true;
+  @override
+  Future<void> pause() async => playing = false;
+  @override
+  Future<void> stop() async {
+    stopCalls++;
+    playing = false;
+  }
+
+  @override
+  Future<void> seek(Duration value) async {}
+  @override
+  Future<void> dispose() async {
+    await _positions.close();
+    await _durations.close();
+    await _playing.close();
+    await _completed.close();
+  }
+}
+
+const _manualChapter = StoryFragment(
+  id: 'manual-chapter',
+  position: 1,
+  safePreview: '测试章节',
+  title: '测试章节',
+  transcript: '测试手动听读内容',
+  interactionType: 'passive',
+  reviewState: 'reviewed',
+  triggerRegion: TriggerRegion(
+      latitude: 22.5,
+      longitude: 114,
+      entryRadiusM: 30,
+      exitRadiusM: 50,
+      maxAccuracyM: 20,
+      qualifyingSamples: 2,
+      sampleWindowSeconds: 15,
+      cooldownSeconds: 120,
+      auditState: 'reviewed'),
+  audio: NarrationAsset(
+      url: 'https://example.test/manual.m4a',
+      mimeType: 'audio/mp4',
+      sizeBytes: 10,
+      scriptVersion: 'v1'),
+);

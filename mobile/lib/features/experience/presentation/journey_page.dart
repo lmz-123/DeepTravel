@@ -11,6 +11,7 @@ import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'widgets/evidence_photo_widgets.dart';
+import 'widgets/editorial_listening.dart';
 import 'widgets/location_mode_selector.dart';
 import 'widgets/narration_voice_selector.dart';
 import 'widgets/node_community_section.dart';
@@ -29,6 +30,8 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
   bool _started = false;
   OverlayEntry? _feedbackOverlay;
   Timer? _feedbackTimer;
+  String _directoryQuery = '';
+  int _directoryPage = 0;
 
   @override
   void dispose() {
@@ -72,11 +75,12 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
         legacy.session?.id == widget.journeyId &&
         legacy.route!.audioTour == null) {
       return PopScope(
-          canPop: false,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) context.go('/');
-          },
-          child: _LegacyJourneyView(state: legacy));
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) context.go('/');
+        },
+        child: _LegacyJourneyView(state: legacy),
+      );
     }
     final state = ref.watch(activeTourControllerProvider);
     if (state.route == null || state.session?.id != widget.journeyId) {
@@ -86,17 +90,22 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
           if (!didPop) context.go('/');
         },
         child: Scaffold(
-            appBar: AppBar(
-                leading: IconButton(
-                    tooltip: '返回首页',
+          appBar: AppBar(
+            leading: IconButton(
+              tooltip: '返回首页',
+              onPressed: () => context.go('/'),
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+          ),
+          body: Center(
+            child: state.status == 'preparing'
+                ? const CircularProgressIndicator()
+                : FilledButton(
                     onPressed: () => context.go('/'),
-                    icon: const Icon(Icons.arrow_back_rounded))),
-            body: Center(
-                child: state.status == 'preparing'
-                    ? const CircularProgressIndicator()
-                    : FilledButton(
-                        onPressed: () => context.go('/'),
-                        child: const Text('从路线详情重新进入')))),
+                    child: const Text('从路线详情重新进入'),
+                  ),
+          ),
+        ),
       );
     }
     final manifest = state.route!.audioTour!;
@@ -132,9 +141,7 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                 collectedCount: ledger?.collectedCount ?? 0,
                 onBack: () => context.go('/'),
                 onLedger: ledger == null ? null : () => _showLedger(ledger),
-                onSelectNode: (fragmentId) => ref
-                    .read(activeTourControllerProvider.notifier)
-                    .selectNode(fragmentId),
+                onSelectNode: (fragmentId) => _showNodePrelude(fragmentId),
               ),
               Transform.translate(
                 offset: const Offset(0, -16),
@@ -142,14 +149,15 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                   padding: const EdgeInsets.fromLTRB(18, 22, 18, 44),
                   decoration: const BoxDecoration(
                     color: AppColors.paper,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(28)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(4),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '空间上自由 · 故事上有序',
+                        'FIELD NOTES / 沿途的见地',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.terracotta,
                               fontSize: 9,
@@ -163,8 +171,9 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                             .textTheme
                             .headlineMedium
                             ?.copyWith(
-                              fontSize: 21,
-                              height: 1.36,
+                              fontFamily: 'Noto Serif SC',
+                              fontSize: 27,
+                              height: 1.5,
                             ),
                       ),
                       const SizedBox(height: 16),
@@ -180,9 +189,16 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                         duration: const Duration(milliseconds: 380),
                         child: state.current == null
                             ? _ListeningCard(
-                                key: const ValueKey('listening'), state: state)
+                                key: const ValueKey('listening'),
+                                state: state,
+                              )
                             : _NarrationCard(
-                                key: ValueKey(state.current!.id), state: state),
+                                key: ValueKey(state.current!.id),
+                                state: state,
+                                onDirectory: ledger == null
+                                    ? null
+                                    : () => _showLedger(ledger),
+                              ),
                       ),
                       if (ledger != null && selectedFragment?.mission != null)
                         Padding(
@@ -232,12 +248,14 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: state.isBusy ||
-                                    state.status != 'simulated'
-                                ? null
-                                : () => ref
-                                    .read(activeTourControllerProvider.notifier)
-                                    .triggerNextDemo(),
+                            onPressed:
+                                state.isBusy || state.status != 'simulated'
+                                    ? null
+                                    : () => ref
+                                        .read(
+                                          activeTourControllerProvider.notifier,
+                                        )
+                                        .triggerNextDemo(),
                             icon: state.isBusy
                                 ? const SizedBox.square(
                                     dimension: 18,
@@ -246,8 +264,9 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
                                     ),
                                   )
                                 : const Icon(Icons.my_location_rounded),
-                            label:
-                                Text(state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）'),
+                            label: Text(
+                              state.isBusy ? '正在确认下一条线索…' : '下一条线索（测试）',
+                            ),
                           ),
                         ),
                       ],
@@ -262,45 +281,481 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
     );
   }
 
-  void _showLedger(StoryLedger ledger) {
-    showModalBottomSheet<void>(
+  Future<void> _showNodePrelude(
+    String fragmentId, {
+    bool fromDirectory = false,
+  }) async {
+    final tour = ref.read(activeTourControllerProvider);
+    final fragment = tour.ledger?.entries
+        .where((entry) => entry.id == fragmentId && entry.isRevealed)
+        .firstOrNull;
+    if (fragment == null) return;
+    await ref.read(activeTourControllerProvider.notifier).pauseTour();
+    if (!mounted) return;
+    var reading = false;
+    final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: AppColors.paper,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .8,
-        maxChildSize: .94,
-        builder: (context, controller) => ListView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 36),
-            children: [
-              Text('故事线索簿', style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 8),
-              Text(
-                  '${ledger.collectedCount} / ${ledger.totalCount} 条线索已收集。未发现的内容不会提前剧透。'),
-              const SizedBox(height: 20),
-              _LedgerReconstructionEntry(
-                ledger: ledger,
-                onPressed: () async {
-                  Navigator.pop(context);
-                  if (ledger.reconstructionCompleted) {
-                    final recap = await ref
-                        .read(activeTourControllerProvider.notifier)
-                        .loadRecap();
-                    if (mounted) _showCompleteStory(recap);
-                  } else if (ledger.reconstructionUnlocked) {
-                    await _showReconstruction(ledger);
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              ...ledger.entries
-                  .map((fragment) => _LedgerEntry(fragment: fragment)),
-            ]),
+      backgroundColor: editorialPaper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, update) => SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .92,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 31,
+                  height: 3,
+                  margin: const EdgeInsets.only(top: 11),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffb5b3a5),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 25),
+                  child: Row(
+                    children: [
+                      if (fromDirectory)
+                        TextButton.icon(
+                          onPressed: () =>
+                              Navigator.pop(sheetContext, 'directory'),
+                          icon: const Icon(Icons.arrow_back, size: 16),
+                          label: const Text(
+                            '返回目录',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      const Spacer(),
+                      Text(
+                        '第 ${fragment.position.toString().padLeft(2, '0')} 篇',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xff7c725f),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '关闭章节序页',
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close, size: 19),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(25, 20, 25, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tour.route!.title,
+                          style: const TextStyle(
+                            color: Color(0xff8a7c68),
+                            fontSize: 10,
+                          ),
+                        ),
+                        const SizedBox(height: 11),
+                        Text(
+                          reading ? fragment.title! : '先停一停，\n再翻这一页。',
+                          style: editorialSerif(
+                            reading ? 31 : 37,
+                            color: editorialInk,
+                          ).copyWith(height: 1.45, letterSpacing: -1.8),
+                        ),
+                        const SizedBox(height: 24),
+                        if (!reading)
+                          Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(58),
+                                  topRight: Radius.circular(58),
+                                  bottomLeft: Radius.circular(3),
+                                  bottomRight: Radius.circular(3),
+                                ),
+                                child: SizedBox(
+                                  width: 106,
+                                  height: 151,
+                                  child: tour.route!.heroImage.isEmpty
+                                      ? const ColoredBox(
+                                          color: Color(0xffd9ddc2),
+                                        )
+                                      : Image.network(
+                                          tour.route!.heroImage,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const ColoredBox(
+                                            color: Color(0xffd9ddc2),
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      fragment.expectedDurationSeconds == null
+                                          ? '沿途故事'
+                                          : '约 ${(fragment.expectedDurationSeconds! / 60).ceil()} 分钟',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xff95806a),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 7),
+                                    Text(
+                                      fragment.title!,
+                                      style: editorialSerif(
+                                        21,
+                                        color: editorialInk,
+                                      ).copyWith(height: 1.55),
+                                    ),
+                                    const SizedBox(height: 9),
+                                    Text(
+                                      fragment.safePreview,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        height: 1.7,
+                                        color: Color(0xff817763),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        else ...[
+                          SelectableText(
+                            fragment.transcript ?? fragment.safePreview,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              height: 2,
+                              color: editorialInk,
+                            ),
+                          ),
+                          if (fragment.authenticityLabel != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 20),
+                              child: Text(
+                                '现场关系：${fragment.authenticityLabel}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  height: 1.8,
+                                  color: Color(0xff817763),
+                                ),
+                              ),
+                            ),
+                          ...fragment.sources.map(
+                            (source) => Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: Text(
+                                '${source.publisher}｜${source.title}\n${source.summary}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  height: 1.8,
+                                  color: Color(0xff817763),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(0, 22, 0, 11),
+                          child: Text(
+                            '听一段，或读一页。按自己的节奏慢慢走。',
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.7,
+                              color: Color(0xff827563),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(25, 15, 25, 18),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () =>
+                              Navigator.pop(sheetContext, 'listen'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xffbc4432),
+                            foregroundColor: const Color(0xfffff8e9),
+                            minimumSize: const Size(48, 60),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(4),
+                                topRight: Radius.circular(22),
+                                bottomLeft: Radius.circular(4),
+                                bottomRight: Radius.circular(4),
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                fragment.position.toString().padLeft(2, '0'),
+                                style: const TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 25,
+                                  fontStyle: FontStyle.italic,
+                                  color: Color(0xfff0c4a2),
+                                ),
+                              ),
+                              const SizedBox(width: 15),
+                              Expanded(
+                                child: Text('播放这一篇', style: editorialSerif(17)),
+                              ),
+                              const Icon(Icons.play_circle_outline, size: 33),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (!reading)
+                        Container(
+                          margin: const EdgeInsets.only(top: 10),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: Color(0x7077725b)),
+                            ),
+                          ),
+                        ),
+                      if (!reading)
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: () => update(() => reading = true),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(48, 50),
+                              foregroundColor: const Color(0xff626451),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.menu_book_outlined, size: 17),
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: Text(
+                                    '阅读这一篇',
+                                    style: editorialSerif(
+                                      15,
+                                      color: const Color(0xff626451),
+                                    ),
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward, size: 17),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
+    if (!mounted) return;
+    if (result == 'listen') {
+      await ref
+          .read(activeTourControllerProvider.notifier)
+          .selectNode(fragment.id);
+    } else if (result == 'directory' || (result == null && fromDirectory)) {
+      final ledger = ref.read(activeTourControllerProvider).ledger;
+      if (ledger != null) _showLedger(ledger);
+    }
+  }
+
+  Future<void> _showLedger(StoryLedger ledger) async {
+    await ref.read(activeTourControllerProvider.notifier).pauseTour();
+    if (!mounted) return;
+    final queryController = TextEditingController(text: _directoryQuery);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: editorialPaper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, update) {
+          final entries = ledger.entries
+              .where(
+                (entry) =>
+                    '${entry.position} ${entry.title ?? ''} ${entry.safePreview}'
+                        .contains(_directoryQuery.trim()),
+              )
+              .toList();
+          final pages = (entries.length / 12).ceil().clamp(1, 100000);
+          final page = _directoryPage.clamp(0, pages - 1);
+          final visible = entries.skip(page * 12).take(12).toList();
+          return SafeArea(
+            top: false,
+            child: SizedBox(
+              height: MediaQuery.sizeOf(context).height * .9,
+              child: Column(
+                children: [
+                  Container(
+                    width: 31,
+                    height: 3,
+                    margin: const EdgeInsets.only(top: 11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xffb5b3a5),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 14, 14, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '沿途目录',
+                            style: editorialSerif(32, color: editorialInk),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '关闭目录',
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close, size: 20),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${ledger.collectedCount} / ${ledger.totalCount} 条线索已收集 · 未发现的故事，留给现场',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            height: 1.7,
+                            color: Color(0xff827563),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: queryController,
+                          onChanged: (value) => update(() {
+                            _directoryQuery = value;
+                            _directoryPage = 0;
+                          }),
+                          style: const TextStyle(fontSize: 13),
+                          decoration: const InputDecoration(
+                            hintText: '按篇名、地点或页码寻找',
+                            prefixIcon: Icon(Icons.search, size: 19),
+                            filled: false,
+                            border: UnderlineInputBorder(),
+                            enabledBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Color(0x55252824)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
+                      children: [
+                        if (_directoryQuery.isEmpty) ...[
+                          _LedgerReconstructionEntry(
+                            ledger: ledger,
+                            onPressed: () async {
+                              Navigator.pop(sheetContext);
+                              if (ledger.reconstructionCompleted) {
+                                final recap = await ref
+                                    .read(activeTourControllerProvider.notifier)
+                                    .loadRecap();
+                                if (mounted) _showCompleteStory(recap);
+                              } else if (ledger.reconstructionUnlocked) {
+                                await _showReconstruction(ledger);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (entries.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Text('还没找到这一页，换个词试试。'),
+                          ),
+                        ...visible.map(
+                          (fragment) => _LedgerEntry(
+                            fragment: fragment,
+                            onPressed: fragment.isRevealed
+                                ? () {
+                                    Navigator.pop(sheetContext);
+                                    _showNodePrelude(
+                                      fragment.id,
+                                      fromDirectory: true,
+                                    );
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (pages > 1)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            tooltip: '上一页目录',
+                            onPressed: page == 0
+                                ? null
+                                : () => update(() => _directoryPage = page - 1),
+                            icon: const Icon(Icons.arrow_back, size: 19),
+                          ),
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                '第 ${page + 1} / $pages 页 · 每页 12 篇',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '下一页目录',
+                            onPressed: page == pages - 1
+                                ? null
+                                : () => update(() => _directoryPage = page + 1),
+                            icon: const Icon(Icons.arrow_forward, size: 19),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    queryController.dispose();
   }
 
   Future<void> _showReconstruction(StoryLedger ledger) async {
@@ -316,101 +771,103 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
       showDragHandle: true,
       backgroundColor: AppColors.paper,
       builder: (sheetContext) => StatefulBuilder(
-          builder: (context, setSheetState) => SizedBox(
-                height: MediaQuery.sizeOf(context).height * .82,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('拼回完整故事',
-                            style: Theme.of(context).textTheme.headlineMedium),
-                        const SizedBox(height: 8),
-                        const Text('长按拖动，让这些关系形成有解释力的历史链。'),
-                        const SizedBox(height: 16),
-                        Expanded(
-                            child: ReorderableListView.builder(
-                                itemCount: values.length,
-                                onReorderItem: (oldIndex, newIndex) {
-                                  setSheetState(() {
-                                    values.insert(
-                                        newIndex, values.removeAt(oldIndex));
-                                    mismatchPositions = {};
-                                  });
-                                },
-                                itemBuilder: (context, index) => Card(
-                                    key: ValueKey(values[index].id),
-                                    color: mismatchPositions.contains(index)
-                                        ? Theme.of(context)
-                                            .colorScheme
-                                            .errorContainer
-                                        : null,
-                                    shape: RoundedRectangleBorder(
-                                        side: BorderSide(
-                                            color: mismatchPositions
-                                                    .contains(index)
-                                                ? Theme.of(context)
-                                                    .colorScheme
-                                                    .error
-                                                : Colors.transparent,
-                                            width: 1.5),
-                                        borderRadius:
-                                            BorderRadius.circular(16)),
-                                    child: ListTile(
-                                        key: ValueKey(
-                                            'reconstruction-${values[index].id}'),
-                                        leading: CircleAvatar(
-                                            backgroundColor: AppColors.ink,
-                                            foregroundColor: AppColors.white,
-                                            child: Text('${index + 1}')),
-                                        title: Text(values[index].text),
-                                        trailing:
-                                            const Icon(Icons.drag_handle_rounded))))),
-                        SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                                onPressed: () async {
-                                  ReconstructionResult result;
-                                  try {
-                                    result = await ref
-                                        .read(activeTourControllerProvider
-                                            .notifier)
-                                        .reconstruct(values
-                                            .map((item) => item.id)
-                                            .toList());
-                                  } catch (_) {
-                                    _showRootFeedback(
-                                        '提交失败，当前顺序已经保留，请检查网络后重试。');
-                                    return;
-                                  }
-                                  if (!context.mounted) return;
-                                  if (!result.correct) {
-                                    setSheetState(() {
-                                      mismatchPositions = result.feedback
-                                          .map((item) => item['position'])
-                                          .whereType<int>()
-                                          .map((position) => position - 1)
-                                          .where((position) => position >= 0)
-                                          .toSet();
-                                    });
-                                    _showRootFeedback(
-                                        '还有 ${result.feedback.length} 处关系没有接上，红色线索的位置需要调整。');
-                                    return;
-                                  }
-                                  _clearRootFeedback();
-                                  Navigator.pop(context);
-                                  final recap = await ref
-                                      .read(
-                                          activeTourControllerProvider.notifier)
-                                      .loadRecap();
-                                  if (mounted) {
-                                    _showCompleteStory(recap);
-                                  }
-                                },
-                                child: const Text('提交这条历史因果链'))),
-                      ]),
+        builder: (context, setSheetState) => SizedBox(
+          height: MediaQuery.sizeOf(context).height * .82,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '拼回完整故事',
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-              )),
+                const SizedBox(height: 8),
+                const Text('长按拖动，让这些关系形成有解释力的历史链。'),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ReorderableListView.builder(
+                    itemCount: values.length,
+                    onReorderItem: (oldIndex, newIndex) {
+                      setSheetState(() {
+                        values.insert(newIndex, values.removeAt(oldIndex));
+                        mismatchPositions = {};
+                      });
+                    },
+                    itemBuilder: (context, index) => Card(
+                      key: ValueKey(values[index].id),
+                      color: mismatchPositions.contains(index)
+                          ? Theme.of(context).colorScheme.errorContainer
+                          : null,
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(
+                          color: mismatchPositions.contains(index)
+                              ? Theme.of(context).colorScheme.error
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: ListTile(
+                        key: ValueKey('reconstruction-${values[index].id}'),
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.ink,
+                          foregroundColor: AppColors.white,
+                          child: Text('${index + 1}'),
+                        ),
+                        title: Text(values[index].text),
+                        trailing: const Icon(Icons.drag_handle_rounded),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      ReconstructionResult result;
+                      try {
+                        result = await ref
+                            .read(activeTourControllerProvider.notifier)
+                            .reconstruct(
+                              values.map((item) => item.id).toList(),
+                            );
+                      } catch (_) {
+                        _showRootFeedback('提交失败，当前顺序已经保留，请检查网络后重试。');
+                        return;
+                      }
+                      if (!context.mounted) return;
+                      if (!result.correct) {
+                        setSheetState(() {
+                          mismatchPositions = result.feedback
+                              .map((item) => item['position'])
+                              .whereType<int>()
+                              .map((position) => position - 1)
+                              .where((position) => position >= 0)
+                              .toSet();
+                        });
+                        _showRootFeedback(
+                          '还有 ${result.feedback.length} 处关系没有接上，红色线索的位置需要调整。',
+                        );
+                        return;
+                      }
+                      _clearRootFeedback();
+                      Navigator.pop(context);
+                      final recap = await ref
+                          .read(activeTourControllerProvider.notifier)
+                          .loadRecap();
+                      if (mounted) {
+                        _showCompleteStory(recap);
+                      }
+                    },
+                    child: const Text('提交这条历史因果链'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -418,45 +875,55 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
     _clearRootFeedback();
     final overlay = Overlay.of(context, rootOverlay: true);
     _feedbackOverlay = OverlayEntry(
-        builder: (context) => Positioned(
-              top: MediaQuery.paddingOf(context).top + 14,
-              left: 18,
-              right: 18,
-              child: SafeArea(
-                bottom: false,
-                child: Semantics(
-                  liveRegion: true,
-                  button: true,
-                  label: message,
-                  hint: '轻触关闭',
-                  child: GestureDetector(
-                    onTap: _clearRootFeedback,
-                    child: Material(
-                      key: const ValueKey('reconstruction-feedback-overlay'),
-                      elevation: 16,
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(18),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 14),
-                        child: Row(children: [
-                          Icon(Icons.account_tree_rounded,
-                              color: Theme.of(context).colorScheme.error),
-                          const SizedBox(width: 12),
-                          Expanded(
-                              child: Text(message,
-                                  style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onErrorContainer,
-                                      fontWeight: FontWeight.w600))),
-                        ]),
+      builder: (context) => Positioned(
+        top: MediaQuery.paddingOf(context).top + 14,
+        left: 18,
+        right: 18,
+        child: SafeArea(
+          bottom: false,
+          child: Semantics(
+            liveRegion: true,
+            button: true,
+            label: message,
+            hint: '轻触关闭',
+            child: GestureDetector(
+              onTap: _clearRootFeedback,
+              child: Material(
+                key: const ValueKey('reconstruction-feedback-overlay'),
+                elevation: 16,
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.account_tree_rounded,
+                        color: Theme.of(context).colorScheme.error,
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ));
+            ),
+          ),
+        ),
+      ),
+    );
     overlay.insert(_feedbackOverlay!);
     _feedbackTimer = Timer(const Duration(seconds: 5), () {
       _feedbackOverlay?.remove();
@@ -473,28 +940,35 @@ class _JourneyPageState extends ConsumerState<JourneyPage> {
 
   void _showCompleteStory(FragmentRecap recap) {
     showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        backgroundColor: AppColors.paper,
-        builder: (context) => DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: .88,
-            builder: (context, controller) => ListView(
-                    controller: controller,
-                    padding: const EdgeInsets.fromLTRB(22, 6, 22, 40),
-                    children: [
-                      const Icon(Icons.check_circle_rounded,
-                          color: AppColors.moss, size: 42),
-                      const SizedBox(height: 12),
-                      Text('你拼回了这座城',
-                          style: Theme.of(context).textTheme.displaySmall),
-                      const SizedBox(height: 12),
-                      Text(recap.completeStory,
-                          style: Theme.of(context).textTheme.bodyLarge),
-                      const SizedBox(height: 24),
-                      const Text('内容状态：研究预览。现场物件与坐标仍待实地核验，来源可在线索簿中查看。'),
-                    ])));
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.paper,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .88,
+        builder: (context, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(22, 6, 22, 40),
+          children: [
+            const Icon(
+              Icons.check_circle_rounded,
+              color: AppColors.moss,
+              size: 42,
+            ),
+            const SizedBox(height: 12),
+            Text('你拼回了这座城', style: Theme.of(context).textTheme.displaySmall),
+            const SizedBox(height: 12),
+            Text(
+              recap.completeStory,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 24),
+            const Text('内容状态：研究预览。现场物件与坐标仍待实地核验，来源可在线索簿中查看。'),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -681,12 +1155,13 @@ class _LegacyJourneyView extends ConsumerWidget {
     final arrived = session.arrivedStopId == stop.id;
     return Scaffold(
       appBar: AppBar(
-          leading: IconButton(
-              tooltip: '返回首页',
-              onPressed: () => context.go('/'),
-              icon: const Icon(Icons.arrow_back_rounded)),
-          title:
-              Text('${session.currentStopPosition} / ${route.stops.length}')),
+        leading: IconButton(
+          tooltip: '返回首页',
+          onPressed: () => context.go('/'),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+        title: Text('${session.currentStopPosition} / ${route.stops.length}'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -701,15 +1176,19 @@ class _LegacyJourneyView extends ConsumerWidget {
               label: const Text('我已到达，开始观察'),
             )
           else ...[
-            Text(stop.storyTitle,
-                style: Theme.of(context).textTheme.headlineMedium),
+            Text(
+              stop.storyTitle,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
             const SizedBox(height: 12),
             Text(stop.storyBody),
             const SizedBox(height: 22),
             const Text('观察一下'),
             const SizedBox(height: 6),
-            Text(stop.challenge.prompt,
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              stop.challenge.prompt,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 10),
             ...stop.challenge.options.indexed.map(
               (entry) => Padding(
@@ -759,8 +1238,9 @@ class _SelectedNodeDetail extends StatelessWidget {
             .firstOrNull
             ?.id ??
         manifest.fragments.first.id;
-    final manifestFragment =
-        manifest.fragments.firstWhere((fragment) => fragment.id == effectiveId);
+    final manifestFragment = manifest.fragments.firstWhere(
+      (fragment) => fragment.id == effectiveId,
+    );
     final ledgerFragment = ledger?.entries
         .where((fragment) => fragment.id == effectiveId)
         .firstOrNull;
@@ -782,17 +1262,12 @@ class _SelectedNodeDetail extends StatelessWidget {
     ];
     return Container(
       key: ValueKey('selected-node-detail-${fragment.id}'),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(vertical: 18),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink.withValues(alpha: .08),
-            blurRadius: 24,
-            offset: const Offset(0, 9),
-          ),
-        ],
+        color: AppColors.paper,
+        border: Border.symmetric(
+          horizontal: BorderSide(color: AppColors.ink.withValues(alpha: .22)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -813,20 +1288,20 @@ class _SelectedNodeDetail extends StatelessWidget {
                 point?.distanceMeters == null
                     ? _statusLabel(status)
                     : _distanceLabel(point!.distanceMeters!),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: _statusColor(status),
-                      fontSize: 9,
-                    ),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: _statusColor(status), fontSize: 9),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Text(
             fragment.title ?? fragment.safePreview,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontSize: 19,
-                  height: 1.35,
-                ),
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontSize: 19, height: 1.35),
           ),
           if (fragment.title != null && fragment.safePreview.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -857,10 +1332,10 @@ class _SelectedNodeDetail extends StatelessWidget {
                       ),
                       child: Text(
                         value,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontSize: 8,
-                              letterSpacing: 0,
-                            ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(fontSize: 10, letterSpacing: 0),
                       ),
                     ),
                   )
@@ -947,10 +1422,10 @@ class _ListeningCard extends ConsumerWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.white,
-                            fontSize: 13,
-                          ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(color: AppColors.white, fontSize: 13),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -962,7 +1437,7 @@ class _ListeningCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: AppColors.white.withValues(alpha: .65),
-                        fontSize: 8,
+                        fontSize: 10,
                       ),
                     ),
                   ],
@@ -992,7 +1467,7 @@ class _ListeningCard extends ConsumerWidget {
                 : '设置模式：真实定位',
             style: TextStyle(
               color: AppColors.white.withValues(alpha: .62),
-              fontSize: 8,
+              fontSize: 10,
             ),
           ),
         ],
@@ -1002,8 +1477,9 @@ class _ListeningCard extends ConsumerWidget {
 }
 
 class _NarrationCard extends ConsumerStatefulWidget {
-  const _NarrationCard({required this.state, super.key});
+  const _NarrationCard({required this.state, this.onDirectory, super.key});
   final ActiveTourState state;
+  final VoidCallback? onDirectory;
 
   @override
   ConsumerState<_NarrationCard> createState() => _NarrationCardState();
@@ -1016,173 +1492,189 @@ class _NarrationCardState extends ConsumerState<_NarrationCard> {
   Widget build(BuildContext context) {
     final state = widget.state;
     final fragment = state.current!;
-    final total = state.duration?.inMilliseconds ?? 0;
-    final progress = total == 0
-        ? 0.0
-        : (state.position.inMilliseconds / total).clamp(0.0, 1.0);
     final profiles = state.route!.audioTour!.narrationProfiles;
     final selectedProfile = profiles
         .where((profile) => profile.id == state.narrationProfileId)
         .firstOrNull;
     final monitoring =
         state.status == 'monitoring' || state.status == 'simulated';
+    final controller = ref.read(activeTourControllerProvider.notifier);
     return _DarkNarrationSurface(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(
-          children: [
-            _NarrationPlayButton(
-              icon: state.isPlaying
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
-              tooltip: state.isPlaying ? '暂停' : '继续',
-              onPressed: () => ref
-                  .read(activeTourControllerProvider.notifier)
-                  .togglePlayback(),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '正在播放：${fragment.title ?? fragment.safePreview}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.white,
-                          fontSize: 13,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_formatAudioTime(state.position)} / ${total == 0 ? '--:--' : _formatAudioTime(state.duration!)} · 锁屏可继续播放',
-                    style: TextStyle(
-                      color: AppColors.white.withValues(alpha: .62),
-                      fontSize: 8,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: monitoring ? '暂停自动导览' : '继续自动导览',
-              color: AppColors.white.withValues(alpha: .72),
-              onPressed: monitoring
-                  ? () => ref
-                      .read(activeTourControllerProvider.notifier)
-                      .pauseTour()
-                  : () => ref
-                      .read(activeTourControllerProvider.notifier)
-                      .resumeTour(),
-              icon: Icon(
-                monitoring
-                    ? Icons.pause_circle_outline_rounded
-                    : Icons.play_circle_outline_rounded,
-                size: 21,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 3,
-            activeTrackColor: AppColors.terracotta,
-            inactiveTrackColor: AppColors.white.withValues(alpha: .15),
-            thumbColor: AppColors.white,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          EditorialRecordArtwork(
+            imageUrl: state.route!.heroImage,
+            chapterNumber: fragment.position,
+            isPlaying: state.isPlaying,
+            caption: '给眼前的城市，一段耳朵的时间。',
           ),
-          child: Slider(
-            value: progress,
-            onChanged: total == 0
-                ? null
-                : (value) => ref
-                    .read(activeTourControllerProvider.notifier)
-                    .seek(Duration(milliseconds: (total * value).round())),
+          const SizedBox(height: 9),
+          EditorialChapterHeading(
+            number: fragment.position,
+            total: state.route!.audioTour!.fragments.length,
+            title: fragment.title ?? fragment.safePreview,
+            location: state.route!.title,
           ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          children: [
-            PopupMenuButton<double>(
-              initialValue: state.speed,
-              tooltip: '速度',
-              onSelected: (value) => ref
-                  .read(activeTourControllerProvider.notifier)
-                  .setSpeed(value),
-              itemBuilder: (_) => const [.8, 1.0, 1.2, 1.5]
-                  .map((speed) => PopupMenuItem(
-                        value: speed,
-                        child: Text('${speed}x'),
-                      ))
-                  .toList(),
-              child: _DarkControlSurface(
-                icon: Icons.speed_rounded,
-                label: '${state.speed}× 语速',
+          const SizedBox(height: 16),
+          Text(
+            fragment.safePreview,
+            style: const TextStyle(
+              color: Color(0xffd1d2c6),
+              fontSize: 12,
+              height: 1.8,
+            ),
+          ),
+          EditorialPlaybackControls(
+            isPlaying: state.isPlaying,
+            position: state.position,
+            duration: state.duration,
+            playTooltip: state.isPlaying ? '暂停' : '继续',
+            onToggle: controller.togglePlayback,
+            onSeek: controller.seek,
+            nextLabel: '选篇',
+            onNext: widget.onDirectory,
+            status:
+                '${_formatAudioTime(state.position)} / ${state.duration == null ? '--:--' : _formatAudioTime(state.duration!)} · 锁屏可继续播放',
+          ),
+          const SizedBox(height: 24),
+          if (fragment.transcript != null) ...[
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Color(0x33f5f0e7))),
               ),
             ),
-            if (profiles.isNotEmpty)
-              _DarkControlButton(
-                icon: Icons.record_voice_over_outlined,
-                label: selectedProfile?.name ?? profiles.first.name,
-                onPressed: profiles.length <= 1
-                    ? null
-                    : () async {
-                        final chosen = await showNarrationVoicePicker(
-                          context,
-                          profiles: profiles,
-                          selectedProfileId: state.narrationProfileId,
-                        );
-                        if (chosen != null &&
-                            chosen != state.narrationProfileId) {
-                          ref
-                              .read(activeTourControllerProvider.notifier)
-                              .selectNarrationProfile(chosen);
-                        }
-                      },
-              ),
-            if (fragment.transcript != null)
-              _DarkControlButton(
-                icon: Icons.subject_rounded,
-                label: '阅读等价文字稿',
-                selected: _showTranscript,
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
                 onPressed: () =>
                     setState(() => _showTranscript = !_showTranscript),
+                style: TextButton.styleFrom(
+                  foregroundColor: editorialPaper,
+                  minimumSize: const Size(48, 72),
+                  padding: EdgeInsets.zero,
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('边听边读', style: TextStyle(fontSize: 13)),
+                          SizedBox(height: 6),
+                          Text(
+                            '阅读等价文字稿',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: editorialMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      _showTranscript
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_showTranscript)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 25),
+                child: SelectableText(
+                  fragment.transcript!,
+                  style: const TextStyle(
+                    color: Color(0xffe4e3d7),
+                    fontSize: 14,
+                    height: 2.05,
+                  ),
+                ),
               ),
           ],
-        ),
-        if (state.narrationProfileMessage != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              state.narrationProfileMessage!,
-              style: TextStyle(
-                color: AppColors.white.withValues(alpha: .72),
-                fontSize: 8,
+          if (widget.onDirectory != null)
+            EditorialDirectoryLink(
+              count: state.route!.audioTour!.fragments.length,
+              currentNumber: fragment.position,
+              onPressed: widget.onDirectory!,
+            ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              PopupMenuButton<double>(
+                initialValue: state.speed,
+                tooltip: '速度',
+                onSelected: controller.setSpeed,
+                itemBuilder: (_) => const [.8, 1.0, 1.2, 1.5]
+                    .map(
+                      (speed) =>
+                          PopupMenuItem(value: speed, child: Text('${speed}x')),
+                    )
+                    .toList(),
+                child: _DarkControlSurface(
+                  icon: Icons.speed_rounded,
+                  label: '${state.speed}× 语速',
+                ),
+              ),
+              if (profiles.isNotEmpty)
+                _DarkControlButton(
+                  icon: Icons.record_voice_over_outlined,
+                  label: selectedProfile?.name ?? profiles.first.name,
+                  selected: selectedProfile != null,
+                  onPressed: profiles.length <= 1
+                      ? null
+                      : () async {
+                          final chosen = await showNarrationVoicePicker(
+                            context,
+                            profiles: profiles,
+                            selectedProfileId: state.narrationProfileId,
+                          );
+                          if (chosen != null &&
+                              chosen != state.narrationProfileId) {
+                            controller.selectNarrationProfile(chosen);
+                          }
+                        },
+                ),
+              Tooltip(
+                message: monitoring ? '暂停自动导览' : '继续自动导览',
+                child: _DarkControlButton(
+                  icon: monitoring
+                      ? Icons.pause_circle_outline
+                      : Icons.play_circle_outline,
+                  label: monitoring ? '暂停自动导览' : '继续自动导览',
+                  onPressed:
+                      monitoring ? controller.pauseTour : controller.resumeTour,
+                ),
+              ),
+            ],
+          ),
+          if (state.narrationProfileMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                state.narrationProfileMessage!,
+                style: const TextStyle(
+                  color: editorialMuted,
+                  fontSize: 10,
+                  height: 1.7,
+                ),
               ),
             ),
-          ),
-        if (_showTranscript && fragment.transcript != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            fragment.transcript!,
-            style: TextStyle(
-              color: AppColors.white.withValues(alpha: .82),
-              height: 1.7,
+          if (state.queue.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                '另有 ${state.queue.length} 段故事在队列中',
+                style: const TextStyle(color: editorialLime, fontSize: 10),
+              ),
             ),
-          ),
         ],
-        if (state.queue.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text('另有 ${state.queue.length} 段故事在队列中',
-                style: const TextStyle(color: AppColors.gold)),
-          ),
-      ]),
+      ),
     );
   }
 }
@@ -1195,10 +1687,10 @@ class _DarkNarrationSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(17),
+        padding: const EdgeInsets.fromLTRB(22, 7, 22, 25),
         decoration: BoxDecoration(
-          color: AppColors.ink,
-          borderRadius: BorderRadius.circular(23),
+          color: editorialInk,
+          borderRadius: const BorderRadius.only(topRight: Radius.circular(28)),
           boxShadow: [
             BoxShadow(
               color: AppColors.ink.withValues(alpha: .16),
@@ -1227,9 +1719,9 @@ class _NarrationPlayButton extends StatelessWidget {
         tooltip: tooltip,
         onPressed: onPressed,
         style: IconButton.styleFrom(
-          fixedSize: const Size.square(48),
-          backgroundColor: AppColors.terracotta,
-          foregroundColor: AppColors.white,
+          fixedSize: const Size.square(64),
+          backgroundColor: editorialLime,
+          foregroundColor: editorialInk,
         ),
         icon: Icon(icon),
       );
@@ -1252,11 +1744,8 @@ class _DarkControlButton extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(99),
-        child: _DarkControlSurface(
-          icon: icon,
-          label: label,
-          selected: selected,
-        ),
+        child:
+            _DarkControlSurface(icon: icon, label: label, selected: selected),
       );
 }
 
@@ -1273,16 +1762,18 @@ class _DarkControlSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 12),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.terracotta.withValues(alpha: .22)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(
-            color: selected
-                ? AppColors.terracotta
-                : AppColors.white.withValues(alpha: .22),
+          border: Border(
+            bottom: BorderSide(
+              color: selected
+                  ? editorialLime
+                  : editorialPaper.withValues(alpha: .22),
+            ),
           ),
         ),
         child: Row(
@@ -1292,7 +1783,7 @@ class _DarkControlSurface extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(color: AppColors.white, fontSize: 8),
+              style: const TextStyle(color: editorialPaper, fontSize: 10),
             ),
           ],
         ),
@@ -1335,45 +1826,56 @@ class _MissionCard extends ConsumerWidget {
             state.isBusy ? null : () => _showCameraGuide(context, ref, mission),
         child: Padding(
           padding: const EdgeInsets.all(17),
-          child: Row(children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: hasPhoto
-                    ? AppColors.moss.withValues(alpha: .14)
-                    : AppColors.terracotta.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(16),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: hasPhoto
+                      ? AppColors.moss.withValues(alpha: .14)
+                      : AppColors.terracotta.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  hasPhoto
+                      ? Icons.photo_camera_back_rounded
+                      : Icons.add_a_photo_outlined,
+                  color: hasPhoto ? AppColors.moss : AppColors.terracotta,
+                ),
               ),
-              child: Icon(
-                hasPhoto
-                    ? Icons.photo_camera_back_rounded
-                    : Icons.add_a_photo_outlined,
-                color: hasPhoto ? AppColors.moss : AppColors.terracotta,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('可选的现场留念',
-                      style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(mission.prompt,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  Text(status,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '可选的现场留念',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      mission.prompt,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(color: AppColors.moss, fontSize: 12)),
-                ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.moss,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded),
-          ]),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
         ),
       ),
     );
@@ -1408,8 +1910,10 @@ class _MissionCard extends ConsumerWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(22, 10, 22, 28),
             children: [
-              Text(mission.prompt,
-                  style: Theme.of(sheetContext).textTheme.headlineMedium),
+              Text(
+                mission.prompt,
+                style: Theme.of(sheetContext).textTheme.headlineMedium,
+              ),
               const SizedBox(height: 8),
               const Text('一个节点只保留这一处留念入口。机位建议用于帮助构图，不是通关条件。'),
               if (pendingPath?.isNotEmpty == true) ...[
@@ -1526,57 +2030,55 @@ class _GuideRow extends StatelessWidget {
 }
 
 class _LedgerEntry extends StatelessWidget {
-  const _LedgerEntry({required this.fragment});
+  const _LedgerEntry({required this.fragment, this.onPressed});
   final StoryFragment fragment;
+  final VoidCallback? onPressed;
   @override
-  Widget build(BuildContext context) {
-    final revealed = fragment.isRevealed;
-    return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ExpansionTile(
-          leading: CircleAvatar(
-              backgroundColor: fragment.isCollected
-                  ? AppColors.moss
-                  : fragment.isMissionPending
-                      ? AppColors.terracotta
-                      : AppColors.paperDeep,
-              foregroundColor: fragment.isCollected || fragment.isMissionPending
-                  ? AppColors.white
-                  : AppColors.ink,
-              child: Icon(
-                  fragment.isCollected
-                      ? Icons.check_rounded
-                      : fragment.isMissionPending
-                          ? Icons.photo_camera_outlined
-                          : Icons.lock_outline_rounded,
-                  size: 18)),
-          title: Text(revealed ? fragment.title! : '未发现的线索'),
-          subtitle: Text(revealed
-              ? fragment.keyClaim ?? fragment.safePreview
-              : fragment.safePreview),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          children: revealed
-              ? [
-                  if (fragment.authenticityLabel != null)
-                    Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text('现场关系：${fragment.authenticityLabel}',
-                            style: Theme.of(context).textTheme.labelMedium)),
-                  if (fragment.sources.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    ...fragment.sources.map((source) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                                '${source.publisher}｜${source.title}\n${source.summary}',
-                                style:
-                                    Theme.of(context).textTheme.bodyMedium))))
-                  ]
-                ]
-              : const [],
-        ));
-  }
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0x33252824))),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          onTap: onPressed,
+          leading: SizedBox(
+            width: 32,
+            child: Text(
+              fragment.position.toString().padLeft(2, '0'),
+              style: const TextStyle(
+                fontFamily: 'Georgia',
+                fontStyle: FontStyle.italic,
+                fontSize: 27,
+                color: Color(0xffb17661),
+              ),
+            ),
+          ),
+          title: Text(
+            fragment.title ?? '未发现的线索',
+            style: editorialSerif(17, color: editorialInk),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 7),
+            child: Text(
+              fragment.isRevealed
+                  ? (fragment.isCollected ? '已听过 · 随时回来翻阅' : '已抵达 · 选择听或读')
+                  : fragment.safePreview,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10,
+                height: 1.6,
+                color: Color(0xff827563),
+              ),
+            ),
+          ),
+          trailing: Icon(
+            fragment.isRevealed ? Icons.arrow_outward : Icons.lock_outline,
+            size: 17,
+            color: const Color(0xff827563),
+          ),
+        ),
+      );
 }
 
 class _LedgerReconstructionEntry extends StatelessWidget {
@@ -1602,55 +2104,61 @@ class _LedgerReconstructionEntry extends StatelessWidget {
         onTap: unlocked ? onPressed : null,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(children: [
-            CircleAvatar(
-              backgroundColor: unlocked ? AppColors.gold : AppColors.white,
-              foregroundColor: AppColors.ink,
-              child: Icon(completed
-                  ? Icons.check_rounded
-                  : unlocked
-                      ? Icons.account_tree_outlined
-                      : Icons.lock_outline_rounded),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    completed
-                        ? '完整故事已经拼好'
-                        : unlocked
-                            ? '把线索拼成完整故事'
-                            : '完整故事还差一点',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: unlocked && !completed
-                          ? AppColors.white
-                          : AppColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    completed
-                        ? '点开重温你走出来的故事'
-                        : unlocked
-                            ? '${ledger.totalCount} 条线索已齐，试着排出它们的关系'
-                            : '${ledger.collectedCount}/${ledger.totalCount}，收集齐后在这里解锁',
-                    style: TextStyle(
-                      color: unlocked && !completed
-                          ? Colors.white70
-                          : AppColors.ink.withValues(alpha: .62),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: unlocked ? AppColors.gold : AppColors.white,
+                foregroundColor: AppColors.ink,
+                child: Icon(
+                  completed
+                      ? Icons.check_rounded
+                      : unlocked
+                          ? Icons.account_tree_outlined
+                          : Icons.lock_outline_rounded,
+                ),
               ),
-            ),
-            if (unlocked)
-              Icon(Icons.chevron_right_rounded,
-                  color: completed ? AppColors.moss : AppColors.white),
-          ]),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      completed
+                          ? '完整故事已经拼好'
+                          : unlocked
+                              ? '把线索拼成完整故事'
+                              : '完整故事还差一点',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: unlocked && !completed
+                            ? AppColors.white
+                            : AppColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      completed
+                          ? '点开重温你走出来的故事'
+                          : unlocked
+                              ? '${ledger.totalCount} 条线索已齐，试着排出它们的关系'
+                              : '${ledger.collectedCount}/${ledger.totalCount}，收集齐后在这里解锁',
+                      style: TextStyle(
+                        color: unlocked && !completed
+                            ? Colors.white70
+                            : AppColors.ink.withValues(alpha: .62),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (unlocked)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: completed ? AppColors.moss : AppColors.white,
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -8,61 +8,72 @@ import 'package:jiandi/features/experience/presentation/active_tour_controller.d
 import 'package:jiandi/features/experience/presentation/journey_page.dart';
 
 void main() {
-  testWidgets('selected node exposes one optional photo entry and guide detail',
-      (tester) async {
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        activeTourControllerProvider.overrideWith(
-          () => _StaticTourController(_photoState),
+  testWidgets(
+    'selected node exposes one optional photo entry and guide detail',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeTourControllerProvider.overrideWith(
+              () => _StaticTourController(_photoState),
+            ),
+          ],
+          child: const MaterialApp(
+            home: JourneyPage(journeyId: 'journey-photo'),
+          ),
         ),
-      ],
-      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-photo')),
-    ));
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.dragUntilVisible(
-      find.text('可选的现场留念'),
-      find.byType(ListView),
-      const Offset(0, -260),
-    );
-    expect(find.text('可选的现场留念'), findsOneWidget);
-    expect(find.byKey(const ValueKey('node-photo-entry-fragment-photo')),
-        findsOneWidget);
-    expect(find.text('老树旁不挡路的位置'), findsNothing);
+      await tester.dragUntilVisible(
+        find.text('可选的现场留念'),
+        find.byType(ListView),
+        const Offset(0, -260),
+      );
+      expect(find.text('可选的现场留念'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('node-photo-entry-fragment-photo')),
+        findsOneWidget,
+      );
+      expect(find.text('老树旁不挡路的位置'), findsNothing);
 
-    await tester.ensureVisible(find.text('可选的现场留念'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('可选的现场留念'));
-    await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('可选的现场留念'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('可选的现场留念'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('推荐机位'), findsOneWidget);
-    expect(find.text('老树旁不挡路的位置'), findsOneWidget);
-    expect(find.text('面向城门'), findsOneWidget);
-    expect(find.text('城门居中，留出街巷'), findsOneWidget);
-    expect(find.text('打开相机'), findsOneWidget);
+      expect(find.text('推荐机位'), findsOneWidget);
+      expect(find.text('老树旁不挡路的位置'), findsOneWidget);
+      expect(find.text('面向城门'), findsOneWidget);
+      expect(find.text('城门居中，留出街巷'), findsOneWidget);
+      expect(find.text('打开相机'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('关闭留念详情'));
-    await tester.pumpAndSettle();
-    expect(find.text('推荐机位'), findsNothing);
-    expect(find.text('可选的现场留念'), findsOneWidget);
+      await tester.tap(find.byTooltip('关闭留念详情'));
+      await tester.pumpAndSettle();
+      expect(find.text('推荐机位'), findsNothing);
+      expect(find.text('可选的现场留念'), findsOneWidget);
 
-    await tester.dragUntilVisible(
-      find.text('下一条线索（测试）'),
-      find.byType(ListView),
-      const Offset(0, -180),
-    );
-    expect(find.text('下一条线索（测试）'), findsOneWidget);
-  });
+      await tester.dragUntilVisible(
+        find.text('下一条线索（测试）'),
+        find.byType(ListView),
+        const Offset(0, -180),
+      );
+      expect(find.text('下一条线索（测试）'), findsOneWidget);
+    },
+  );
 
-  testWidgets('header route points keep safe targets and reject locked nodes',
-      (tester) async {
+  testWidgets('header route points keep safe targets and reject locked nodes', (
+    tester,
+  ) async {
     final controller = _StaticTourController(_railState);
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        activeTourControllerProvider.overrideWith(() => controller),
-      ],
-      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-rail')),
-    ));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeTourControllerProvider.overrideWith(() => controller),
+        ],
+        child: const MaterialApp(home: JourneyPage(journeyId: 'journey-rail')),
+      ),
+    );
     await tester.pumpAndSettle();
 
     final collected = find.byTooltip('查看第 1 个节点');
@@ -87,22 +98,40 @@ void main() {
       findsOneWidget,
     );
     expect(
-        find.byKey(const ValueKey('fragment-node-rail-scroll')), findsNothing);
+      find.byKey(const ValueKey('fragment-node-rail-scroll')),
+      findsNothing,
+    );
     expect(find.text('2'), findsNothing);
     expect(find.bySemanticsLabel('第 1 个节点，城门的变化，已听过'), findsOneWidget);
     expect(find.bySemanticsLabel('第 2 个节点，尚未发现的线索，未解锁'), findsOneWidget);
 
     await tester.tap(collected);
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(controller.selectedFragmentId, isNull);
+    expect(find.text('播放这一篇'), findsOneWidget);
+    await tester.tap(find.text('阅读这一篇'));
+    await tester.pumpAndSettle();
+    expect(find.text('已经听完的正文'), findsOneWidget);
+    expect(controller.selectedFragmentId, isNull);
+    await tester.tap(find.byTooltip('关闭章节序页'));
+    await tester.pumpAndSettle();
+    await tester.tap(collected);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('播放这一篇'));
+    await tester.pumpAndSettle();
     expect(controller.selectedFragmentId, 'fragment-photo');
 
     await tester.tap(untriggered);
     await tester.pump();
     expect(controller.selectedFragmentId, 'fragment-photo');
-    expect(find.byKey(const ValueKey('selected-node-detail-fragment-locked')),
-        findsNothing);
-    expect(find.byKey(const ValueKey('selected-node-detail-fragment-photo')),
-        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('selected-node-detail-fragment-locked')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('selected-node-detail-fragment-photo')),
+      findsOneWidget,
+    );
     final audio = find.byKey(const ValueKey('fragment-photo'));
     await tester.dragUntilVisible(
       audio,
@@ -124,109 +153,119 @@ void main() {
   });
 
   testWidgets(
-      'header path renders an arbitrary backend node count without overflow',
-      (tester) async {
-    await tester.binding.setSurfaceSize(const Size(320, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final fragments = List<StoryFragment>.generate(
-      8,
-      (index) => StoryFragment(
-        id: 'dense-${index + 1}',
-        position: index + 1,
-        safePreview: '密集节点 ${index + 1}',
-        interactionType: 'passive',
-        reviewState: 'reviewed',
-        triggerRegion: TriggerRegion(
-          latitude: 22.5 + (index ~/ 4) * .001,
-          longitude: 114 + (index % 4) * .001,
-          entryRadiusM: 50,
-          exitRadiusM: 80,
-          maxAccuracyM: 35,
-          qualifyingSamples: 2,
-          sampleWindowSeconds: 15,
-          cooldownSeconds: 120,
-          auditState: 'reviewed',
+    'header path renders an arbitrary backend node count without overflow',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final fragments = List<StoryFragment>.generate(
+        8,
+        (index) => StoryFragment(
+          id: 'dense-${index + 1}',
+          position: index + 1,
+          safePreview: '密集节点 ${index + 1}',
+          interactionType: 'passive',
+          reviewState: 'reviewed',
+          triggerRegion: TriggerRegion(
+            latitude: 22.5 + (index ~/ 4) * .001,
+            longitude: 114 + (index % 4) * .001,
+            entryRadiusM: 50,
+            exitRadiusM: 80,
+            maxAccuracyM: 35,
+            qualifyingSamples: 2,
+            sampleWindowSeconds: 15,
+            cooldownSeconds: 120,
+            auditState: 'reviewed',
+          ),
+          audio: _photoFragment.audio,
+          title: '密集节点 ${index + 1}',
+          transcript: '密集节点 ${index + 1} 的正文',
+          state: 'triggered',
         ),
-        audio: _photoFragment.audio,
-        title: '密集节点 ${index + 1}',
-        transcript: '密集节点 ${index + 1} 的正文',
-        state: 'triggered',
-      ),
-    );
-    final manifest = AudioTourManifest(
-      title: '密集节点路线',
-      centralQuestion: '多个节点如何展示？',
-      scriptVersion: 'v1',
-      reviewState: 'reviewed',
-      fieldAuditState: 'reviewed',
-      productionReady: true,
-      demoLabel: null,
-      contentMethod: '测试',
-      downloadSizeBytes: 1,
-      fragments: fragments,
-    );
-    final route = RouteExperience(
-      id: 'dense-route',
-      slug: 'dense-route',
-      title: '密集节点路线',
-      subtitle: '测试',
-      description: '测试',
-      durationMinutes: 20,
-      distanceKm: 1,
-      difficulty: '轻松',
-      theme: '历史',
-      heroImage: '',
-      contentStatus: 'published',
-      stops: const [],
-      audioTour: manifest,
-    );
-    final state = ActiveTourState(
-      status: 'monitoring',
-      route: route,
-      session: const JourneySession(
-        id: 'dense-journey',
-        routeId: 'dense-route',
-        status: 'active',
-        currentStopPosition: 1,
-        arrivedStopId: null,
-        answeredStopIds: {},
-        progress: 0,
-      ),
-      ledger: StoryLedger(
+      );
+      final manifest = AudioTourManifest(
+        title: '密集节点路线',
         centralQuestion: '多个节点如何展示？',
-        collectedCount: 0,
-        totalCount: fragments.length,
-        reconstructionUnlocked: false,
-        entries: fragments,
-      ),
-      selectedFragmentId: 'dense-1',
-      locationMode: TourLocationMode.real,
-    );
-    final controller = _StaticTourController(state);
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        activeTourControllerProvider.overrideWith(() => controller),
-      ],
-      child: const MaterialApp(home: JourneyPage(journeyId: 'dense-journey')),
-    ));
-    await tester.pumpAndSettle();
+        scriptVersion: 'v1',
+        reviewState: 'reviewed',
+        fieldAuditState: 'reviewed',
+        productionReady: true,
+        demoLabel: null,
+        contentMethod: '测试',
+        downloadSizeBytes: 1,
+        fragments: fragments,
+      );
+      final route = RouteExperience(
+        id: 'dense-route',
+        slug: 'dense-route',
+        title: '密集节点路线',
+        subtitle: '测试',
+        description: '测试',
+        durationMinutes: 20,
+        distanceKm: 1,
+        difficulty: '轻松',
+        theme: '历史',
+        heroImage: '',
+        contentStatus: 'published',
+        stops: const [],
+        audioTour: manifest,
+      );
+      final state = ActiveTourState(
+        status: 'monitoring',
+        route: route,
+        session: const JourneySession(
+          id: 'dense-journey',
+          routeId: 'dense-route',
+          status: 'active',
+          currentStopPosition: 1,
+          arrivedStopId: null,
+          answeredStopIds: {},
+          progress: 0,
+        ),
+        ledger: StoryLedger(
+          centralQuestion: '多个节点如何展示？',
+          collectedCount: 0,
+          totalCount: fragments.length,
+          reconstructionUnlocked: false,
+          entries: fragments,
+        ),
+        selectedFragmentId: 'dense-1',
+        locationMode: TourLocationMode.real,
+      );
+      final controller = _StaticTourController(state);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeTourControllerProvider.overrideWith(() => controller),
+          ],
+          child: const MaterialApp(
+            home: JourneyPage(journeyId: 'dense-journey'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(
-        find.byKey(const ValueKey('fragment-node-rail-scroll')), findsNothing);
-    for (var position = 1; position <= 8; position += 1) {
-      expect(find.byTooltip('查看第 $position 个节点'), findsOneWidget);
-    }
-    await tester.tap(find.byTooltip('查看第 8 个节点'));
-    await tester.pump();
-    expect(controller.selectedFragmentId, 'dense-8');
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('selected-node-detail-dense-8')),
-        matching: find.text('密集节点 8'),
-      ),
-      findsWidgets,
-    );
-  });
+      expect(
+        find.byKey(const ValueKey('fragment-node-rail-scroll')),
+        findsNothing,
+      );
+      for (var position = 1; position <= 8; position += 1) {
+        expect(find.byTooltip('查看第 $position 个节点'), findsOneWidget);
+      }
+      await tester.tap(find.byTooltip('查看第 8 个节点'));
+      await tester.pumpAndSettle();
+      expect(controller.selectedFragmentId, isNull);
+      await tester.tap(find.text('播放这一篇'));
+      await tester.pumpAndSettle();
+      expect(controller.selectedFragmentId, 'dense-8');
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('selected-node-detail-dense-8')),
+          matching: find.text('密集节点 8'),
+        ),
+        findsWidgets,
+      );
+    },
+  );
 }
 
 class _StaticTourController extends ActiveTourController {
@@ -238,6 +277,11 @@ class _StaticTourController extends ActiveTourController {
 
   @override
   ActiveTourState build() => initial;
+
+  @override
+  Future<void> pauseTour() async {
+    state = state.copyWith(status: 'paused', isPlaying: false);
+  }
 
   @override
   Future<bool> selectNode(String fragmentId) async {

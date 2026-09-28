@@ -48,10 +48,13 @@ void main() {
       child: const MaterialApp(home: RouteDetailPage(slug: 'test-route')),
     ));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -520));
+    await tester.ensureVisible(find.text('行走准备'));
     await tester.pumpAndSettle();
-
-    expect(find.text('真实行走已启用，开始导览后会按位置发现线索'), findsOneWidget);
+    await tester.tap(find.text('行走准备'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('route-detail-mode-simulated')));
+    await tester.pumpAndSettle();
     expect(
         find.byKey(const ValueKey('route-detail-mode-real')), findsOneWidget);
     expect(find.byKey(const ValueKey('route-detail-mode-simulated')),
@@ -62,7 +65,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('route-detail-mode-simulated')));
     await tester.pumpAndSettle();
     expect(modeStore.mode, TourLocationMode.simulated);
-    expect(find.text('模拟预览已启用，开始导览后可手动推进线索'), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-detail-mode-simulated')),
+        findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('route-detail-mode-real')));
     await tester.pumpAndSettle();

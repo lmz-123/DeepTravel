@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
@@ -10,6 +11,14 @@ import 'core/logging/runtime_log_reporter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    for (final family in ['NotoSerifSC', 'NotoSansSC', 'Inter', 'Gelasio']) {
+      yield LicenseEntryWithLineBreaks(
+        [family],
+        await rootBundle.loadString('assets/fonts/$family-OFL.txt'),
+      );
+    }
+  });
   final reporter = await RuntimeLogReporter.create();
   FlutterError.onError = (details) {
     FlutterError.presentError(details);

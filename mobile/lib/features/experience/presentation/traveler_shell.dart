@@ -78,8 +78,8 @@ class _TravelerDrawer extends ConsumerWidget {
                       '见',
                       style: TextStyle(
                         color: AppColors.gold,
-                        fontFamily: 'Songti SC',
-                        fontFamilyFallback: ['STSong', 'serif'],
+                        fontFamily: 'Noto Serif SC',
+                        fontFamilyFallback: ['serif'],
                         fontSize: 18,
                       ),
                     ),
