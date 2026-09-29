@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../application/nearby_story_points.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
 import 'active_tour_controller.dart';

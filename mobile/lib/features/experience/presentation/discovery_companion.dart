@@ -57,10 +57,15 @@ class _DiscoveryCompanion extends StatelessWidget {
                   style: discoverySans(13, height: 1.8, color: AppColors.textMuted),
                 ),
                 const SizedBox(height: 24),
+                _CompanionSignalWidget(
+                  active: _running,
+                  state: activeTour,
+                ),
+                const SizedBox(height: 10),
                 if (_running && selected != null)
                   _CompanionRunningCard(state: activeTour, route: selected)
                 else
-                  _CompanionPromiseCard(),
+                  const _CompanionPromiseCard(),
                 const SizedBox(height: 30),
                 Text(
                   '选择一条路线开始',
@@ -187,6 +192,158 @@ class _CompanionRunningCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A deliberately small field signal: it communicates whether the companion
+/// is actually receiving a usable position, without inventing a distance.
+class _CompanionSignalWidget extends StatelessWidget {
+  const _CompanionSignalWidget({required this.active, required this.state});
+
+  final bool active;
+  final ActiveTourState state;
+
+  NearbyStoryPoint? get _nearest => state.nearbyStoryPoints.firstOrNull;
+
+  bool get _hasFreshPosition =>
+      state.locationMode == TourLocationMode.real &&
+      state.latestLocationSample != null;
+
+  bool get _hasNearbyStory {
+    final status = _nearest?.status.name;
+    return status == 'approaching' ||
+        status == 'inRange' ||
+        status == 'triggered' ||
+        status == 'heard';
+  }
+
+  String get _headline {
+    if (!active) return '等你开启';
+    if (state.status == 'paused') return '随行已暂停';
+    if (state.status == 'permission_limited') return '等待定位许可';
+    if (state.locationMode == TourLocationMode.simulated) return '模拟定位';
+    if (state.status == 'monitoring' && _hasFreshPosition) return '定位正常';
+    if (state.status == 'monitoring') return '等待位置回传';
+    return '正在确认位置';
+  }
+
+  String get _detail {
+    if (!active) return '选择一条路线，现场信号会在这里亮起';
+    final point = _nearest;
+    if (point == null) return '—  ·  暂无可用故事点';
+    if (_hasNearbyStory) return '附近有一段声音';
+    return '沿途有故事，走近再听';
+  }
+
+  String get _distance {
+    // Simulated mode has no physical position. A null or unavailable sample
+    // must stay visibly unknown instead of looking like a measured distance.
+    if (!_hasFreshPosition) return '—';
+    final value = _nearest?.distanceMeters;
+    if (value == null || !value.isFinite) return '—';
+    if (value < 1000) return '${value.round()} m';
+    return '${(value / 1000).toStringAsFixed(1)} km';
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(minHeight: 76),
+        padding: const EdgeInsets.fromLTRB(14, 12, 15, 12),
+        decoration: BoxDecoration(
+          color: AppColors.paperDeep,
+          border: Border.all(color: AppColors.line),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(23),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(4),
+          ),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: CustomPaint(
+                painter: _CompanionSignalPainter(
+                  active: active,
+                  connected: _hasFreshPosition ||
+                      (active && state.locationMode == TourLocationMode.simulated),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _headline,
+                    style: discoverySerif(16, weight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _detail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: discoverySans(10, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 9),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _distance,
+                  style: const TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 20,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.terracotta,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text('距离', style: discoverySans(9, color: AppColors.textMuted)),
+              ],
+            ),
+          ],
+        ),
+      );
+}
+
+class _CompanionSignalPainter extends CustomPainter {
+  const _CompanionSignalPainter({required this.active, required this.connected});
+
+  final bool active;
+  final bool connected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2 - 3;
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = (active ? AppColors.terracotta : AppColors.textMuted)
+          .withValues(alpha: .42);
+    canvas.drawCircle(center, radius, ring);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius - 5),
+      -math.pi * .84,
+      math.pi * (connected ? 1.48 : .72),
+      false,
+      ring..color = (connected ? AppColors.moss : AppColors.terracotta).withValues(alpha: .85),
+    );
+    final dot = Paint()
+      ..style = PaintingStyle.fill
+      ..color = connected ? AppColors.moss : AppColors.terracotta;
+    canvas.drawCircle(center, active ? 4.5 : 3.5, dot);
+  }
+
+  @override
+  bool shouldRepaint(_CompanionSignalPainter oldDelegate) =>
+      oldDelegate.active != active || oldDelegate.connected != connected;
 }
 
 class _CompanionRouteTile extends StatelessWidget {
