@@ -33,6 +33,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   var _section = TravelerSection.journal;
   final _busyFavorites = <String>{};
   RouteExperience? _lastOpened;
+  String? _companionRouteId;
 
   @override
   void initState() {
@@ -104,6 +105,24 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   void _openRoute(RouteExperience route) {
     setState(() => _lastOpened = route);
     context.push('/route/${route.slug}');
+  }
+
+  Future<void> _startCompanion(RouteExperience route) async {
+    final journey = ref.read(journeyControllerProvider.notifier);
+    final journeyId = await journey.start(route);
+    if (!mounted) return;
+    final session = ref.read(journeyControllerProvider).session;
+    if (journeyId == null || session == null) {
+      _notice('这条随行暂时无法开始，请先打开路线查看详情。');
+      return;
+    }
+    if (route.audioTour != null) {
+      await ref
+          .read(activeTourControllerProvider.notifier)
+          .start(route, session);
+      return;
+    }
+    context.go('/journey/$journeyId');
   }
 
   Future<void> _toggleFavorite(RouteExperience route) =>
@@ -267,7 +286,10 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     state: state,
                     activeTour: tour,
                     onOpen: _openRoute,
-                    onCity: () => _chooseCity(state),
+                    selectedRouteId: _companionRouteId,
+                    onSelectRoute: (route) =>
+                        setState(() => _companionRouteId = route.id),
+                    onStart: _startCompanion,
                   ),
                 ],
               ),
