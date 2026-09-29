@@ -1054,7 +1054,7 @@ class _FieldPreparation extends ConsumerWidget {
           bottomLeft: Radius.circular(4),
           bottomRight: Radius.circular(4),
         ),
-        border: Border.all(color: Color(0x45252824)),
+        border: Border.fromBorderSide(BorderSide(color: Color(0x45252824))),
       ),
       child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,

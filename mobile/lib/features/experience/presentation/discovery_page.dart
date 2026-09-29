@@ -8,11 +8,11 @@ import '../../../core/theme/app_theme.dart';
 import '../application/nearby_story_points.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
+import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'audio_ownership_controller.dart';
 import 'discovery_controller.dart';
 import 'experience_providers.dart';
-import 'location_mode_controller.dart';
 import 'widgets/discovery_art.dart';
 import 'widgets/traveler_bottom_navigation.dart';
 
@@ -216,7 +216,8 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
         : hasTour
             ? tour.route!.title
             : _lastOpened?.title;
-    final bottom = MediaQuery.paddingOf(context).bottom
+    final bottom = MediaQuery.paddingOf(context)
+        .bottom
         .clamp(15.0, double.infinity)
         .toDouble();
     return Scaffold(
@@ -400,8 +401,7 @@ class _DiscoveryHeader extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              DiscoveryBrand(
-                  onTap: () => context.push('/profile')),
+              DiscoveryBrand(onTap: () => context.push('/profile')),
               if (city != null)
                 Tooltip(
                   message: '选择城市',

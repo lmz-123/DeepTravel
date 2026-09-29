@@ -11,14 +11,15 @@ TextStyle discoverySerif(
   FontWeight weight = FontWeight.w500,
   double height = 1.5,
   double spacing = 0,
-}) => TextStyle(
-  fontFamily: 'Noto Serif SC',
-  fontSize: size,
-  fontWeight: weight,
-  height: height,
-  letterSpacing: spacing,
-  color: color,
-);
+}) =>
+    TextStyle(
+      fontFamily: 'Noto Serif SC',
+      fontSize: size,
+      fontWeight: weight,
+      height: height,
+      letterSpacing: spacing,
+      color: color,
+    );
 
 TextStyle discoverySans(
   double size, {
@@ -26,13 +27,14 @@ TextStyle discoverySans(
   FontWeight weight = FontWeight.w400,
   double height = 1.5,
   double spacing = 0,
-}) => TextStyle(
-  fontSize: size,
-  fontWeight: weight,
-  height: height,
-  letterSpacing: spacing,
-  color: color,
-);
+}) =>
+    TextStyle(
+      fontSize: size,
+      fontWeight: weight,
+      height: height,
+      letterSpacing: spacing,
+      color: color,
+    );
 
 /// The same outlined marks used by the approved paper prototype. Keeping these
 /// paths local avoids platform-dependent Material icon silhouettes.
@@ -48,6 +50,9 @@ enum DiscoveryMark {
   close,
   check,
   pin,
+  radio,
+  play,
+  pause,
   sliders,
   headphones,
 }
@@ -68,11 +73,12 @@ class DiscoveryIcon extends StatelessWidget {
   final double stroke;
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
-    child: SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: _MarkPainter(mark, color, filled, stroke)),
-    ),
-  );
+        child: SizedBox.square(
+          dimension: size,
+          child:
+              CustomPaint(painter: _MarkPainter(mark, color, filled, stroke)),
+        ),
+      );
 }
 
 class _MarkPainter extends CustomPainter {
@@ -158,6 +164,33 @@ class _MarkPainter extends CustomPainter {
         path.cubicTo(12, 22, 4, 16, 4, 10);
         path.arcToPoint(const Offset(20, 10), radius: const Radius.circular(8));
         canvas.drawCircle(const Offset(12, 10), 2.5, pen);
+      case DiscoveryMark.radio:
+        canvas.drawCircle(const Offset(12, 12), 2.2, pen);
+        canvas.drawArc(
+          Rect.fromCircle(center: const Offset(12, 12), radius: 7),
+          math.pi * 1.15,
+          math.pi * .7,
+          false,
+          pen,
+        );
+        canvas.drawArc(
+          Rect.fromCircle(center: const Offset(12, 12), radius: 10),
+          math.pi * 1.18,
+          math.pi * .64,
+          false,
+          pen,
+        );
+      case DiscoveryMark.play:
+        path.moveTo(8, 5);
+        path.lineTo(19, 12);
+        path.lineTo(8, 19);
+        path.close();
+        if (filled) canvas.drawPath(path, Paint()..color = color);
+      case DiscoveryMark.pause:
+        path.moveTo(8, 5);
+        path.lineTo(8, 19);
+        path.moveTo(16, 5);
+        path.lineTo(16, 19);
       case DiscoveryMark.sliders:
         path.moveTo(3, 6);
         path.lineTo(7, 6);
@@ -263,9 +296,8 @@ class _DiscoveryTouchState extends State<DiscoveryTouch> {
             onTapUp: (_) => _set(false),
             onTapCancel: () => _set(false),
             child: AnimatedContainer(
-              duration: reduced
-                  ? Duration.zero
-                  : const Duration(milliseconds: 180),
+              duration:
+                  reduced ? Duration.zero : const Duration(milliseconds: 180),
               transform: Matrix4.translationValues(
                 0,
                 _pressed && widget.tint && !reduced ? 1 : 0,
@@ -283,14 +315,13 @@ class _DiscoveryTouchState extends State<DiscoveryTouch> {
                 ),
               ),
               child: AnimatedOpacity(
-                duration: reduced
-                    ? Duration.zero
-                    : const Duration(milliseconds: 180),
+                duration:
+                    reduced ? Duration.zero : const Duration(milliseconds: 180),
                 opacity: widget.onTap == null
                     ? .3
                     : _pressed && !widget.tint
-                    ? .76
-                    : 1,
+                        ? .76
+                        : 1,
                 child: widget.child,
               ),
             ),
@@ -306,48 +337,48 @@ class DiscoveryBrand extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
-    label: '打开个人档案',
-    onTap: onTap,
-    child: SizedBox(
-      height: 48,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: 33,
-            height: 36,
-            child: CustomPaint(painter: _BrandPainter()),
-          ),
-          const SizedBox(width: 7),
-          Column(
+        label: '打开个人档案',
+        onTap: onTap,
+        child: SizedBox(
+          height: 48,
+          child: Row(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '见地',
-                style: discoverySerif(
-                  24,
-                  weight: FontWeight.w600,
-                  height: 1,
-                  spacing: .48,
-                ),
+              const SizedBox(
+                width: 33,
+                height: 36,
+                child: CustomPaint(painter: _BrandPainter()),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'THE CITY, UNFOLDED',
-                style: discoverySans(
-                  6,
-                  spacing: .48,
-                  height: 1,
-                  color: const Color(0xff817764),
-                ),
+              const SizedBox(width: 7),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '见地',
+                    style: discoverySerif(
+                      24,
+                      weight: FontWeight.w600,
+                      height: 1,
+                      spacing: .48,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'THE CITY, UNFOLDED',
+                    style: discoverySans(
+                      6,
+                      spacing: .48,
+                      height: 1,
+                      color: const Color(0xff817764),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
 
 class _BrandPainter extends CustomPainter {
@@ -387,9 +418,9 @@ class DiscoveryCircle extends StatelessWidget {
   final double angle;
   @override
   Widget build(BuildContext context) => CustomPaint(
-    foregroundPainter: _CirclePainter(color, angle),
-    child: child,
-  );
+        foregroundPainter: _CirclePainter(color, angle),
+        child: child,
+      );
 }
 
 class _CirclePainter extends CustomPainter {
@@ -474,15 +505,15 @@ class DiscoveryPhoto extends StatelessWidget {
   }
 
   Widget _fallback() => const ColoredBox(
-    color: Color(0xffe7e9d6),
-    child: Center(
-      child: DiscoveryIcon(
-        DiscoveryMark.pin,
-        size: 28,
-        color: Color(0xff869273),
-      ),
-    ),
-  );
+        color: Color(0xffe7e9d6),
+        child: Center(
+          child: DiscoveryIcon(
+            DiscoveryMark.pin,
+            size: 28,
+            color: Color(0xff869273),
+          ),
+        ),
+      );
 }
 
 class DiscoveryPaperButton extends StatelessWidget {
@@ -499,39 +530,39 @@ class DiscoveryPaperButton extends StatelessWidget {
   final Widget? child;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
-    label: label,
-    onTap: onTap,
-    child: Container(
-      constraints: const BoxConstraints(minHeight: 52),
-      padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 12),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(4),
-          topRight: Radius.circular(18),
-          bottomLeft: Radius.circular(4),
-          bottomRight: Radius.circular(4),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(
-            child: Text(
-              label,
-              style: discoverySans(14, color: AppColors.paper),
+        label: label,
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 52),
+          padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 12),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(4),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(4),
+              bottomRight: Radius.circular(4),
             ),
           ),
-          child ??
-              const DiscoveryIcon(
-                DiscoveryMark.arrowUpRight,
-                color: AppColors.paper,
-                size: 19,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  style: discoverySans(14, color: AppColors.paper),
+                ),
               ),
-        ],
-      ),
-    ),
-  );
+              child ??
+                  const DiscoveryIcon(
+                    DiscoveryMark.arrowUpRight,
+                    color: AppColors.paper,
+                    size: 19,
+                  ),
+            ],
+          ),
+        ),
+      );
 }
 
 /// Retains the physical paper silhouette independently of photo dimensions.

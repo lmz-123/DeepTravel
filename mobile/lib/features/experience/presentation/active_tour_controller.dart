@@ -715,7 +715,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     _refreshNearbyStoryPoints(sample);
   }
 
-  Future<void> triggerNextDemo() async {
+  Future<void> triggerNextDemo({bool autoPlay = true}) async {
     final reporter = ref.read(runtimeLogReporterProvider);
     if (state.locationMode != TourLocationMode.simulated ||
         state.status != 'simulated' ||
@@ -826,9 +826,17 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         ));
         return;
       }
-      final triggered = await _trigger(next, method: 'demo');
+      final triggered = await _trigger(
+        next,
+        method: 'demo',
+        autoPlay: autoPlay,
+      );
       if (triggered) {
-        state = state.copyWith(locationMessage: '已到达新线索，正在准备播放故事。');
+        state = state.copyWith(
+          locationMessage: autoPlay
+              ? '已到达新线索，正在准备播放故事。'
+              : '已到达新线索，准备好后点击播放。',
+        );
       } else {
         state = state.copyWith(locationMessage: '新线索暂时没有触发成功，请再次点击重试。');
       }
@@ -919,11 +927,12 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   Future<bool> _trigger(StoryFragment fragment,
-      {required String method, LocationSample? sample}) async {
+      {required String method, LocationSample? sample, bool? autoPlay}) async {
     final session = state.session;
     if (session == null) return false;
     final transition = _transitionGeneration;
     final reporter = ref.read(runtimeLogReporterProvider);
+    final shouldAutoPlay = autoPlay ?? method == 'demo';
     _triggering = true;
     final key = _uuid.v4();
     unawaited(reporter?.info(
@@ -952,13 +961,12 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           },
         ));
         _triggerEngine.acknowledge(fragment.id);
-        await _enqueueNarration(revealed, autoPlay: method == 'demo');
+        await _enqueueNarration(revealed, autoPlay: shouldAutoPlay);
         if (method == 'location') {
           final title = fragment.title ?? fragment.safePreview;
           state = state.copyWith(
-            locationMessage: title.isEmpty
-                ? '已到达新线索，准备好了就点击播放。'
-                : '已到达「$title」，准备好了就点击播放。',
+            locationMessage:
+                title.isEmpty ? '已到达新线索，准备好了就点击播放。' : '已到达「$title」，准备好了就点击播放。',
           );
         }
         return true;
@@ -983,13 +991,12 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       // but must not seize the traveller's ears without an explicit tap.
       // Simulation keeps its existing autoplay shortcut for deterministic
       // demos and tests.
-      await _enqueueNarration(revealed, autoPlay: method == 'demo');
+      await _enqueueNarration(revealed, autoPlay: shouldAutoPlay);
       if (method == 'location') {
         final title = fragment.title ?? fragment.safePreview;
         state = state.copyWith(
-          locationMessage: title.isEmpty
-              ? '已到达新线索，准备好了就点击播放。'
-              : '已到达「$title」，准备好了就点击播放。',
+          locationMessage:
+              title.isEmpty ? '已到达新线索，准备好了就点击播放。' : '已到达「$title」，准备好了就点击播放。',
         );
       }
       await _refreshLedger();
@@ -1014,7 +1021,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           'accuracy_m': sample?.accuracyM
         }));
         if (state.preparedPaths.containsKey(fragment.id)) {
-          await _enqueueNarration(fragment, autoPlay: method == 'demo');
+          await _enqueueNarration(fragment, autoPlay: shouldAutoPlay);
         }
       }
       state = state.copyWith(errorMessage: _message(error));
@@ -1682,7 +1689,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     _loadedProfileId = null;
   }
 
-  Future<void> resumeTour() async {
+  Future<void> resumeTour({bool resumeAudio = true}) async {
     if (state.locationMode == TourLocationMode.simulated) {
       state = state.copyWith(
           status: 'simulated',
@@ -1693,7 +1700,28 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     } else {
       await _activateRealLocation();
     }
-    if (state.current != null && _loadedFragmentId == state.current!.id) {
+    if (!resumeAudio) {
+      _cancelPendingPlayback();
+      await _player.stop();
+      final token = _audioOwnershipGeneration;
+      if (token != null) {
+        ref.read(audioOwnershipProvider.notifier).clear(token);
+        _audioOwnershipGeneration = null;
+      }
+      _loadedFragmentId = null;
+      _loadedProfileId = null;
+      state = state.copyWith(
+        isPlaying: false,
+        nearbyStoryPoints: const [],
+        clearCurrent: true,
+        clearLiveFragment: true,
+        clearPlaybackOwner: true,
+      );
+      return;
+    }
+    if (resumeAudio &&
+        state.current != null &&
+        _loadedFragmentId == state.current!.id) {
       await _player.resume();
       state = state.copyWith(isPlaying: true);
       final token = _audioOwnershipGeneration;
