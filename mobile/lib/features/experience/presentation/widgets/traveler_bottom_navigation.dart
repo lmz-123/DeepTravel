@@ -9,7 +9,15 @@ import '../active_tour_controller.dart';
 import 'discovery_art.dart';
 
 // Legacy destinations stay available to existing journey and footprint screens.
-enum TravelerSection { discovery, journey, footprints, journal, atlas, shelf }
+enum TravelerSection {
+  discovery,
+  journey,
+  footprints,
+  journal,
+  atlas,
+  companion,
+  shelf,
+}
 
 class TravelerBottomNavigation extends ConsumerWidget {
   const TravelerBottomNavigation({
@@ -28,14 +36,16 @@ class TravelerBottomNavigation extends ConsumerWidget {
     final entries = [
       (TravelerSection.journal, DiscoveryMark.book, '随刊'),
       (TravelerSection.atlas, DiscoveryMark.search, '路线'),
-      (TravelerSection.shelf, DiscoveryMark.bookmark, '书架'),
+      (TravelerSection.companion, DiscoveryMark.pin, '随行'),
     ];
     return Padding(
       padding: EdgeInsets.fromLTRB(
         horizontal,
         0,
         horizontal,
-        MediaQuery.paddingOf(context).bottom.clamp(15.0, double.infinity),
+        MediaQuery.paddingOf(context).bottom
+            .clamp(15.0, double.infinity)
+            .toDouble(),
       ),
       child: Stack(
         clipBehavior: Clip.none,

@@ -952,7 +952,15 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           },
         ));
         _triggerEngine.acknowledge(fragment.id);
-        await _enqueueNarration(revealed);
+        await _enqueueNarration(revealed, autoPlay: method == 'demo');
+        if (method == 'location') {
+          final title = fragment.title ?? fragment.safePreview;
+          state = state.copyWith(
+            locationMessage: title.isEmpty
+                ? '已到达新线索，准备好了就点击播放。'
+                : '已到达「$title」，准备好了就点击播放。',
+          );
+        }
         return true;
       } finally {
         _triggering = false;
@@ -971,7 +979,19 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         return false;
       }
       _triggerEngine.acknowledge(fragment.id);
-      await _enqueueNarration(revealed);
+      // A physical arrival reveals the story and makes its player available,
+      // but must not seize the traveller's ears without an explicit tap.
+      // Simulation keeps its existing autoplay shortcut for deterministic
+      // demos and tests.
+      await _enqueueNarration(revealed, autoPlay: method == 'demo');
+      if (method == 'location') {
+        final title = fragment.title ?? fragment.safePreview;
+        state = state.copyWith(
+          locationMessage: title.isEmpty
+              ? '已到达新线索，准备好了就点击播放。'
+              : '已到达「$title」，准备好了就点击播放。',
+        );
+      }
       await _refreshLedger();
       unawaited(reporter?.info(
         'tour',
@@ -994,7 +1014,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
           'accuracy_m': sample?.accuracyM
         }));
         if (state.preparedPaths.containsKey(fragment.id)) {
-          await _enqueueNarration(fragment);
+          await _enqueueNarration(fragment, autoPlay: method == 'demo');
         }
       }
       state = state.copyWith(errorMessage: _message(error));
@@ -1015,7 +1035,8 @@ class ActiveTourController extends Notifier<ActiveTourState> {
     }
   }
 
-  Future<void> _enqueueNarration(StoryFragment fragment) async {
+  Future<void> _enqueueNarration(StoryFragment fragment,
+      {bool autoPlay = true}) async {
     if (state.current != null && state.isPlaying) {
       state = state.copyWith(
         queue: [...state.queue, fragment],
@@ -1032,7 +1053,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         position: Duration.zero,
         clearError: true);
     await _persistNarrationQueue();
-    await _playNarration(fragment);
+    if (autoPlay) await _playNarration(fragment);
   }
 
   Future<void> _onNarrationCompleted(int generation) async {

@@ -9,6 +9,7 @@ class _DiscoveryJournal extends StatefulWidget {
     required this.onOpen,
     required this.onCity,
     required this.onAtlas,
+    required this.onCompanion,
     required this.onRefresh,
     super.key,
   });
@@ -16,6 +17,7 @@ class _DiscoveryJournal extends StatefulWidget {
   final Set<String> saved, busyFavorites;
   final ValueChanged<RouteExperience> onFavorite, onOpen;
   final VoidCallback onCity, onAtlas;
+  final VoidCallback onCompanion;
   final Future<void> Function() onRefresh;
   @override
   State<_DiscoveryJournal> createState() => _DiscoveryJournalState();
@@ -243,6 +245,74 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal> {
                                       color: Color(0xff6d6656),
                                     ),
                                   ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        DiscoveryTouch(
+                          label: '打开随行，开启到点提醒',
+                          onTap: widget.onCompanion,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 11,
+                              horizontal: 2,
+                            ),
+                            decoration: const BoxDecoration(
+                              border: Border(
+                                top: BorderSide(color: Color(0x35252824)),
+                                bottom: BorderSide(color: AppColors.terracotta),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.terracotta,
+                                    ),
+                                  ),
+                                  child: const Center(
+                                    child: DiscoveryIcon(
+                                      DiscoveryMark.pin,
+                                      size: 15,
+                                      color: AppColors.terracotta,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '随行',
+                                        style: discoverySerif(
+                                          17,
+                                          color: AppColors.terracotta,
+                                          weight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '到点先提醒，再决定听不听',
+                                        style: discoverySans(
+                                          9,
+                                          color: const Color(0xff8a7763),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const DiscoveryIcon(
+                                  DiscoveryMark.arrowUpRight,
+                                  size: 17,
+                                  color: AppColors.terracotta,
                                 ),
                               ],
                             ),

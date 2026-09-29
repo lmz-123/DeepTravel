@@ -422,6 +422,10 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                             : '可以先收藏，留给下次',
                         style: manualType(11, color: const Color(0xFF61645B)),
                       ),
+                      if (route.audioTour != null || route.stops.isNotEmpty) ...[
+                        const SizedBox(height: 22),
+                        _FieldPreparation(route: route, onStart: _startField),
+                      ],
                       if (route.audioTour?.productionReady == false &&
                           (route.audioTour?.demoLabel?.isNotEmpty ?? false))
                         Padding(
@@ -733,11 +737,6 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                         ),
                         const SizedBox(height: 36),
                       ],
-                      if (route.audioTour != null ||
-                          route.stops.isNotEmpty) ...[
-                        _FieldPreparation(route: route, onStart: _startField),
-                        const SizedBox(height: 30),
-                      ],
                       Container(
                         padding: const EdgeInsets.only(top: 27, bottom: 32),
                         decoration: const BoxDecoration(
@@ -1045,14 +1044,30 @@ class _FieldPreparation extends ConsumerWidget {
             const OfflinePackageStatus.idle();
     final mode = ref.watch(locationModeControllerProvider).asData?.value ??
         TourLocationMode.real;
-    return Column(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFFECE8D9),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(4),
+          topRight: Radius.circular(24),
+          bottomLeft: Radius.circular(4),
+          bottomRight: Radius.circular(4),
+        ),
+        border: Border.all(color: Color(0x45252824)),
+      ),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '03 / TAKE THIS WALK',
-          style: manualType(9, color: manualMuted, spacing: 1.08),
+          '随行 / LOCATION LISTENING',
+          style: manualType(9, color: manualRed, spacing: 1.08),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
+        Text('到点发现，点击播放', style: manualType(23, serif: true, weight: FontWeight.w600)),
+        const SizedBox(height: 3),
+        Text('开启后，靠近故事点时再提醒你。不会打开页面就播放。', style: manualType(10, color: manualMuted, height: 1.6)),
+        const SizedBox(height: 8),
         TextButton.icon(
           onPressed: journey.isBusy ? null : onStart,
           style: TextButton.styleFrom(
@@ -1062,12 +1077,12 @@ class _FieldPreparation extends ConsumerWidget {
           ),
           icon: const Icon(Icons.directions_walk_outlined, size: 20),
           label: Text(
-            journey.isBusy ? '正在准备行走…' : '到现场，开始行走',
+            journey.isBusy ? '正在准备随行…' : '开启随行',
             style: manualType(18, serif: true, color: manualRed),
           ),
         ),
         Text('到了现场，再让位置带你发现沿途。', style: manualType(11, color: manualMuted)),
-        const SizedBox(height: 12),
+        const SizedBox(height: 7),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
           childrenPadding: const EdgeInsets.only(bottom: 12),
@@ -1117,6 +1132,7 @@ class _FieldPreparation extends ConsumerWidget {
         if (journey.errorMessage != null)
           Text(journey.errorMessage!, style: manualType(12, color: manualRed)),
       ],
+      ),
     );
   }
 }

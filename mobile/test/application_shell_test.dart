@@ -12,11 +12,12 @@ import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
+import 'package:jiandi/features/experience/presentation/profile_page.dart';
 import 'package:jiandi/features/experience/presentation/traveler_shell.dart';
 
 void main() {
   testWidgets(
-      'brand opens the shared traveler drawer and navigation keeps player',
+      'brand opens the personal file and navigation keeps player',
       (tester) async {
     final player = _Player();
     final container = ProviderContainer(overrides: [
@@ -31,6 +32,10 @@ void main() {
         builder: (_, __, child) => TravelerShell(child: child),
         routes: [
           GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
+          GoRoute(
+            path: '/profile',
+            builder: (_, __) => const ProfilePage(),
+          ),
           GoRoute(
             path: '/footprints',
             builder: (_, __) => const Scaffold(body: Text('足迹页已打开')),
@@ -50,14 +55,18 @@ void main() {
     await tester.pumpAndSettle();
     final originalPlayer = container.read(narrationPlayerProvider);
 
+    final profileTrigger = find.bySemanticsLabel(RegExp('打开个人档案'));
     final menuTrigger = find.bySemanticsLabel(RegExp('打开旅行者菜单'));
+    expect(profileTrigger, findsOneWidget);
+    await tester.tap(profileTrigger);
+    await tester.pumpAndSettle();
+    expect(find.text('PRIVATE FILE / 见地档案'), findsOneWidget);
     expect(menuTrigger, findsOneWidget);
+    await tester.tap(menuTrigger);
+    await tester.pumpAndSettle();
     expect(find.byTooltip('账号'), findsNothing);
     expect(find.text('见地现场'), findsNothing);
     expect(find.text('动态'), findsNothing);
-    await tester.tap(menuTrigger);
-    await tester.pumpAndSettle();
-
     expect(find.text('见地旅行者'), findsOneWidget);
     final drawerFootprints = find.widgetWithText(ListTile, '足迹');
     expect(drawerFootprints, findsOneWidget);
@@ -104,6 +113,10 @@ void main() {
         builder: (_, __, child) => TravelerShell(child: child),
         routes: [
           GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
+          GoRoute(
+            path: '/profile',
+            builder: (_, __) => const ProfilePage(),
+          ),
         ],
       ),
     ]);
@@ -115,6 +128,8 @@ void main() {
     await container.read(authControllerProvider.future);
     await tester.pumpAndSettle();
 
+    await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
+    await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel(RegExp('打开旅行者菜单')));
     await tester.pumpAndSettle();
     expect(find.text('tester-a'), findsOneWidget);
@@ -123,6 +138,8 @@ void main() {
     expect(auth.session?.user.id, 'tester-b');
     expect(store.clearCalls, 1);
 
+    await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
+    await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel(RegExp('打开旅行者菜单')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('退出登录'));

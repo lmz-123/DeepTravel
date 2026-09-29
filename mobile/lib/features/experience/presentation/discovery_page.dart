@@ -11,13 +11,14 @@ import 'active_tour_controller.dart';
 import 'audio_ownership_controller.dart';
 import 'discovery_controller.dart';
 import 'experience_providers.dart';
-import 'traveler_shell.dart';
+import 'location_mode_controller.dart';
 import 'widgets/discovery_art.dart';
 import 'widgets/traveler_bottom_navigation.dart';
 
 part 'discovery_journal.dart';
 part 'discovery_atlas.dart';
 part 'discovery_shelf.dart';
+part 'discovery_companion.dart';
 
 class DiscoveryPage extends ConsumerStatefulWidget {
   const DiscoveryPage({super.key, this.initialTab});
@@ -49,6 +50,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   TravelerSection _parseTab(String? tab) => switch (tab) {
         'atlas' => TravelerSection.atlas,
         'shelf' => TravelerSection.shelf,
+        'companion' => TravelerSection.companion,
         _ => TravelerSection.journal,
       };
 
@@ -194,8 +196,9 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
         : hasTour
             ? tour.route!.title
             : _lastOpened?.title;
-    final bottom =
-        MediaQuery.paddingOf(context).bottom.clamp(15.0, double.infinity);
+    final bottom = MediaQuery.paddingOf(context).bottom
+        .clamp(15.0, double.infinity)
+        .toDouble();
     return Scaffold(
       backgroundColor: AppColors.paper,
       body: Stack(
@@ -212,6 +215,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                 index: switch (_section) {
                   TravelerSection.atlas => 1,
                   TravelerSection.shelf => 2,
+                  TravelerSection.companion => 3,
                   _ => 0,
                 },
                 children: [
@@ -225,6 +229,8 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     onCity: () => _chooseCity(state),
                     onAtlas: () =>
                         setState(() => _section = TravelerSection.atlas),
+                    onCompanion: () =>
+                        setState(() => _section = TravelerSection.companion),
                     onRefresh: _refresh,
                   ),
                   _DiscoveryAtlas(
@@ -255,6 +261,12 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     onCity: () => _chooseCity(state),
                     onBrowse: () =>
                         setState(() => _section = TravelerSection.journal),
+                  ),
+                  _DiscoveryCompanion(
+                    state: state,
+                    activeTour: tour,
+                    onOpen: _openRoute,
+                    onCity: () => _chooseCity(state),
                   ),
                 ],
               ),
@@ -366,7 +378,7 @@ class _DiscoveryHeader extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               DiscoveryBrand(
-                  onTap: () => TravelerShellScope.showDrawer(context)),
+                  onTap: () => context.push('/profile')),
               if (city != null)
                 Tooltip(
                   message: '选择城市',

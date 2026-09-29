@@ -8,6 +8,7 @@ import '../../features/experience/presentation/recap_page.dart';
 import '../../features/experience/presentation/route_detail_page.dart';
 import '../../features/experience/presentation/settings_page.dart';
 import '../../features/experience/presentation/home_story_page.dart';
+import '../../features/experience/presentation/profile_page.dart';
 import '../../features/experience/presentation/traveler_shell.dart';
 
 final appRouter = GoRouter(
@@ -57,6 +58,10 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsPage(),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfilePage(),
         ),
       ],
     ),

@@ -306,7 +306,7 @@ class DiscoveryBrand extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
-    label: '打开旅行者菜单',
+    label: '打开个人档案',
     onTap: onTap,
     child: SizedBox(
       height: 48,
