@@ -1,5 +1,8 @@
+import '../../data/platform_tour_adapters.dart' show preparedFileExists;
+import '../../data/prepared_route_service.dart' show narrationCacheVersion;
 import '../../domain/fragment_models.dart';
 import '../../domain/models.dart';
+import '../../domain/tour_runtime.dart';
 
 /// Reading a chapter is deliberately independent of an on-site journey.
 class ManualChapter {
@@ -50,7 +53,7 @@ List<ManualChapter> routeManualChapters(RouteExperience route) {
         body: fragment.transcript ?? stop?.storyBody ?? fragment.safePreview,
         image:
             (stop?.image.isNotEmpty ?? false) ? stop!.image : route.heroImage,
-        fragment: fragment,
+        fragment: manualNarrationFragment(route, fragment),
         duration: Duration(seconds: fragment.expectedDurationSeconds ?? 0),
       );
     }).toList(growable: false);
@@ -67,6 +70,19 @@ List<ManualChapter> routeManualChapters(RouteExperience route) {
         ),
       )
       .toList(growable: false);
+}
+
+StoryFragment manualNarrationFragment(
+        RouteExperience route, StoryFragment fragment) =>
+    fragment.withNarrationProfile(route.audioTour?.effectiveProfileId(null));
+
+Future<String?> preparedManualChapterPath(
+    TourStore store, RouteExperience route, StoryFragment fragment) async {
+  final profileId = route.audioTour?.effectiveProfileId(null);
+  final asset = fragment.narrationFor(profileId);
+  final path = await store.preparedAsset(
+      asset.url, narrationCacheVersion(profileId, asset), asset.sizeBytes);
+  return preparedFileExists(path, asset.sizeBytes) ? path : null;
 }
 
 String manualTime(Duration value) =>

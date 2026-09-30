@@ -156,12 +156,13 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
     if (choice.mode == ManualChapterMode.audio) {
       final session =
           ref.read(manualSessionProvider(widget.route.id)).asData?.value;
-      final asset = choice.chapter.fragment!.audio;
       String? preparedPath;
       try {
-        preparedPath = await ref
-            .read(tourStoreProvider)
-            .preparedAsset(asset.url, asset.scriptVersion, asset.sizeBytes);
+        preparedPath = await preparedManualChapterPath(
+          ref.read(tourStoreProvider),
+          widget.route,
+          choice.chapter.fragment!,
+        );
       } catch (_) {
         // A missing local cache can still play the original published URL.
       }

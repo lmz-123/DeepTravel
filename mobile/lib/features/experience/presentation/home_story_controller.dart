@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/api_experience_repository.dart';
 import '../data/home_story_audio_player.dart';
+import '../data/platform_tour_adapters.dart' show preparedFileExists;
 import '../domain/home_story.dart';
 import '../domain/fragment_models.dart';
 import '../domain/models.dart';
 import 'active_tour_controller.dart';
 import 'audio_ownership_controller.dart';
 import 'experience_providers.dart';
+import 'route_manual/manual_chapter.dart' show manualNarrationFragment;
 
 enum HomeStoryPhase {
   idle,
@@ -170,6 +173,10 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
     Duration resumePosition = Duration.zero,
     String? preparedPath,
   }) async {
+    fragment = manualNarrationFragment(route, fragment);
+    if (!preparedFileExists(preparedPath, fragment.audio.sizeBytes)) {
+      preparedPath = null;
+    }
     final id =
         'manual:${route.id}:${fragment.id}:${fragment.audio.scriptVersion}';
     final audioUrl = preparedPath == null
@@ -207,7 +214,7 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
       routeTitle: route.title,
       routeSlug: route.slug,
       narratorName: route.audioTour
-              ?.profile(route.audioTour?.defaultNarrationProfileId)
+              ?.profile(route.audioTour?.effectiveProfileId(null))
               ?.name ??
           '见地讲述者',
       contentType: '城市手册',
@@ -291,12 +298,26 @@ class HomeStoryPlaybackController extends Notifier<HomeStoryPlaybackState> {
       if (!_requestIsCurrent(generation, story.id)) return;
       state = state.copyWith(phase: HomeStoryPhase.playing, clearMessage: true);
       ref.read(audioOwnershipProvider.notifier).playing(token, true);
-    } catch (_) {
+    } catch (error) {
       if (!_requestIsCurrent(generation, story.id)) return;
       state = state.copyWith(
         phase: HomeStoryPhase.error,
         message: '这段音频暂时不能播放，文字稿仍然可以阅读。',
       );
+      final uri = Uri.tryParse(story.audioUrl);
+      unawaited(ref.read(runtimeLogReporterProvider)?.error(
+        'audio',
+        'story_playback_failed',
+        error: error,
+        context: {
+          'source': state.source.name,
+          'story_id': story.id,
+          'route_slug': story.routeSlug,
+          'audio_scheme': uri?.scheme,
+          if (uri?.scheme == 'http' || uri?.scheme == 'https')
+            'audio_host': uri?.host,
+        },
+      ));
     }
   }
 
