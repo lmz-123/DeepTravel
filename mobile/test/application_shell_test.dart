@@ -16,8 +16,7 @@ import 'package:jiandi/features/experience/presentation/profile_page.dart';
 import 'package:jiandi/features/experience/presentation/traveler_shell.dart';
 
 void main() {
-  testWidgets(
-      'brand opens the personal file and navigation keeps player',
+  testWidgets('brand opens the personal file and navigation keeps player',
       (tester) async {
     final player = _Player();
     final container = ProviderContainer(overrides: [
@@ -56,12 +55,13 @@ void main() {
     final originalPlayer = container.read(narrationPlayerProvider);
 
     final profileTrigger = find.bySemanticsLabel(RegExp('打开个人档案'));
-    final menuTrigger = find.bySemanticsLabel(RegExp('打开旅行者菜单'));
+    final menuTrigger = find.byTooltip('打开旅行者菜单');
     expect(profileTrigger, findsOneWidget);
     await tester.tap(profileTrigger);
     await tester.pumpAndSettle();
     expect(find.text('PRIVATE FILE / 见地档案'), findsOneWidget);
     expect(menuTrigger, findsOneWidget);
+    expect(menuTrigger.hitTestable(), findsOneWidget);
     await tester.tap(menuTrigger);
     await tester.pumpAndSettle();
     expect(find.byTooltip('账号'), findsNothing);
@@ -83,7 +83,7 @@ void main() {
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('足迹页已打开'), findsNothing);
-    await tester.tap(find.bySemanticsLabel(RegExp('打开旅行者菜单')));
+    await tester.tap(find.byTooltip('打开旅行者菜单'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('设置'));
     await tester.pumpAndSettle();
@@ -130,9 +130,12 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel(RegExp('打开旅行者菜单')));
+    await tester.tap(find.byTooltip('打开旅行者菜单'));
     await tester.pumpAndSettle();
-    expect(find.text('tester-a'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(Drawer), matching: find.text('tester-a')),
+      findsOneWidget,
+    );
     await tester.tap(find.text('切换测试账号 B'));
     await tester.pumpAndSettle();
     expect(auth.session?.user.id, 'tester-b');
@@ -140,7 +143,7 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel(RegExp('打开旅行者菜单')));
+    await tester.tap(find.byTooltip('打开旅行者菜单'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('退出登录'));
     await tester.pumpAndSettle();

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jiandi/core/router/travel_destinations.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
@@ -15,6 +16,8 @@ import 'package:jiandi/features/experience/presentation/active_tour_controller.d
 import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
+import 'package:jiandi/features/experience/presentation/location_mode_controller.dart';
+import 'package:jiandi/features/experience/presentation/offline_package_controller.dart';
 
 /// Companion regression coverage is deliberately kept separate from release
 /// approval. The tests assert the native phone surface size, keep labeled
@@ -90,16 +93,160 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('preparing and cancelling never starts GPS or a journey',
+      (tester) async {
+    final harness = _CompanionHarness();
+    await _pump(tester, harness: harness);
+    await _reveal(tester, find.byKey(const ValueKey('companion-primary')));
+    await tester.tap(find.byKey(const ValueKey('companion-primary')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byKey(const ValueKey('companion-walk-settings-sheet')),
+        findsOneWidget);
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    expect(find.byTooltip('关闭行走设置').hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip('关闭行走设置'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    expect(harness.discovery.coldStartCalls, 0);
+    expect(find.byKey(const ValueKey('companion-walk-settings-sheet')),
+        findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the fifth requested route is selected before explicit start',
+      (tester) async {
+    final routes = List.generate(6, (i) => _route('route-$i', '测试路线 $i'));
+    final harness = _CompanionHarness(routes: routes);
+    await _pump(tester, harness: harness, requestedSlug: 'route-4');
+
+    expect(find.text('本次随行 · 测试路线 4'), findsOneWidget);
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    await _reveal(tester, find.byKey(const ValueKey('companion-primary')));
+    await tester.tap(find.byKey(const ValueKey('companion-primary')));
+    await _confirmStart(tester);
+    expect(harness.tour.snapshot.route?.id, 'route-4');
+    expect(harness.journey.startCalls, 1);
+    expect(harness.tour.startCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cross-city handoff retains the requested route outside catalog',
+      (tester) async {
+    final requested = _route('another-city', '另一座城的旅程');
+    final harness = _CompanionHarness(requestedRoute: requested);
+    await _pump(tester, harness: harness, requestedSlug: requested.slug);
+
+    expect(find.text('本次随行 · 另一座城的旅程'), findsOneWidget);
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    expect(harness.discovery.coldStartCalls, 0);
+    await _reveal(tester, find.byKey(const ValueKey('companion-primary')));
+    await tester.tap(find.byKey(const ValueKey('companion-primary')));
+    await _confirmStart(tester);
+    expect(harness.tour.snapshot.route?.id, requested.id);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('returning from the same route detail renews its selection',
+      (tester) async {
+    final harness = _CompanionHarness();
+    final router = await _pump(tester,
+        harness: harness, requestedSlug: _routes.first.slug);
+    final firstRequest =
+        router.routeInformationProvider.value.uri.queryParameters['selection'];
+    final originalPage = tester.state(find.byType(DiscoveryPage));
+    expect(find.text('本次随行 · 测试路线 0'), findsOneWidget);
+
+    final second = find.byKey(const ValueKey('companion-route-route-1'));
+    await _reveal(tester, second);
+    await tester.tap(second);
+    await tester.pump();
+    expect(find.text('本次随行 · 测试路线 1'), findsOneWidget);
+
+    router.push('/route/${_routes.first.slug}');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('detail:route-0'), findsOneWidget);
+    await tester.tap(find.text('去随行'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    expect(tester.state(find.byType(DiscoveryPage)), same(originalPage));
+    expect(router.routeInformationProvider.value.uri.queryParameters['route'],
+        _routes.first.slug);
+    expect(
+        router.routeInformationProvider.value.uri.queryParameters['selection'],
+        isNot(firstRequest));
+    expect(find.text('本次随行 · 测试路线 0'), findsOneWidget);
+    expect(find.text('本次随行 · 测试路线 1'), findsNothing);
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed route handoff never silently chooses the first route',
+      (tester) async {
+    final harness = _CompanionHarness();
+    await _pump(tester, harness: harness, requestedSlug: 'missing-route');
+    expect(find.text('这条路线暂时未能载入。'), findsOneWidget);
+    expect(find.text('重新载入'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('companion-selected-route')), findsNothing);
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('handoff while walking preserves session and listening progress',
+      (tester) async {
+    final initial = ActiveTourState(
+      status: 'paused',
+      route: _routes.first,
+      session: _session(_routes.first),
+      current: _fragment,
+      position: const Duration(seconds: 37),
+      selectedFragmentId: _fragment.id,
+      locationMode: TourLocationMode.simulated,
+    );
+    final requested = _route('another-city', '另一座城的旅程');
+    final harness = _CompanionHarness(
+      initialTour: initial,
+      requestedRoute: requested,
+    );
+    final router = await _pump(tester, harness: harness);
+    router.go('/?tab=companion&route=${requested.slug}');
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(harness.tour.snapshot, same(initial));
+    expect(harness.tour.snapshot.position, const Duration(seconds: 37));
+    expect(harness.tour.snapshot.session?.id, 'session-route-0');
+    expect(harness.tour.startCalls, 0);
+    expect(harness.tour.stopCalls, 0);
+    expect(harness.journey.startCalls, 0);
+    expect(find.text('继续寻找'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('starting disables repeated taps while preparing',
       (tester) async {
-    final harness =
-        _CompanionHarness(startDelay: const Duration(milliseconds: 80));
+    final harness = _CompanionHarness(startDelay: const Duration(seconds: 2));
     await _pump(tester, harness: harness);
 
     final primary = find.byKey(const ValueKey('companion-primary'));
     await _reveal(tester, primary);
     await tester.tap(primary);
     await tester.pump();
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    await _confirmStart(tester);
     expect(find.text('准备中…'), findsOneWidget);
 
     await _reveal(tester, primary);
@@ -107,7 +254,7 @@ void main() {
     expect(harness.journey.startCalls, 1);
     expect(harness.tour.startCalls, 1);
 
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(seconds: 3));
     expect(harness.tour.startCalls, 1);
     expect(find.text('暂停随行'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -123,7 +270,7 @@ void main() {
     await _reveal(tester, primary);
     await tester.tap(primary);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1));
+    await _confirmStart(tester);
     expect(find.text('暂停随行'), findsOneWidget);
 
     await _reveal(tester, find.text('暂停随行'));
@@ -166,7 +313,7 @@ void main() {
     await _reveal(tester, primary);
     await tester.tap(primary);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1));
+    await _confirmStart(tester);
     expect(find.text('暂停随行'), findsOneWidget);
 
     await _reveal(tester, find.text('结束本次随行'));
@@ -178,10 +325,11 @@ void main() {
   });
 }
 
-Future<void> _pump(
+Future<GoRouter> _pump(
   WidgetTester tester, {
   Size size = const Size(390, 844),
   _CompanionHarness? harness,
+  String? requestedSlug,
 }) async {
   final fixture = harness ?? _CompanionHarness();
   tester.view.physicalSize = size;
@@ -190,18 +338,31 @@ Future<void> _pump(
   addTearDown(tester.view.resetDevicePixelRatio);
 
   final router = GoRouter(
-    initialLocation: '/?tab=companion',
+    initialLocation: companionLocation(requestedSlug,
+        requestSelection: requestedSlug != null),
     routes: [
       GoRoute(
         path: '/',
         builder: (_, state) => DiscoveryPage(
           initialTab: state.uri.queryParameters['tab'],
+          initialCompanionRouteSlug: state.uri.queryParameters['route'],
+          initialCompanionRequestId: state.uri.queryParameters['selection'],
         ),
       ),
       GoRoute(
         path: '/route/:slug',
-        builder: (_, state) => Scaffold(
-          body: Text('detail:${state.pathParameters['slug']}'),
+        builder: (context, state) => Scaffold(
+          body: Column(
+            children: [
+              Text('detail:${state.pathParameters['slug']}'),
+              TextButton(
+                onPressed: () => context.go(companionLocation(
+                    state.pathParameters['slug'],
+                    requestSelection: true)),
+                child: const Text('去随行'),
+              ),
+            ],
+          ),
         ),
       ),
     ],
@@ -211,7 +372,17 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         currentUserIdProvider.overrideWithValue(null),
-        discoveryControllerProvider.overrideWith(() => _TestDiscovery()),
+        discoveryControllerProvider.overrideWith(() => fixture.discovery),
+        offlineAwareRouteProvider.overrideWith((ref, slug) async {
+          final route = [
+            ...fixture.discovery.routes,
+            if (fixture.requestedRoute != null) fixture.requestedRoute!,
+          ].where((route) => route.slug == slug).firstOrNull;
+          if (route == null) throw StateError('Route unavailable');
+          return route;
+        }),
+        locationModeControllerProvider.overrideWith(_MemoryMode.new),
+        offlinePackageControllerProvider.overrideWith2(_NoOfflineIO.new),
         journeyControllerProvider.overrideWith(() => fixture.journey),
         activeTourControllerProvider.overrideWith(() => fixture.tour),
       ],
@@ -229,6 +400,21 @@ Future<void> _pump(
   // pumpAndSettle would wait forever. A bounded pump lets async providers
   // finish without treating the animation as unfinished work.
   await tester.pump(const Duration(milliseconds: 250));
+  await tester.pump();
+  return router;
+}
+
+Future<void> _confirmStart(WidgetTester tester) async {
+  // The first frame mounts the bottom sheet and starts its entrance animation.
+  // Advancing time before that frame leaves it below the phone viewport.
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  final done = find.byKey(const ValueKey('companion-settings-done'));
+  await tester.ensureVisible(done);
+  await tester.pump(const Duration(milliseconds: 50));
+  expect(done.hitTestable(), findsOneWidget);
+  await tester.tap(done);
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 Future<void> _reveal(WidgetTester tester, Finder finder) async {
@@ -241,14 +427,47 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
 }
 
 class _CompanionHarness {
-  _CompanionHarness({this.startDelay = Duration.zero})
-      : journey = _TestJourney(),
-        tour = _TestTour(startDelay: startDelay);
+  _CompanionHarness({
+    this.startDelay = Duration.zero,
+    List<RouteExperience>? routes,
+    this.requestedRoute,
+    ActiveTourState initialTour = const ActiveTourState(),
+  })  : journey = _TestJourney(),
+        tour = _TestTour(startDelay: startDelay, initial: initialTour),
+        discovery = _TestDiscovery(routes ?? _routes);
 
   final Duration startDelay;
+  final RouteExperience? requestedRoute;
   final _TestJourney journey;
   final _TestTour tour;
+  final _TestDiscovery discovery;
 }
+
+class _MemoryMode extends LocationModeController {
+  @override
+  Future<TourLocationMode> build() async => TourLocationMode.simulated;
+
+  @override
+  Future<void> setMode(TourLocationMode mode) async => state = AsyncData(mode);
+}
+
+class _NoOfflineIO extends OfflinePackageController {
+  _NoOfflineIO(super.key);
+
+  @override
+  Future<OfflinePackageStatus> build() async =>
+      const OfflinePackageStatus.idle();
+}
+
+JourneySession _session(RouteExperience route) => JourneySession(
+      id: 'session-${route.id}',
+      routeId: route.id,
+      status: 'active',
+      currentStopPosition: 1,
+      arrivedStopId: null,
+      answeredStopIds: const {},
+      progress: 0,
+    );
 
 class _TestJourney extends JourneyController {
   var startCalls = 0;
@@ -274,14 +493,21 @@ class _TestJourney extends JourneyController {
 }
 
 class _TestTour extends ActiveTourController {
-  _TestTour({this.startDelay = Duration.zero});
+  _TestTour({
+    this.startDelay = Duration.zero,
+    this.initial = const ActiveTourState(),
+  });
+
+  final ActiveTourState initial;
+  ActiveTourState get snapshot => state;
 
   final Duration startDelay;
   var startCalls = 0;
   var playCalls = 0;
+  var stopCalls = 0;
 
   @override
-  ActiveTourState build() => const ActiveTourState();
+  ActiveTourState build() => initial;
 
   @override
   Future<void> start(RouteExperience route, JourneySession session) async {
@@ -348,23 +574,30 @@ class _TestTour extends ActiveTourController {
 
   @override
   Future<void> stopTour() async {
+    stopCalls += 1;
     state = const ActiveTourState();
   }
 }
 
 class _TestDiscovery extends DiscoveryController {
+  _TestDiscovery(this.routes);
+  final List<RouteExperience> routes;
+  var coldStartCalls = 0;
+
   @override
   Future<DiscoveryState> build() async => DiscoveryState(
         cities: const [_city],
         city: _city,
-        catalog: CityDiscoveryCatalog(routes: _routes),
-        cards: _routes.map((route) => ScenicAreaCard(route: route)).toList(),
+        catalog: CityDiscoveryCatalog(routes: routes),
+        cards: routes.map((route) => ScenicAreaCard(route: route)).toList(),
         revision: 0,
       );
 
   @override
-  Future<DiscoveryStartupAction> prepareColdStart() async =>
-      DiscoveryStartupAction.completed;
+  Future<DiscoveryStartupAction> prepareColdStart() async {
+    coldStartCalls += 1;
+    return DiscoveryStartupAction.completed;
+  }
 }
 
 const _city = CityExperience(

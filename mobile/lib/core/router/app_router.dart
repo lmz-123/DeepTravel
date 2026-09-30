@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/experience/presentation/discovery_page.dart';
 import '../../features/experience/presentation/footprint_detail_page.dart';
 import '../../features/experience/presentation/footprints_page.dart';
-import '../../features/experience/presentation/journey_page.dart';
+import '../../features/experience/presentation/journey_redirect_page.dart';
 import '../../features/experience/presentation/recap_page.dart';
 import '../../features/experience/presentation/route_detail_page.dart';
 import '../../features/experience/presentation/settings_page.dart';
@@ -18,8 +18,11 @@ final appRouter = GoRouter(
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) =>
-              DiscoveryPage(initialTab: state.uri.queryParameters['tab']),
+          builder: (context, state) => DiscoveryPage(
+            initialTab: state.uri.queryParameters['tab'],
+            initialCompanionRouteSlug: state.uri.queryParameters['route'],
+            initialCompanionRequestId: state.uri.queryParameters['selection'],
+          ),
         ),
         GoRoute(
           path: '/route/:slug',
@@ -29,7 +32,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/journey/:id',
           builder: (context, state) =>
-              JourneyPage(journeyId: state.pathParameters['id']!),
+              JourneyRedirectPage(journeyId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/recap/:id',

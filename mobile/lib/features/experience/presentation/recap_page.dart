@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/router/travel_destinations.dart';
 import '../../../core/widgets/brand_mark.dart';
 import '../../../core/widgets/primary_action.dart';
 import '../domain/models.dart';
@@ -56,7 +57,12 @@ class _RecapContent extends StatelessWidget {
                   children: [
                     IconButton.filledTonal(
                       tooltip: '返回行走',
-                      onPressed: () => context.go('/journey/$journeyId'),
+                      onPressed: () => context.go(
+                        (recap.route.audioTour?.fragments.isNotEmpty ?? false)
+                            ? companionLocation(recap.route.slug)
+                            : Uri(pathSegments: ['', 'route', recap.route.slug])
+                                .toString(),
+                      ),
                       style: IconButton.styleFrom(
                         backgroundColor: AppColors.white.withValues(alpha: .1),
                         foregroundColor: AppColors.white,

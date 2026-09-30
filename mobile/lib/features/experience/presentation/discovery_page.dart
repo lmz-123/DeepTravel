@@ -11,8 +11,10 @@ import '../domain/models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'audio_ownership_controller.dart';
+import 'companion_walk_settings.dart';
 import 'discovery_controller.dart';
 import 'experience_providers.dart';
+import 'offline_package_controller.dart';
 import 'widgets/discovery_art.dart';
 import 'widgets/traveler_bottom_navigation.dart';
 
@@ -22,8 +24,15 @@ part 'discovery_shelf.dart';
 part 'discovery_companion.dart';
 
 class DiscoveryPage extends ConsumerStatefulWidget {
-  const DiscoveryPage({super.key, this.initialTab});
+  const DiscoveryPage({
+    super.key,
+    this.initialTab,
+    this.initialCompanionRouteSlug,
+    this.initialCompanionRequestId,
+  });
   final String? initialTab;
+  final String? initialCompanionRouteSlug;
+  final String? initialCompanionRequestId;
   @override
   ConsumerState<DiscoveryPage> createState() => _DiscoveryPageState();
 }
@@ -34,6 +43,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   final _busyFavorites = <String>{};
   RouteExperience? _lastOpened;
   String? _companionRouteId;
+  bool _startingCompanion = false;
 
   @override
   void initState() {
@@ -46,6 +56,15 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialTab != widget.initialTab) {
       _section = _parseTab(widget.initialTab);
+    }
+    if (oldWidget.initialCompanionRouteSlug !=
+            widget.initialCompanionRouteSlug ||
+        oldWidget.initialCompanionRequestId !=
+            widget.initialCompanionRequestId) {
+      _companionRouteId = null;
+      if (widget.initialCompanionRouteSlug != null) {
+        _section = TravelerSection.companion;
+      }
     }
   }
 
@@ -61,10 +80,12 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     super.didChangeDependencies();
     if (_coldStartPrepared) return;
     _coldStartPrepared = true;
+    if (_section == TravelerSection.companion) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepareColdStart());
   }
 
   Future<void> _prepareColdStart() async {
+    if (!mounted || _section == TravelerSection.companion) return;
     final controller = ref.read(discoveryControllerProvider.notifier);
     DiscoveryStartupAction action;
     try {
@@ -108,21 +129,79 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   }
 
   Future<void> _startCompanion(RouteExperience route) async {
-    final journey = ref.read(journeyControllerProvider.notifier);
-    final journeyId = await journey.start(route);
-    if (!mounted) return;
-    final session = ref.read(journeyControllerProvider).session;
-    if (journeyId == null || session == null) {
-      _notice('这条随行暂时无法开始，请先打开路线查看详情。');
+    if (_startingCompanion ||
+        _companionRunning(ref.read(activeTourControllerProvider))) {
       return;
     }
-    if (route.audioTour != null) {
+    if (!_supportsCompanion(route)) {
+      _notice('这条路线暂未开放定位随行，可以先翻阅路线目录。');
+      return;
+    }
+    setState(() => _startingCompanion = true);
+    try {
+      final confirmed = await showCompanionWalkSettings(
+        context,
+        route: route,
+        startAfterPreparation: true,
+      );
+      if (!mounted || !confirmed) return;
+      if (_companionRunning(ref.read(activeTourControllerProvider))) return;
+      final journeyId = await _startCompanionSession(route);
+      if (!mounted) return;
+      final journey = ref.read(journeyControllerProvider);
+      final session = journey.session;
+      if (journeyId == null || session == null) {
+        _notice(journey.errorMessage ?? '这条随行暂时无法开始，请稍后重试。');
+        return;
+      }
       await ref
           .read(activeTourControllerProvider.notifier)
-          .start(route, session);
-      return;
+          .start(journey.route ?? route, session);
+      if (!mounted) return;
+      final error = ref.read(activeTourControllerProvider).errorMessage;
+      if (error != null) _notice(error);
+    } catch (_) {
+      if (mounted) _notice('随行准备未能完成，请稍后再试。');
+    } finally {
+      if (mounted) setState(() => _startingCompanion = false);
     }
-    context.go('/journey/$journeyId');
+  }
+
+  Future<String?> _startCompanionSession(RouteExperience route) async {
+    final controller = ref.read(journeyControllerProvider.notifier);
+    final onlineId = await controller.start(route);
+    if (onlineId != null) return onlineId;
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return null;
+    final package =
+        await ref.read(routeOfflinePackageServiceProvider).load(route.slug);
+    if (package == null) return null;
+    final localId = 'offline:$userId:${route.id}';
+    final now = DateTime.now().toUtc();
+    final session = JourneySession(
+      id: localId,
+      routeId: route.id,
+      status: 'active',
+      currentStopPosition: 1,
+      arrivedStopId: null,
+      answeredStopIds: const {},
+      progress: 0,
+      startedAt: now,
+      updatedAt: now,
+    );
+    final store = ref.read(tourStoreProvider);
+    await store.enqueue(
+      OutboxEvent(
+        id: 'start_journey:$localId',
+        type: 'start_journey',
+        payload: {'local_journey_id': localId, 'route_id': route.id},
+      ),
+    );
+    await store.saveJson('offline_session_$localId', {
+      'route_slug': route.slug,
+      'created_at': now.toIso8601String(),
+    });
+    return controller.resume(package.route, session);
   }
 
   Future<void> _toggleFavorite(RouteExperience route) =>
@@ -207,6 +286,36 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
         .toSet();
     final ownership = ref.watch(audioOwnershipProvider);
     final tour = ref.watch(activeTourControllerProvider);
+    final requestedSlug = widget.initialCompanionRouteSlug;
+    final requestedRoute = requestedSlug == null
+        ? null
+        : ref.watch(offlineAwareRouteProvider(requestedSlug));
+    final companion = TickerMode(
+      enabled: _section == TravelerSection.companion &&
+          !MediaQuery.disableAnimationsOf(context),
+      child: _DiscoveryCompanion(
+        state: state ??
+            const DiscoveryState(
+              cities: [],
+              city: null,
+              catalog: CityDiscoveryCatalog(routes: []),
+              cards: [],
+              revision: 0,
+            ),
+        activeTour: tour,
+        onOpen: _openRoute,
+        selectedRouteId: _companionRouteId,
+        requestedRoute: requestedRoute,
+        onRetryRequestedRoute: () {
+          if (requestedSlug != null) {
+            ref.invalidate(offlineAwareRouteProvider(requestedSlug));
+          }
+        },
+        onSelectRoute: (route) => setState(() => _companionRouteId = route.id),
+        onStart: _startCompanion,
+        starting: _startingCompanion,
+      ),
+    );
     final hasTour = tour.session != null &&
         tour.route != null &&
         tour.status != 'stopped' &&
@@ -226,75 +335,71 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
         children: [
           SafeArea(
             bottom: false,
-            child: discovery.when(
-              skipLoadingOnRefresh: true,
-              loading: () => const _DiscoveryLoading(),
-              error: (_, __) => _DiscoveryFailure(
-                onRetry: () => ref.invalidate(discoveryControllerProvider),
-              ),
-              data: (state) => IndexedStack(
-                index: switch (_section) {
-                  TravelerSection.atlas => 1,
-                  TravelerSection.shelf => 2,
-                  TravelerSection.companion => 3,
-                  _ => 0,
-                },
-                children: [
-                  _DiscoveryJournal(
-                    key: ValueKey('journal-${state.city?.slug}'),
-                    state: state,
-                    saved: saved,
-                    busyFavorites: _busyFavorites,
-                    onFavorite: _toggleFavorite,
-                    onOpen: _openRoute,
-                    onCity: () => _chooseCity(state),
-                    onAtlas: () =>
-                        setState(() => _section = TravelerSection.atlas),
-                    onCompanion: () =>
-                        setState(() => _section = TravelerSection.companion),
-                    onRefresh: _refresh,
+            child: _section == TravelerSection.companion && state == null
+                ? companion
+                : discovery.when(
+                    skipLoadingOnRefresh: true,
+                    loading: () => const _DiscoveryLoading(),
+                    error: (_, __) => _DiscoveryFailure(
+                      onRetry: () =>
+                          ref.invalidate(discoveryControllerProvider),
+                    ),
+                    data: (state) => IndexedStack(
+                      index: switch (_section) {
+                        TravelerSection.atlas => 1,
+                        TravelerSection.shelf => 2,
+                        TravelerSection.companion => 3,
+                        _ => 0,
+                      },
+                      children: [
+                        _DiscoveryJournal(
+                          key: ValueKey('journal-${state.city?.slug}'),
+                          state: state,
+                          saved: saved,
+                          busyFavorites: _busyFavorites,
+                          onFavorite: _toggleFavorite,
+                          onOpen: _openRoute,
+                          onCity: () => _chooseCity(state),
+                          onAtlas: () =>
+                              setState(() => _section = TravelerSection.atlas),
+                          onCompanion: () => setState(
+                              () => _section = TravelerSection.companion),
+                          onRefresh: _refresh,
+                        ),
+                        _DiscoveryAtlas(
+                          key: ValueKey('atlas-${state.city?.slug}'),
+                          state: state,
+                          saved: saved,
+                          busyFavorites: _busyFavorites,
+                          onFavorite: _toggleFavorite,
+                          onOpen: _openRoute,
+                          onCity: () => _chooseCity(state),
+                          onRefresh: _refresh,
+                        ),
+                        _DiscoveryShelf(
+                          favoritesLoading: favoriteState?.isLoading == true,
+                          favoritesError: favoriteState?.hasError == true,
+                          onRetryFavorites: () {
+                            if (userId != null) {
+                              ref.invalidate(travelerFavoritesProvider(userId));
+                            }
+                          },
+                          favorites: favorites
+                              .where((f) => f.kind == 'route')
+                              .toList(),
+                          state: state,
+                          visible: _section == TravelerSection.shelf,
+                          busyFavorites: _busyFavorites,
+                          onRemove: _toggleFavoriteId,
+                          onOpen: _openRoute,
+                          onCity: () => _chooseCity(state),
+                          onBrowse: () => setState(
+                              () => _section = TravelerSection.journal),
+                        ),
+                        companion,
+                      ],
+                    ),
                   ),
-                  _DiscoveryAtlas(
-                    key: ValueKey('atlas-${state.city?.slug}'),
-                    state: state,
-                    saved: saved,
-                    busyFavorites: _busyFavorites,
-                    onFavorite: _toggleFavorite,
-                    onOpen: _openRoute,
-                    onCity: () => _chooseCity(state),
-                    onRefresh: _refresh,
-                  ),
-                  _DiscoveryShelf(
-                    favoritesLoading: favoriteState?.isLoading == true,
-                    favoritesError: favoriteState?.hasError == true,
-                    onRetryFavorites: () {
-                      if (userId != null) {
-                        ref.invalidate(travelerFavoritesProvider(userId));
-                      }
-                    },
-                    favorites:
-                        favorites.where((f) => f.kind == 'route').toList(),
-                    state: state,
-                    visible: _section == TravelerSection.shelf,
-                    busyFavorites: _busyFavorites,
-                    onRemove: _toggleFavoriteId,
-                    onOpen: _openRoute,
-                    onCity: () => _chooseCity(state),
-                    onBrowse: () =>
-                        setState(() => _section = TravelerSection.journal),
-                  ),
-                  _DiscoveryCompanion(
-                    state: state,
-                    activeTour: tour,
-                    onOpen: _openRoute,
-                    selectedRouteId: _companionRouteId,
-                    onSelectRoute: (route) =>
-                        setState(() => _companionRouteId = route.id),
-                    onStart: _startCompanion,
-                  ),
-                ],
-              ),
-            ),
           ),
           if (resumeTitle != null)
             Positioned(
@@ -304,10 +409,11 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
               child: DiscoveryTouch(
                 label: '继续查看$resumeTitle',
                 onTap: () {
-                  if (ownership.isActive) {
+                  if (ownership.kind == AudioOwnerKind.onSite ||
+                      (!ownership.isActive && hasTour)) {
+                    setState(() => _section = TravelerSection.companion);
+                  } else if (ownership.isActive) {
                     context.push(ownership.destination);
-                  } else if (hasTour) {
-                    context.push('/journey/${tour.session!.id}');
                   } else if (_lastOpened != null) {
                     _openRoute(_lastOpened!);
                   }

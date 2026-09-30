@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/router/travel_destinations.dart';
 import '../../../core/logging/runtime_log_reporter.dart';
 import '../application/nearby_story_points.dart';
 import '../application/trigger_engine.dart';
@@ -833,9 +834,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       );
       if (triggered) {
         state = state.copyWith(
-          locationMessage: autoPlay
-              ? '已到达新线索，正在准备播放故事。'
-              : '已到达新线索，准备好后点击播放。',
+          locationMessage: autoPlay ? '已到达新线索，正在准备播放故事。' : '已到达新线索，准备好后点击播放。',
         );
       } else {
         state = state.copyWith(locationMessage: '新线索暂时没有触发成功，请再次点击重试。');
@@ -1148,7 +1147,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       if (route == null || session == null) return;
       final ownership = ref.read(audioOwnershipProvider.notifier).acquire(
             kind: AudioOwnerKind.onSite,
-            destination: '/journey/${session.id}',
+            destination: companionLocation(route.slug),
             title: fragment.title ?? '第 ${fragment.position} 条线索',
             subtitle: route.title,
             artwork: route.heroImage,

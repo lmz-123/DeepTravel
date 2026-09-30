@@ -17,9 +17,9 @@ import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
-import 'package:jiandi/features/experience/presentation/journey_page.dart';
+import 'package:jiandi/features/experience/presentation/companion_walk_settings.dart';
+import 'package:jiandi/features/experience/presentation/offline_package_controller.dart';
 import 'package:jiandi/features/experience/presentation/location_mode_controller.dart';
-import 'package:jiandi/features/experience/presentation/route_detail_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -37,91 +37,105 @@ void main() {
     expect(await restored.read(), TourLocationMode.simulated);
   });
 
-  testWidgets('route detail switches and persists real or simulated mode',
+  testWidgets(
+      'companion settings persist real or simulated mode without starting GPS',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final modeStore = _MemoryLocationModeStore(TourLocationMode.real);
+    final location = _RecordingLocationTracker();
     await tester.pumpWidget(ProviderScope(
       overrides: [
-        experienceRepositoryProvider.overrideWithValue(_FragmentRepository()),
         locationModeStoreProvider.overrideWithValue(modeStore),
+        locationTrackerProvider.overrideWithValue(location),
+        offlinePackageControllerProvider(
+                const OfflinePackageKey('test-route', 'v1'))
+            .overrideWith(() => _IdleOfflinePackageController()),
       ],
-      child: const MaterialApp(home: RouteDetailPage(slug: 'test-route')),
+      child: const MaterialApp(
+        home: Scaffold(body: CompanionWalkSettingsEntry(route: _route)),
+      ),
     ));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('行走准备'));
+    await tester
+        .tap(find.byKey(const ValueKey('companion-walk-settings-entry')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('行走准备'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-        find.byKey(const ValueKey('route-detail-mode-simulated')));
-    await tester.pumpAndSettle();
-    expect(
-        find.byKey(const ValueKey('route-detail-mode-real')), findsOneWidget);
-    expect(find.byKey(const ValueKey('route-detail-mode-simulated')),
+    expect(find.byKey(const ValueKey('companion-settings-mode-real')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('companion-settings-mode-simulated')),
         findsOneWidget);
     expect(find.byType(Switch), findsNothing);
     expect(modeStore.mode, TourLocationMode.real);
 
-    await tester.tap(find.byKey(const ValueKey('route-detail-mode-simulated')));
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('companion-settings-mode-simulated')));
+    await tester
+        .tap(find.byKey(const ValueKey('companion-settings-mode-simulated')));
     await tester.pumpAndSettle();
     expect(modeStore.mode, TourLocationMode.simulated);
-    expect(find.byKey(const ValueKey('route-detail-mode-simulated')),
-        findsOneWidget);
+    final close = find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == '关闭行走设置',
+    );
+    await tester.ensureVisible(close);
+    await tester.pumpAndSettle();
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(find.text('模拟预览 · 离线内容'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('route-detail-mode-real')));
+    await tester
+        .tap(find.byKey(const ValueKey('companion-walk-settings-entry')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('companion-settings-mode-real')));
     await tester.pumpAndSettle();
     expect(modeStore.mode, TourLocationMode.real);
+    expect(location.permissionRequests, 0);
+    expect(location.sampleSubscriptions, 0);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-      'real journey shows selected node copy before audio without a mandatory next action',
-      (tester) async {
+  test(
+      'real companion exposes the first clue without invented distance or autoplay',
+      () async {
     final store = _MemoryTourStore();
+    final location = _RecordingLocationTracker();
+    final player = _ControllableNarrationPlayer();
     final container = ProviderContainer(overrides: [
       experienceRepositoryProvider.overrideWithValue(_FragmentRepository()),
-      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
-      narrationPlayerProvider.overrideWithValue(_SilentNarrationPlayer()),
+      locationTrackerProvider.overrideWithValue(location),
+      narrationPlayerProvider.overrideWithValue(player),
       tourStoreProvider.overrideWithValue(store),
       preparedRouteServiceProvider
           .overrideWithValue(_NoopPreparedRouteService(store)),
       locationModeStoreProvider
           .overrideWithValue(_MemoryLocationModeStore(TourLocationMode.real)),
     ]);
-    addTearDown(container.dispose);
-    container.read(journeyControllerProvider.notifier).resume(_route, _session);
+    addTearDown(() async {
+      container.dispose();
+      await player.dispose();
+    });
+    final subscription = container.listen(
+        activeTourControllerProvider, (_, __) {},
+        fireImmediately: true);
+    addTearDown(subscription.close);
 
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-1')),
-    ));
-    await tester.pumpAndSettle();
-
-    expect(find.text('附近故事点'), findsNothing);
-    await tester.dragUntilVisible(
-      find.byKey(const ValueKey('selected-node-detail-fragment-1')),
-      find.byType(ListView),
-      const Offset(0, -180),
-    );
-    expect(find.byKey(const ValueKey('selected-node-detail-fragment-1')),
-        findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('selected-node-detail-fragment-1')),
-        matching: find.text('第一条线索'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.textContaining('潮汐里的旧城'), findsOneWidget);
-    expect(find.text('约 3 分钟'), findsOneWidget);
-    expect(find.text('等待定位'), findsOneWidget);
-    expect(
-        find.byWidgetPredicate((widget) =>
-            widget is Text &&
-            widget.data != null &&
-            RegExp(r'^\d+ 米$').hasMatch(widget.data!)),
-        findsNothing);
-    expect(find.text('下一条线索（测试）'), findsNothing);
-    expect(find.byType(Switch), findsNothing);
+    await container
+        .read(activeTourControllerProvider.notifier)
+        .start(_route, _session);
+    final state = container.read(activeTourControllerProvider);
+    final first = state.nearbyStoryPoints.single;
+    expect(state.status, 'monitoring');
+    expect(state.selectedFragmentId, 'fragment-1');
+    expect(first.fragment.safePreview, '第一条线索');
+    expect(first.fragment.displayTheme, '潮汐里的旧城');
+    expect(first.fragment.expectedDurationSeconds, 121);
+    expect(first.distanceMeters, isNull);
+    expect(state.latestLocationSample, isNull);
+    expect(state.current, isNull);
+    expect(state.isPlaying, isFalse);
+    expect(player.playedFragmentIds, isEmpty);
+    expect(location.permissionRequests, 1);
+    expect(location.sampleSubscriptions, 1);
   });
 
   test('selecting an untriggered node is rejected without changing selection',
@@ -480,11 +494,12 @@ void main() {
     );
   });
 
-  testWidgets(
-      'restored triggered clue shows audio and transcript then advances to the next clue',
-      (tester) async {
+  test(
+      'restored triggered clue retains transcript, playback controls and next-clue order',
+      () async {
     final store = _MemoryTourStore();
     final player = _ControllableNarrationPlayer();
+    final location = _RecordingLocationTracker();
     final repository = _ProgressingFragmentRepository(initialStates: const {
       'fragment-1': 'collected',
       'fragment-2': 'triggered',
@@ -492,7 +507,7 @@ void main() {
     });
     final container = ProviderContainer(overrides: [
       experienceRepositoryProvider.overrideWithValue(repository),
-      locationTrackerProvider.overrideWithValue(_RecordingLocationTracker()),
+      locationTrackerProvider.overrideWithValue(location),
       narrationPlayerProvider.overrideWithValue(player),
       tourStoreProvider.overrideWithValue(store),
       preparedRouteServiceProvider
@@ -504,81 +519,73 @@ void main() {
       container.dispose();
       await player.dispose();
     });
+    final subscription = container.listen(
+        activeTourControllerProvider, (_, __) {},
+        fireImmediately: true);
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
 
-    await container
-        .read(journeyControllerProvider.notifier)
-        .start(_threeFragmentRoute);
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-1')),
-    ));
-    await tester.pumpAndSettle();
+    await controller.start(_threeFragmentRoute, _session);
+    var state = container.read(activeTourControllerProvider);
+    expect(state.status, 'simulated');
+    expect(state.current?.id, 'fragment-2');
+    expect(state.current?.transcript, '第二条线索的正文');
+    expect(state.isPlaying, isFalse);
+    expect(player.playedFragmentIds, isEmpty);
+    expect(location.permissionRequests, 0);
+    expect(state.ledger?.reconstructionUnlocked, isFalse);
 
-    expect(find.byType(Switch), findsNothing);
-    expect(find.byTooltip('暂停自动导览'), findsOneWidget);
-    await tester.dragUntilVisible(
-      find.byKey(const ValueKey('journey-mode-simulated')),
-      find.byType(ListView),
-      const Offset(0, -220),
-    );
-    expect(find.text('模拟预览模式'), findsOneWidget);
-    await tester.ensureVisible(find.byTooltip('暂停自动导览'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('暂停自动导览'));
-    await tester.pump();
-    expect(find.byTooltip('继续自动导览'), findsOneWidget);
-    await tester.ensureVisible(find.byTooltip('继续自动导览'));
-    await tester.tap(find.byTooltip('继续自动导览'));
-    await tester.pump();
-    expect(find.byTooltip('暂停自动导览'), findsOneWidget);
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    expect(find.text('第二条线索'), findsWidgets);
-    await tester.dragUntilVisible(
-      find.text('阅读等价文字稿'),
-      find.byType(ListView),
-      const Offset(0, -220),
-    );
-    await tester.pumpAndSettle();
-    expect(find.textContaining('00:00 / --:--'), findsOneWidget);
-    await tester.tap(find.text('阅读等价文字稿'));
-    await tester.pumpAndSettle();
-    expect(find.text('第二条线索的正文'), findsOneWidget);
+    await controller.pauseTour();
+    expect(container.read(activeTourControllerProvider).status, 'paused');
+    // Restore the paused, unplayed clue. The separate quiet "continue looking"
+    // action intentionally clears it, so that is not a playback resume.
+    await controller.resumeTour();
+    expect(container.read(activeTourControllerProvider).status, 'simulated');
+    expect(player.playedFragmentIds, isEmpty);
 
-    await tester.ensureVisible(find.byTooltip('继续'));
-    await tester.tap(find.byTooltip('继续'));
-    await tester.pump();
+    await controller.togglePlayback();
+    await _waitUntil(() => player.playedFragmentIds.isNotEmpty);
     expect(player.playedFragmentIds, ['fragment-2']);
-    expect(find.byTooltip('暂停'), findsOneWidget);
-
+    expect(container.read(activeTourControllerProvider).isPlaying, isTrue);
     player.emitDuration(const Duration(minutes: 2));
     player.emitPosition(const Duration(seconds: 30));
-    await tester.pump();
-    expect(find.textContaining('00:30 / 02:00'), findsOneWidget);
+    await _waitUntil(() =>
+        container.read(activeTourControllerProvider).position ==
+        const Duration(seconds: 30));
+    state = container.read(activeTourControllerProvider);
+    expect(state.duration, const Duration(minutes: 2));
+    expect(state.position, const Duration(seconds: 30));
 
-    await tester.tap(find.byTooltip('暂停'));
-    await tester.pump();
-    expect(find.byTooltip('继续'), findsOneWidget);
-    await tester.tap(find.byTooltip('继续'));
-    await tester.pump();
-    expect(find.byTooltip('暂停'), findsOneWidget);
+    await controller.togglePlayback();
+    expect(container.read(activeTourControllerProvider).isPlaying, isFalse);
+    await controller.togglePlayback();
+    expect(container.read(activeTourControllerProvider).isPlaying, isTrue);
 
     player.completeNaturally();
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('下一条线索（测试）'));
-    await container
-        .read(activeTourControllerProvider.notifier)
-        .triggerNextDemo();
-    await tester.pump();
-
-    expect(repository.isCollected('fragment-2'), isTrue);
+    await _waitUntil(() => repository.isCollected('fragment-2'));
+    await controller.triggerNextDemo();
     expect(player.playedFragmentIds, ['fragment-2', 'fragment-3']);
-    expect(find.text('第三条线索'), findsWidgets);
+    expect(
+        container.read(activeTourControllerProvider).current?.id, 'fragment-3');
+    expect(
+        container
+            .read(activeTourControllerProvider)
+            .ledger
+            ?.reconstructionUnlocked,
+        isFalse);
+    player.completeNaturally();
+    await _waitUntil(() =>
+        container
+            .read(activeTourControllerProvider)
+            .ledger
+            ?.reconstructionUnlocked ==
+        true);
+    expect(repository.isCollected('fragment-3'), isTrue);
   });
 
-  testWidgets(
-      'reconstruction uses server items and shows mismatch above the bottom sheet',
-      (tester) async {
+  test(
+      'reconstruction preserves server order, mismatch feedback and completion',
+      () async {
     final store = _MemoryTourStore();
     final repository = _ReconstructionRepository();
     final container = ProviderContainer(overrides: [
@@ -592,45 +599,34 @@ void main() {
           _MemoryLocationModeStore(TourLocationMode.simulated)),
     ]);
     addTearDown(container.dispose);
+    final subscription = container.listen(
+        activeTourControllerProvider, (_, __) {},
+        fireImmediately: true);
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
 
-    await container
-        .read(journeyControllerProvider.notifier)
-        .start(_twoFragmentRoute);
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(home: JourneyPage(journeyId: 'journey-1')),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byTooltip('故事线索簿'));
-    await tester.pumpAndSettle();
-    expect(find.text('把线索拼成完整故事'), findsOneWidget);
-    await tester.tap(find.text('把线索拼成完整故事'));
-    await tester.pumpAndSettle();
-    expect(find.text('服务器给出的第二项'), findsOneWidget);
-    expect(find.text('服务器给出的第一项'), findsOneWidget);
-
-    await tester.tap(find.text('提交这条历史因果链'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
+    await controller.start(_twoFragmentRoute, _session);
+    final ledger = container.read(activeTourControllerProvider).ledger!;
+    expect(ledger.reconstructionUnlocked, isTrue);
+    expect(ledger.reconstructionItems.map((item) => item.text),
+        ['服务器给出的第二项', '服务器给出的第一项']);
+    final ids = ledger.reconstructionItems.map((item) => item.id).toList();
+    final mismatch = await controller.reconstruct(ids);
     expect(repository.submittedIds, ['cause-2', 'cause-1']);
-    final feedback =
-        find.byKey(const ValueKey('reconstruction-feedback-overlay'));
-    expect(feedback, findsOneWidget);
-    expect(find.textContaining('红色线索的位置需要调整'), findsOneWidget);
-    final mismatchedCard = tester.widget<Card>(find.ancestor(
-        of: find.byKey(const ValueKey('reconstruction-cause-2')),
-        matching: find.byType(Card)));
-    expect(mismatchedCard.color, isNotNull);
-    expect(tester.getTopLeft(feedback).dy,
-        lessThan(tester.getTopLeft(find.text('拼回完整故事')).dy));
+    expect(mismatch.correct, isFalse);
+    expect(mismatch.completeStoryUnlocked, isFalse);
+    expect(mismatch.feedback, [
+      {'position': 1, 'submitted': 'cause-2'}
+    ]);
+    expect(
+        container.read(activeTourControllerProvider).status, isNot('stopped'));
 
-    await tester.tap(find.text('提交这条历史因果链'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('reconstruction-feedback-overlay')),
-        findsNothing);
-    expect(find.text('测试完整故事正文'), findsOneWidget);
+    final correct = await controller.reconstruct(ids.reversed.toList());
+    expect(repository.submittedIds, ['cause-1', 'cause-2']);
+    expect(correct.correct, isTrue);
+    expect(correct.completeStoryUnlocked, isTrue);
+    expect(container.read(activeTourControllerProvider).status, 'stopped');
+    expect((await controller.loadRecap()).completeStory, '测试完整故事正文');
   });
 
   test(
@@ -2141,4 +2137,13 @@ class _GenerationNarrationPlayer implements NarrationPlayer {
       await controller.close();
     }
   }
+}
+
+class _IdleOfflinePackageController extends OfflinePackageController {
+  _IdleOfflinePackageController()
+      : super(const OfflinePackageKey('test-route', 'v1'));
+
+  @override
+  Future<OfflinePackageStatus> build() async =>
+      const OfflinePackageStatus(phase: OfflinePackagePhase.idle);
 }

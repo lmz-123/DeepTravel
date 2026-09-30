@@ -5,20 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../domain/tour_runtime.dart';
+import '../../../core/router/route_back.dart';
+import '../../../core/router/travel_destinations.dart';
 import '../domain/models.dart';
-import 'active_tour_controller.dart';
+import 'active_tour_controller.dart' show tourStoreProvider;
 import 'experience_providers.dart';
 import 'home_story_controller.dart';
-import 'location_mode_controller.dart';
-import 'offline_package_controller.dart';
+import 'offline_package_controller.dart' show offlineAwareRouteProvider;
 import 'route_manual/chapter_directory.dart';
 import 'route_manual/chapter_focus.dart';
 import 'route_manual/chapter_prelude.dart';
 import 'route_manual/manual_chapter.dart';
 import 'route_manual/manual_session.dart';
 import 'route_manual/manual_visuals.dart';
-import 'widgets/location_mode_selector.dart';
+import 'route_manual/route_companion_entry.dart';
 import 'widgets/favorite_button.dart';
 import 'widgets/editorial_listening.dart' show EditorialPageArrival;
 
@@ -251,6 +251,7 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
     final items = chapters;
     final canStart = items.isNotEmpty;
     final hasAudio = items.any((chapter) => chapter.hasAudio);
+    final canCompanion = route.audioTour?.fragments.isNotEmpty ?? false;
     final session = ref.watch(manualSessionProvider(route.id)).asData?.value ??
         const ManualReadingSession();
     ref.listen(homeStoryPlaybackControllerProvider, (previous, next) {
@@ -268,9 +269,14 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
     final side = narrow ? 18.0 : 22.0;
     final focus = _focus;
     return PopScope(
-      canPop: focus == null,
+      canPop: focus == null && Navigator.of(context).canPop(),
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _focus != null) unawaited(_leaveFocus());
+        if (didPop) return;
+        if (_focus != null) {
+          unawaited(_leaveFocus());
+        } else {
+          GoRouter.maybeOf(context)?.go('/');
+        }
       },
       child: Scaffold(
         backgroundColor: focus == null ? manualPaper : manualInk,
@@ -297,7 +303,7 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                             TextButton.icon(
                               onPressed: () async {
                                 await _pause();
-                                if (context.mounted) context.pop();
+                                if (context.mounted) popOrGo(context, '/');
                               },
                               style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
@@ -422,9 +428,13 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                             : '可以先收藏，留给下次',
                         style: manualType(11, color: const Color(0xFF61645B)),
                       ),
-                      if (route.audioTour != null || route.stops.isNotEmpty) ...[
-                        const SizedBox(height: 22),
-                        _FieldPreparation(route: route, onStart: _startField),
+                      if (canCompanion) ...[
+                        const SizedBox(height: 14),
+                        RouteCompanionEntry(
+                          key: const ValueKey('route-companion-entry'),
+                          routeName: route.title,
+                          onTap: _openCompanion,
+                        ),
                       ],
                       if (route.audioTour?.productionReady == false &&
                           (route.audioTour?.demoLabel?.isNotEmpty ?? false))
@@ -433,7 +443,7 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                             child: Text(route.audioTour!.demoLabel!,
                                 style: manualType(10,
                                     color: manualMuted, height: 1.7))),
-                      const SizedBox(height: 30),
+                      SizedBox(height: canCompanion ? 18 : 30),
                       Padding(
                         padding: const EdgeInsets.only(left: 25),
                         child: SizedBox(
@@ -443,6 +453,25 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                             fit: StackFit.expand,
                             children: [
                               ManualPhoto(source: route.heroImage),
+                              if (canCompanion)
+                                Positioned(
+                                  left: -19,
+                                  top: 0,
+                                  child: RotatedBox(
+                                    quarterTurns: 3,
+                                    child: Text(
+                                      route.cityName == '上海'
+                                          ? 'SHANGHAI, ON FOOT.'
+                                          : 'THE CITY, ON FOOT.',
+                                      style: manualType(
+                                        9,
+                                        height: 1,
+                                        spacing: 1.3,
+                                        color: const Color(0xFF767868),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               const DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
@@ -765,7 +794,7 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                               ],
                             ),
                             TextButton(
-                              onPressed: () => context.pop(),
+                              onPressed: () => popOrGo(context, '/'),
                               child: Text('回到城市  →', style: manualType(12)),
                             ),
                           ],
@@ -806,49 +835,10 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
     );
   }
 
-  Future<void> _startField() async {
+  Future<void> _openCompanion() async {
     await _pause();
     if (!mounted) return;
-    final id = await _startRoute();
-    if (id != null && mounted) context.go('/journey/$id');
-  }
-
-  Future<String?> _startRoute() async {
-    final route = widget.route;
-    final controller = ref.read(journeyControllerProvider.notifier);
-    final onlineId = await controller.start(route);
-    if (onlineId != null) return onlineId;
-    final userId = ref.read(currentUserIdProvider);
-    if (userId == null) return null;
-    final package =
-        await ref.read(routeOfflinePackageServiceProvider).load(route.slug);
-    if (package == null) return null;
-    final localId = 'offline:$userId:${route.id}';
-    final now = DateTime.now().toUtc();
-    final session = JourneySession(
-      id: localId,
-      routeId: route.id,
-      status: 'active',
-      currentStopPosition: 1,
-      arrivedStopId: null,
-      answeredStopIds: const {},
-      progress: 0,
-      startedAt: now,
-      updatedAt: now,
-    );
-    final store = ref.read(tourStoreProvider);
-    await store.enqueue(
-      OutboxEvent(
-        id: 'start_journey:$localId',
-        type: 'start_journey',
-        payload: {'local_journey_id': localId, 'route_id': route.id},
-      ),
-    );
-    await store.saveJson('offline_session_$localId', {
-      'route_slug': route.slug,
-      'created_at': now.toIso8601String(),
-    });
-    return controller.resume(package.route, session);
+    context.go(companionLocation(widget.route.slug, requestSelection: true));
   }
 }
 
@@ -1029,110 +1019,4 @@ class _DirectoryDock extends StatelessWidget {
           ],
         ),
       );
-}
-
-class _FieldPreparation extends ConsumerWidget {
-  const _FieldPreparation({required this.route, required this.onStart});
-  final RouteExperience route;
-  final VoidCallback onStart;
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final journey = ref.watch(journeyControllerProvider);
-    final key = OfflinePackageKey(route.slug, route.audioTour?.scriptVersion);
-    final package =
-        ref.watch(offlinePackageControllerProvider(key)).asData?.value ??
-            const OfflinePackageStatus.idle();
-    final mode = ref.watch(locationModeControllerProvider).asData?.value ??
-        TourLocationMode.real;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFFECE8D9),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(4),
-          topRight: Radius.circular(24),
-          bottomLeft: Radius.circular(4),
-          bottomRight: Radius.circular(4),
-        ),
-        border: Border.fromBorderSide(BorderSide(color: Color(0x45252824))),
-      ),
-      child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '随行 / LOCATION LISTENING',
-          style: manualType(9, color: manualRed, spacing: 1.08),
-        ),
-        const SizedBox(height: 7),
-        Text('到点发现，点击播放', style: manualType(23, serif: true, weight: FontWeight.w600)),
-        const SizedBox(height: 3),
-        Text('开启后，靠近故事点时再提醒你。不会打开页面就播放。', style: manualType(10, color: manualMuted, height: 1.6)),
-        const SizedBox(height: 8),
-        TextButton.icon(
-          onPressed: journey.isBusy ? null : onStart,
-          style: TextButton.styleFrom(
-            foregroundColor: manualRed,
-            minimumSize: const Size(48, 48),
-            padding: EdgeInsets.zero,
-          ),
-          icon: const Icon(Icons.directions_walk_outlined, size: 20),
-          label: Text(
-            journey.isBusy ? '正在准备随行…' : '开启随行',
-            style: manualType(18, serif: true, color: manualRed),
-          ),
-        ),
-        Text('到了现场，再让位置带你发现沿途。', style: manualType(11, color: manualMuted)),
-        const SizedBox(height: 7),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          childrenPadding: const EdgeInsets.only(bottom: 12),
-          title: Text('行走准备', style: manualType(13)),
-          subtitle: Text(
-            '定位方式与离线内容',
-            style: manualType(10, color: manualMuted),
-          ),
-          children: [
-            LocationModeSelector(
-              keyPrefix: 'route-detail-mode',
-              value: mode,
-              onChanged: (next) => ref
-                  .read(locationModeControllerProvider.notifier)
-                  .setMode(next),
-            ),
-            if (route.audioTour != null)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: package.phase == OfflinePackagePhase.downloading ||
-                          package.isUsable
-                      ? null
-                      : () => ref
-                          .read(
-                            offlinePackageControllerProvider(key).notifier,
-                          )
-                          .download(route),
-                  icon: const Icon(Icons.download_outlined, size: 18),
-                  label: Text(
-                      switch (package.phase) {
-                        OfflinePackagePhase.complete => '离线内容已准备',
-                        OfflinePackagePhase.downloading => package.total > 0
-                            ? '正在准备 ${package.complete}/${package.total}'
-                            : '正在准备…',
-                        OfflinePackagePhase.failed => '重试下载',
-                        OfflinePackagePhase.stale => '更新离线内容',
-                        _ => '下载离线内容',
-                      },
-                      style: const TextStyle(fontSize: 12)),
-                ),
-              ),
-            if (package.message != null)
-              Text(package.message!, style: manualType(10, color: manualMuted)),
-          ],
-        ),
-        if (journey.errorMessage != null)
-          Text(journey.errorMessage!, style: manualType(12, color: manualRed)),
-      ],
-      ),
-    );
-  }
 }

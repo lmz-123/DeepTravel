@@ -6,6 +6,8 @@ import 'package:jiandi/core/router/app_router.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/discovery_location.dart';
+import 'package:jiandi/features/experience/domain/tour_runtime.dart';
+import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 
@@ -36,35 +38,66 @@ void main() {
     expect(find.byTooltip('播放故事'), findsOneWidget);
   });
 
-  testWidgets('explicit on-site entry preserves legacy arrival and observation',
+  testWidgets(
+      'reading-only route keeps its manual and removes the old field controls',
       (tester) async {
     await _pumpApp(tester);
     await _openFeatured(tester);
-    final field = find.text('到现场，开始行走');
-    await tester.ensureVisible(field);
-    await tester.tap(field);
+    expect(find.text('开启随行'), findsNothing);
+    expect(find.text('去随行'), findsNothing);
+    expect(find.text('行走准备'), findsNothing);
+    expect(find.text('到现场，开始行走'), findsNothing);
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(JiandiApp)),
+        listen: false);
+    expect(container.read(journeyControllerProvider).session, isNull);
+    expect(container.read(activeTourControllerProvider).session, isNull);
+
+    await tester.tap(find.text('翻开这段旅程'));
     await tester.pumpAndSettle();
-    final arrive = find.text('我已到达，开始观察');
-    await tester.ensureVisible(arrive);
-    await tester.tap(arrive);
-    await tester.pumpAndSettle();
-    expect(find.text('一栋顺着街角生长的建筑'), findsOneWidget);
-    expect(find.text('观察一下'), findsOneWidget);
-    expect(find.textContaining('一艘停靠街角的船'), findsOneWidget);
+    expect(find.text('本刊目录'), findsOneWidget);
+    expect(find.text('我已到达，开始观察'), findsNothing);
+    expect(container.read(journeyControllerProvider).session, isNull);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('system back from a field journey returns to journal',
+  testWidgets(
+      'saved reading-only journey link returns to its manual without GPS and supports back',
       (tester) async {
-    await _pumpApp(tester);
-    await _openFeatured(tester);
-    await tester.ensureVisible(find.text('到现场，开始行走'));
-    await tester.tap(find.text('到现场，开始行走'));
+    final tracker = _NoTourLocation();
+    final repository = DemoExperienceRepository(latency: Duration.zero);
+    await _pumpApp(tester, repository: repository, locationTracker: tracker);
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(JiandiApp)),
+        listen: false);
+    final route = (await tester
+        .runAsync(() => repository.routeBySlug('wukang-urban-slices')))!;
+    const session = JourneySession(
+      id: 'saved-legacy-journey',
+      routeId: 'route-wukang',
+      status: 'active',
+      currentStopPosition: 1,
+      arrivedStopId: null,
+      answeredStopIds: {},
+      progress: 0,
+    );
+    container.read(journeyControllerProvider.notifier).resume(route, session);
+
+    appRouter.go('/journey/saved-legacy-journey');
     await tester.pumpAndSettle();
-    expect(find.text('我已到达，开始观察'), findsOneWidget);
+    expect(appRouter.routeInformationProvider.value.uri.path,
+        '/route/wukang-urban-slices');
+    expect(find.text('翻开这段旅程'), findsOneWidget);
+    expect(find.text('我已到达，开始观察'), findsNothing);
+    expect(container.read(journeyControllerProvider).session, same(session));
+    expect(container.read(activeTourControllerProvider).session, isNull);
+    expect(tracker.permissionRequests, 0);
+    expect(tracker.sampleSubscriptions, 0);
+
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('深圳'), findsOneWidget);
     expect(find.text('城市随刊'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('defaults to configured Shenzhen and reloads after city change',
@@ -132,7 +165,8 @@ void main() {
 }
 
 Future<void> _pumpApp(WidgetTester tester,
-    {DemoExperienceRepository? repository}) async {
+    {DemoExperienceRepository? repository,
+    LocationTracker? locationTracker}) async {
   await tester.binding.setSurfaceSize(const Size(390, 844));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   appRouter.go('/');
@@ -140,6 +174,8 @@ Future<void> _pumpApp(WidgetTester tester,
     experienceRepositoryProvider.overrideWithValue(
         repository ?? DemoExperienceRepository(latency: Duration.zero)),
     currentLocationSourceProvider.overrideWithValue(_NoLocation()),
+    if (locationTracker != null)
+      locationTrackerProvider.overrideWithValue(locationTracker),
   ], child: const JiandiApp()));
   await tester.pumpAndSettle();
 }
@@ -304,3 +340,23 @@ const _mountainCoastNode = ExperienceStop(
   insight: '节点观察',
   challenge: Challenge(id: '', prompt: '', hint: '', options: []),
 );
+
+class _NoTourLocation implements LocationTracker {
+  int permissionRequests = 0;
+  int sampleSubscriptions = 0;
+
+  @override
+  Future<TourLocationPermission> requestPermission() async {
+    permissionRequests += 1;
+    return TourLocationPermission.denied;
+  }
+
+  @override
+  Stream<LocationSample> samples() {
+    sampleSubscriptions += 1;
+    return const Stream.empty();
+  }
+
+  @override
+  Future<void> stop() async {}
+}

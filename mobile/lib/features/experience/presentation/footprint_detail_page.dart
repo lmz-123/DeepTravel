@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/travel_destinations.dart';
 import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/footprint_share_service.dart';
@@ -367,10 +368,10 @@ class _FootprintEditorState extends ConsumerState<_FootprintEditor> {
           journeyContextProvider(UserJourneyKey(userId, entry.journeyId))
               .future);
       if (!mounted) return;
-      ref
-          .read(journeyControllerProvider.notifier)
-          .resume(owner.route, owner.journey);
-      context.go('/journey/${entry.journeyId}');
+      final route = owner.route;
+      context.go((route.audioTour?.fragments.isNotEmpty ?? false)
+          ? companionLocation(route.slug)
+          : Uri(pathSegments: ['', 'route', route.slug]).toString());
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context)

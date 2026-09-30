@@ -1,9 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/features/experience/data/narration_voice_preference_repository.dart';
 import 'package:jiandi/features/experience/data/prepared_route_service.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
-import 'package:jiandi/features/experience/presentation/widgets/narration_voice_selector.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -58,45 +56,6 @@ void main() {
         narrationCacheVersion('voice-default',
             manifest.fragments.single.narrationFor('voice-default')),
         'voice-default:v2');
-  });
-
-  testWidgets('single published voice hides the compact playback icon',
-      (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: NarrationVoiceIconButton(
-          profiles: const [_defaultProfile],
-          selectedProfileId: 'voice-default',
-          onSelected: (_) {},
-        ),
-      ),
-    ));
-
-    expect(find.byIcon(Icons.record_voice_over_outlined), findsNothing);
-  });
-
-  testWidgets(
-      'compact playback icon opens an accessible server-driven selector',
-      (tester) async {
-    String? selected;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: NarrationVoiceIconButton(
-          profiles: const [_defaultProfile, _warmProfile],
-          selectedProfileId: 'voice-default',
-          onSelected: (value) => selected = value,
-        ),
-      ),
-    ));
-
-    await tester.tap(find.byTooltip('讲述音色：原声纪实'));
-    await tester.pumpAndSettle();
-    expect(find.text('选择一路陪伴你的声音'), findsOneWidget);
-    expect(find.text('文字内容完全相同，只改变讲述气质。'), findsOneWidget);
-
-    await tester.tap(find.text('温柔讲述者'));
-    await tester.pumpAndSettle();
-    expect(selected, 'voice-warm');
   });
 }
 

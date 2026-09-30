@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/travel_destinations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../active_tour_controller.dart';
 import 'discovery_art.dart';
@@ -43,7 +44,8 @@ class TravelerBottomNavigation extends ConsumerWidget {
         horizontal,
         0,
         horizontal,
-        MediaQuery.paddingOf(context).bottom
+        MediaQuery.paddingOf(context)
+            .bottom
             .clamp(15.0, double.infinity)
             .toDouble(),
       ),
@@ -72,8 +74,7 @@ class TravelerBottomNavigation extends ConsumerWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: entries.map((entry) {
-                      final selected =
-                          active == entry.$1 ||
+                      final selected = active == entry.$1 ||
                           active == TravelerSection.discovery &&
                               entry.$1 == TravelerSection.journal;
                       final color = selected
@@ -154,9 +155,8 @@ class TravelerBottomNavigation extends ConsumerWidget {
       return;
     }
     if (section == TravelerSection.journey) {
-      final id =
-          journeyId ?? ref.read(activeTourControllerProvider).session?.id;
-      if (id != null) context.go('/journey/$id');
+      context.go(companionLocation(
+          ref.read(activeTourControllerProvider).route?.slug));
       return;
     }
     if (section == TravelerSection.footprints) {

@@ -9,31 +9,31 @@ class _DiscoveryCompanion extends ConsumerWidget {
     required this.activeTour,
     required this.onOpen,
     required this.selectedRouteId,
+    required this.requestedRoute,
+    required this.onRetryRequestedRoute,
     required this.onSelectRoute,
     required this.onStart,
+    required this.starting,
   });
 
   final DiscoveryState state;
   final ActiveTourState activeTour;
   final ValueChanged<RouteExperience> onOpen;
   final String? selectedRouteId;
+  final AsyncValue<RouteExperience>? requestedRoute;
+  final VoidCallback onRetryRequestedRoute;
   final ValueChanged<RouteExperience> onSelectRoute;
   final ValueChanged<RouteExperience> onStart;
+  final bool starting;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Modern routes expose their playable nodes as audio-tour fragments and
-    // may have no legacy `stops` at all. Keep both content contracts visible
-    // here so the companion tab does not look empty after publishing a route
-    // through the current admin flow.
-    final routes = state.catalog.routes
-        .where(
-          (route) =>
-              route.stops.isNotEmpty ||
-              (route.audioTour?.fragments.isNotEmpty ?? false),
-        )
-        .take(4)
-        .toList(growable: false);
+    final handoff = requestedRoute?.asData?.value;
+    final routes = <String, RouteExperience>{
+      for (final route in state.catalog.routes)
+        if (_supportsCompanion(route)) route.id: route,
+      if (handoff != null && _supportsCompanion(handoff)) handoff.id: handoff,
+    }.values.toList(growable: false);
     final selected = activeTour.route;
     final horizontal = MediaQuery.sizeOf(context).width <= 360 ? 20.0 : 23.0;
     final running = _companionRunning(activeTour);
@@ -41,8 +41,20 @@ class _DiscoveryCompanion extends ConsumerWidget {
         running && _companionPhase(activeTour) != _CompanionPhase.preparing;
     final selectedRoute = running && selected != null
         ? selected
-        : routes.where((route) => route.id == selectedRouteId).firstOrNull ??
-            (routes.isEmpty ? null : routes.first);
+        : selectedRouteId != null
+            ? routes.where((route) => route.id == selectedRouteId).firstOrNull
+            : requestedRoute != null
+                ? handoff
+                : routes.firstOrNull;
+    final orderedRoutes = <RouteExperience>[
+      if (selectedRoute != null && _supportsCompanion(selectedRoute))
+        selectedRoute,
+      ...routes.where((route) => route.id != selectedRoute?.id),
+    ];
+    final visibleRoutes =
+        orderedRoutes.length > 4 ? orderedRoutes.sublist(0, 4) : orderedRoutes;
+    final awaitingRequestedRoute =
+        requestedRoute != null && selectedRouteId == null && !running;
     return CustomScrollView(
       key: const PageStorageKey('companion-screen'),
       slivers: [
@@ -77,6 +89,7 @@ class _DiscoveryCompanion extends ConsumerWidget {
                 _CompanionStateSection(
                   state: activeTour,
                   selected: selectedRoute,
+                  starting: starting,
                   onStart: () {
                     if (selectedRoute != null) onStart(selectedRoute);
                   },
@@ -96,6 +109,40 @@ class _DiscoveryCompanion extends ConsumerWidget {
                       .read(activeTourControllerProvider.notifier)
                       .triggerNextDemo(autoPlay: false),
                 ),
+                if (awaitingRequestedRoute && handoff == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 17),
+                    child: requestedRoute!.hasError
+                        ? Row(
+                            children: [
+                              Expanded(
+                                child: Text('这条路线暂时未能载入。',
+                                    style: discoverySans(11,
+                                        color: AppColors.textMuted)),
+                              ),
+                              _CompanionTextButton(
+                                icon: DiscoveryMark.arrowRight,
+                                label: '重新载入',
+                                onTap: onRetryRequestedRoute,
+                              ),
+                            ],
+                          )
+                        : Text('正在带来你选好的那条路…',
+                            style:
+                                discoverySans(11, color: AppColors.textMuted)),
+                  ),
+                if (selectedRoute != null && !_supportsCompanion(selectedRoute))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 17),
+                    child: Text('这条路线暂未开放定位随行，可以先翻阅目录。',
+                        style: discoverySans(11,
+                            height: 1.8, color: AppColors.textMuted)),
+                  ),
+                if (selectedRoute != null && _supportsCompanion(selectedRoute))
+                  CompanionWalkSettingsEntry(
+                    route: selectedRoute,
+                    enabled: !running && !starting,
+                  ),
                 const SizedBox(height: 30),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -103,7 +150,8 @@ class _DiscoveryCompanion extends ConsumerWidget {
                     Text('01 / CHOOSE A WALK',
                         style: discoverySans(9,
                             color: AppColors.textMuted, spacing: 1.1)),
-                    Text('${routes.length.toString().padLeft(2, '0')} 条可随行',
+                    Text(
+                        '${orderedRoutes.length.toString().padLeft(2, '0')} 条可随行',
                         style: const TextStyle(
                             fontFamily: 'Georgia',
                             fontSize: 11,
@@ -129,7 +177,7 @@ class _DiscoveryCompanion extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                if (routes.isEmpty)
+                if (orderedRoutes.isEmpty)
                   Text('当前城市还没有可随行的路线。', style: discoverySerif(22))
                 else
                   Container(
@@ -137,20 +185,60 @@ class _DiscoveryCompanion extends ConsumerWidget {
                       border: Border(top: BorderSide(color: AppColors.line)),
                     ),
                     child: Column(
-                      children: routes
+                      children: visibleRoutes
                           .asMap()
                           .entries
                           .map(
                             (entry) => _CompanionRouteTile(
                               index: entry.key,
                               route: entry.value,
-                              city: state.city?.name ?? entry.value.cityName,
+                              city: entry.value.cityName.isNotEmpty
+                                  ? entry.value.cityName
+                                  : state.city?.name ?? '',
                               selected: selectedRoute?.id == entry.value.id,
-                              enabled: !running,
+                              enabled: !running && !starting,
                               onSelect: onSelectRoute,
                             ),
                           )
                           .toList(growable: false),
+                    ),
+                  ),
+                if (orderedRoutes.length > 4)
+                  DiscoveryTouch(
+                    key: const ValueKey('companion-all-routes'),
+                    label: '选择其他路线，共 ${orderedRoutes.length} 条',
+                    onTap: running || starting
+                        ? null
+                        : () async {
+                            final route =
+                                await showModalBottomSheet<RouteExperience>(
+                              context: context,
+                              useRootNavigator: true,
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              backgroundColor: AppColors.paper,
+                              builder: (_) => _CompanionRoutePicker(
+                                routes: orderedRoutes,
+                                selectedRouteId: selectedRoute?.id,
+                              ),
+                            );
+                            if (route != null && context.mounted) {
+                              onSelectRoute(route);
+                            }
+                          },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 17),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text('选择其他路线 · 共 ${orderedRoutes.length} 条',
+                                style: discoverySans(11,
+                                    color: AppColors.terracotta)),
+                          ),
+                          const DiscoveryIcon(DiscoveryMark.arrowUpRight,
+                              color: AppColors.terracotta, size: 17),
+                        ],
+                      ),
                     ),
                   ),
                 if (selectedRoute != null) ...[
@@ -184,6 +272,98 @@ class _DiscoveryCompanion extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+bool _supportsCompanion(RouteExperience route) =>
+    route.audioTour?.fragments.isNotEmpty ?? false;
+
+class _CompanionRoutePicker extends StatefulWidget {
+  const _CompanionRoutePicker({
+    required this.routes,
+    required this.selectedRouteId,
+  });
+
+  final List<RouteExperience> routes;
+  final String? selectedRouteId;
+
+  @override
+  State<_CompanionRoutePicker> createState() => _CompanionRoutePickerState();
+}
+
+class _CompanionRoutePickerState extends State<_CompanionRoutePicker> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final routes = widget.routes
+        .where((route) => '${route.title}${route.cityName}${route.theme}'
+            .toLowerCase()
+            .contains(_query.toLowerCase()))
+        .toList(growable: false);
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .85,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              23, 16, 23, MediaQuery.viewInsetsOf(context).bottom),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('CHOOSE A WALK',
+                        style: discoverySans(9,
+                            color: AppColors.textMuted, spacing: 1.1)),
+                  ),
+                  _DiscoveryIconButton(
+                    mark: DiscoveryMark.close,
+                    label: '关闭路线选择',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              Text('把哪条路，\n带在身边。',
+                  style: discoverySerif(33, height: 1.35, spacing: -1.5)),
+              const SizedBox(height: 18),
+              TextField(
+                key: const ValueKey('companion-route-search'),
+                onChanged: (value) => setState(() => _query = value.trim()),
+                style: discoverySans(13),
+                decoration: const InputDecoration(
+                  hintText: '搜索路线、城市或主题',
+                  border: UnderlineInputBorder(),
+                  prefixIcon: Icon(Icons.search, size: 20),
+                ),
+              ),
+              const SizedBox(height: 18),
+              if (routes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Text('暂时没有找到这条路，换个词试试。',
+                      style: discoverySans(12, color: AppColors.textMuted)),
+                ),
+              Expanded(
+                child: ListView.builder(
+                  key: const ValueKey('companion-route-picker-list'),
+                  itemCount: routes.length,
+                  itemBuilder: (context, index) => _CompanionRouteTile(
+                    index: index,
+                    route: routes[index],
+                    city: routes[index].cityName,
+                    selected: routes[index].id == widget.selectedRouteId,
+                    enabled: true,
+                    onSelect: (route) => Navigator.pop(context, route),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -344,6 +524,7 @@ class _CompanionStateSection extends StatelessWidget {
   const _CompanionStateSection(
       {required this.state,
       required this.selected,
+      required this.starting,
       required this.onStart,
       required this.onPause,
       required this.onResume,
@@ -352,6 +533,7 @@ class _CompanionStateSection extends StatelessWidget {
       required this.onDemo});
   final ActiveTourState state;
   final RouteExperience? selected;
+  final bool starting;
   final VoidCallback onStart;
   final VoidCallback onPause;
   final VoidCallback onResume;
@@ -361,7 +543,7 @@ class _CompanionStateSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phase = _companionPhase(state);
+    final phase = starting ? _CompanionPhase.preparing : _companionPhase(state);
     final copy = switch (phase) {
       _CompanionPhase.idle => (
           'READY WHEN YOU ARE',
@@ -412,6 +594,19 @@ class _CompanionStateSection extends StatelessWidget {
         const SizedBox(height: 10),
         Text(copy.$3,
             style: discoverySans(11, height: 1.8, color: AppColors.textMuted)),
+        if (phase == _CompanionPhase.idle && selected != null) ...[
+          const SizedBox(height: 10),
+          Text('本次随行 · ${selected!.title}',
+              key: const ValueKey('companion-selected-route'),
+              style:
+                  discoverySans(11, height: 1.8, color: AppColors.terracotta)),
+        ],
+        if (state.errorMessage != null) ...[
+          const SizedBox(height: 10),
+          Text(state.errorMessage!,
+              style:
+                  discoverySans(11, height: 1.8, color: AppColors.terracotta)),
+        ],
         const SizedBox(height: 18),
         Wrap(
             spacing: 10,
@@ -422,7 +617,8 @@ class _CompanionStateSection extends StatelessWidget {
                   phase: phase,
                   retryLocation: state.status == 'permission_limited',
                   enabled: phase != _CompanionPhase.preparing &&
-                      (phase != _CompanionPhase.idle || selected != null),
+                      (phase != _CompanionPhase.idle ||
+                          (selected != null && _supportsCompanion(selected!))),
                   onStart: onStart,
                   onPause: onPause,
                   onResume: onResume,

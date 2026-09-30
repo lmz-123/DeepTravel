@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/home_story.dart';
@@ -89,7 +90,17 @@ void main() {
           expect(imageError, isNull);
           await tester.pumpAndSettle();
         }
+        expect(find.byKey(const ValueKey('route-companion-entry')),
+            findsOneWidget);
+        expect(find.text('开启随行'), findsNothing);
+        expect(find.text('行走准备'), findsNothing);
+        expect(find.text('定位发现 · 到点提醒'), findsOneWidget);
         await _capture(tester, 'route-cover-${size.width.toInt()}');
+        await expectLater(
+          find.byKey(const ValueKey('manual-evidence')),
+          matchesGoldenFile(
+              'goldens/route-companion-${size.width.toInt()}.png'),
+        );
         await tester.tap(find.text('翻开这段旅程'));
         await tester.pumpAndSettle();
         expect(find.byType(RouteChapterDirectory), findsOneWidget);
@@ -114,6 +125,41 @@ void main() {
       }, createHttpClient: (_) => _PhotoClient(photoBytes));
     });
   }
+  testWidgets('editorial entry navigates without starting a journey or audio',
+      (tester) async {
+    final playback = _QuietPlayback();
+    final field = _NoFieldStart();
+    final router = GoRouter(initialLocation: '/route/quiet-route', routes: [
+      GoRoute(
+          path: '/route/:slug',
+          builder: (_, __) => const RouteDetailPage(slug: 'quiet-route')),
+      GoRoute(
+          path: '/',
+          builder: (_, state) =>
+              Scaffold(body: Text('destination:${state.uri}'))),
+    ]);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(ProviderScope(overrides: [
+      currentUserIdProvider.overrideWithValue(null),
+      offlineAwareRouteProvider.overrideWith((ref, slug) async => _route),
+      homeStoryPlaybackControllerProvider.overrideWith(() => playback),
+      journeyControllerProvider.overrideWith(() => field),
+      manualSessionProvider.overrideWith2(_MemorySession.new),
+    ], child: MaterialApp.router(routerConfig: router, theme: AppTheme.light)));
+    await tester.pumpAndSettle();
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('route-companion-entry')));
+    await tester.tap(find.byKey(const ValueKey('route-companion-entry')));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/');
+    final query = router.routeInformationProvider.value.uri.queryParameters;
+    expect(query['tab'], 'companion');
+    expect(query['route'], 'quiet-route');
+    expect(query['selection'], isNotEmpty);
+    expect(field.starts, 0);
+    expect(playback.plays, 0);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _capture(WidgetTester tester, String name) async {
@@ -219,7 +265,19 @@ const _route = RouteExperience(
     heroImage: 'https://fixture.example/wukang.png',
     contentStatus: 'published',
     stops: [],
-    manualChapters: [_first, _second]);
+    manualChapters: [_first, _second],
+    audioTour: AudioTourManifest(
+      title: '梧桐深处的上海',
+      centralQuestion: '城市如何留下记忆？',
+      scriptVersion: 'v1',
+      reviewState: 'reviewed',
+      fieldAuditState: 'reviewed',
+      productionReady: true,
+      demoLabel: '',
+      contentMethod: 'field',
+      downloadSizeBytes: 2,
+      fragments: [_first, _second],
+    ));
 const _first = StoryFragment(
     id: 'chapter-1',
     position: 1,
