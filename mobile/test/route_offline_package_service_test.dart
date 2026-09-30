@@ -27,7 +27,11 @@ void main() {
     expect(progress, ['1/1']);
     expect(installed.version, 'v1');
     expect(installed.route.audioTour!.fragments.single.transcript, '完整文字稿');
-    expect((await service.load('route-a'))?.preparedPaths, {
+    final restored = await service.load('route-a');
+    expect(
+        restored?.route.audioTour!.fragments.single.publicPlaceName, '南头古城南门');
+    expect(restored?.route.audioTour!.fragments.single.stopId, 'stop-a');
+    expect(restored?.preparedPaths, {
       'fragment-a': '/cache/fragment-a.m4a',
     });
     expect(
@@ -155,6 +159,8 @@ Map<String, dynamic> _package([String slug = 'route-a']) {
             'id': 'fragment-a',
             'position': 1,
             'safe_preview': '第一条线索',
+            'place_name': '南头古城南门',
+            'stop_id': 'stop-a',
             'interaction_type': 'passive',
             'review_state': 'reviewed',
             'trigger_region': {

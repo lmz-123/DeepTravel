@@ -1,7 +1,8 @@
 import 'dart:io';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show ImageByteFormat, Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,7 @@ import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/application/nearby_story_points.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
+import 'package:jiandi/features/experience/presentation/companion_distance_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
@@ -70,7 +72,147 @@ void main() {
         matchesGoldenFile('goldens/companion-idle-${size.width.toInt()}.png'),
       );
     });
+
+    testWidgets(
+        'distance target matches editorial preview at ${size.width.toInt()}px',
+        (tester) async {
+      final harness = _distanceHarness();
+      await _pump(tester, harness: harness, size: size);
+      expect(tester.takeException(), isNull);
+      expect(_distancePlace(tester), '南城门');
+      expect(_distanceNumber(tester), '120');
+      expect(find.text('自动发现 · 最近未探索'), findsOneWidget);
+      await _captureDistance(tester, 'auto', size.width.toInt());
+
+      await _selectDistancePlace(tester, 'dongguan-hall',
+          beforeSelection: () async {
+        final picker = find.byKey(const ValueKey('companion-point-picker'));
+        expect(tester.getTopLeft(picker).dy,
+            closeTo(size.width <= 375 ? 45 : 58, 1));
+        await _captureDistance(tester, 'picker', size.width.toInt());
+      });
+      expect(_distancePlace(tester), '东莞会馆');
+      expect(_distanceNumber(tester), '260');
+      expect(find.text('手动选定 · 距离目标'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(SnackBar), findsNothing);
+      await _captureDistance(tester, 'manual', size.width.toInt());
+      expect(harness.tour.startCalls, 0);
+      expect(harness.tour.playCalls, 0);
+      expect(harness.tour.stopCalls, 0);
+    });
   }
+
+  testWidgets('choosing distance target leaves the current narration intact',
+      (tester) async {
+    final harness = _distanceHarness(playing: true);
+    await _pump(tester, harness: harness);
+    final before = harness.tour.snapshot;
+    expect(_distancePlace(tester), '南城门');
+
+    await _selectDistancePlace(tester, 'dongguan-hall');
+    expect(_distancePlace(tester), '东莞会馆');
+    expect(_distanceNumber(tester), '260');
+    expect(harness.tour.snapshot, same(before));
+    expect(harness.tour.snapshot.position, const Duration(seconds: 37));
+    expect(harness.tour.snapshot.isPlaying, isTrue);
+    expect(harness.tour.snapshot.selectedFragmentId, 'south-street');
+
+    final automatic =
+        find.byKey(const ValueKey('companion-distance-automatic'));
+    await _reveal(tester, automatic);
+    await tester.tap(automatic);
+    await tester.pump();
+    expect(_distancePlace(tester), '南城门');
+    expect(_distanceNumber(tester), '120');
+    expect(harness.tour.snapshot, same(before));
+    expect(harness.tour.playCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('manual distance survives navigation and clears when walk ends',
+      (tester) async {
+    final harness = _distanceHarness();
+    final router = await _pump(tester, harness: harness);
+    await _selectDistancePlace(tester, 'dongguan-hall');
+    router.push('/route/${_distanceRoute.slug}');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    router.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(_distancePlace(tester), '东莞会馆');
+    expect(_distanceNumber(tester), '260');
+
+    await _reveal(tester, find.text('结束本次随行'));
+    await tester.tap(find.text('结束本次随行'));
+    await tester.pump();
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(DiscoveryPage)));
+    expect(
+      container
+          .read(companionDistanceControllerProvider(_distanceRoute.slug))
+          .mode,
+      CompanionDistanceMode.automatic,
+    );
+    expect(harness.tour.stopCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('explicit requested route changes clear the old distance target',
+      (tester) async {
+    final other = _route('another-route', '另一条路线');
+    final harness = _CompanionHarness(routes: [_distanceRoute, other]);
+    final router = await _pump(tester,
+        harness: harness, requestedSlug: _distanceRoute.slug);
+    await _selectDistancePlace(tester, 'dongguan-hall');
+    expect(_distancePlace(tester), '东莞会馆');
+
+    router.go(companionLocation(other.slug, requestSelection: true));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    router.go(companionLocation(_distanceRoute.slug, requestSelection: true));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('自动发现 · 最近未探索'), findsOneWidget);
+    expect(_distancePlace(tester), '等待位置');
+    expect(harness.tour.startCalls, 0);
+    expect(harness.tour.playCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('slow route handoff clears target even when its panel unmounts',
+      (tester) async {
+    final other = _route('slow-route', '另一条路线');
+    final harness = _CompanionHarness(
+      routes: [_distanceRoute, other],
+      routeLoadDelays: {other.slug: const Duration(seconds: 2)},
+    );
+    final router = await _pump(tester,
+        harness: harness, requestedSlug: _distanceRoute.slug);
+    await _selectDistancePlace(tester, 'dongguan-hall');
+    expect(_distancePlace(tester), '东莞会馆');
+
+    router.go(companionLocation(other.slug, requestSelection: true));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+        find.byKey(const ValueKey('companion-distance-target')), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    expect(find.text('本次随行 · 另一条路线'), findsOneWidget);
+
+    router.go(companionLocation(_distanceRoute.slug, requestSelection: true));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('自动发现 · 最近未探索'), findsOneWidget);
+    expect(_distancePlace(tester), '等待位置');
+    expect(harness.tour.startCalls, 0);
+    expect(harness.tour.playCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('route selection stays on companion and does not start GPS',
       (tester) async {
@@ -291,12 +433,15 @@ void main() {
     await _reveal(tester, find.text('播放这一段'));
     await tester.tap(find.text('播放这一段'));
     await tester.pump();
-    expect(find.text('暂停讲述'), findsOneWidget);
+    expect(find.byTooltip('暂停讲述'), findsOneWidget);
     expect(harness.tour.playCalls, 1);
 
-    await _reveal(tester, find.text('暂停讲述'));
-    await tester.tap(find.text('暂停讲述'));
+    await _reveal(tester, find.byTooltip('暂停讲述'));
+    await tester.tap(find.byTooltip('暂停讲述'));
     await tester.pump();
+    expect(harness.tour.snapshot.isPlaying, isFalse);
+    expect(harness.tour.snapshot.status, 'simulated');
+    expect(find.text('播放这一段'), findsOneWidget);
     expect(find.text('继续寻找'), findsOneWidget);
     await _reveal(tester, find.text('继续寻找'));
     await tester.tap(find.text('继续寻找'));
@@ -372,8 +517,11 @@ Future<GoRouter> _pump(
     ProviderScope(
       overrides: [
         currentUserIdProvider.overrideWithValue(null),
+        companionDistanceNowProvider.overrideWithValue(() => _distanceNow),
         discoveryControllerProvider.overrideWith(() => fixture.discovery),
         offlineAwareRouteProvider.overrideWith((ref, slug) async {
+          final delay = fixture.routeLoadDelays[slug];
+          if (delay != null) await Future<void>.delayed(delay);
           final route = [
             ...fixture.discovery.routes,
             if (fixture.requestedRoute != null) fixture.requestedRoute!,
@@ -396,9 +544,7 @@ Future<GoRouter> _pump(
       ),
     ),
   );
-  // The companion signal deliberately has a repeating breath animation, so
-  // pumpAndSettle would wait forever. A bounded pump lets async providers
-  // finish without treating the animation as unfinished work.
+  // Allow asynchronous route providers to finish before interacting.
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
   return router;
@@ -426,18 +572,73 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
   await tester.pump(const Duration(milliseconds: 50));
 }
 
+String? _distancePlace(WidgetTester tester) => tester
+    .widget<Text>(find.byKey(const ValueKey('companion-distance-place')))
+    .data;
+
+String? _distanceNumber(WidgetTester tester) => tester
+    .widget<Text>(find.byKey(const ValueKey('companion-distance-number')))
+    .data;
+
+Future<void> _selectDistancePlace(WidgetTester tester, String id,
+    {Future<void> Function()? beforeSelection}) async {
+  final target = find.byKey(const ValueKey('companion-distance-target'));
+  if (target.hitTestable().evaluate().isEmpty) {
+    await _reveal(tester, target);
+  }
+  await tester.tap(target);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  expect(find.byKey(const ValueKey('companion-point-picker')), findsOneWidget);
+  await beforeSelection?.call();
+  final place = find.byKey(ValueKey('companion-point-$id'));
+  await tester.ensureVisible(place);
+  await tester.pump(const Duration(milliseconds: 50));
+  await tester.tap(place);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  expect(find.byKey(const ValueKey('companion-point-picker')), findsNothing);
+}
+
+Future<void> _captureDistance(
+    WidgetTester tester, String mode, int width) async {
+  final name = 'companion-distance-$mode-$width';
+  final finder = find.byKey(const ValueKey('companion-screen'));
+  if (mode != 'picker') {
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(0);
+  }
+  await tester.pump();
+  await expectLater(finder, matchesGoldenFile('goldens/$name.png'));
+  const directory = String.fromEnvironment('COMPANION_EVIDENCE_DIR');
+  if (directory.isEmpty) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(finder);
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1);
+    final data = await image.toByteData(format: ImageByteFormat.png);
+    await Directory(directory).create(recursive: true);
+    await File('$directory/$name.png').writeAsBytes(data!.buffer.asUint8List());
+    image.dispose();
+  });
+}
+
 class _CompanionHarness {
   _CompanionHarness({
     this.startDelay = Duration.zero,
     List<RouteExperience>? routes,
     this.requestedRoute,
+    this.routeLoadDelays = const {},
+    CityExperience city = _city,
     ActiveTourState initialTour = const ActiveTourState(),
   })  : journey = _TestJourney(),
         tour = _TestTour(startDelay: startDelay, initial: initialTour),
-        discovery = _TestDiscovery(routes ?? _routes);
+        discovery = _TestDiscovery(routes ?? _routes, city: city);
 
   final Duration startDelay;
   final RouteExperience? requestedRoute;
+  final Map<String, Duration> routeLoadDelays;
   final _TestJourney journey;
   final _TestTour tour;
   final _TestDiscovery discovery;
@@ -580,14 +781,15 @@ class _TestTour extends ActiveTourController {
 }
 
 class _TestDiscovery extends DiscoveryController {
-  _TestDiscovery(this.routes);
+  _TestDiscovery(this.routes, {this.city = _city});
   final List<RouteExperience> routes;
+  final CityExperience city;
   var coldStartCalls = 0;
 
   @override
   Future<DiscoveryState> build() async => DiscoveryState(
-        cities: const [_city],
-        city: _city,
+        cities: [city],
+        city: city,
         catalog: CityDiscoveryCatalog(routes: routes),
         cards: routes.map((route) => ScenicAreaCard(route: route)).toList(),
         revision: 0,
@@ -665,3 +867,111 @@ const _fragment = StoryFragment(
   title: '街角的回声',
   transcript: '你听见了吗？',
 );
+
+final _distanceNow = DateTime.utc(2026, 9, 30, 12);
+
+const _distanceCity = CityExperience(
+  id: 'shenzhen',
+  slug: 'shenzhen',
+  name: '深圳',
+  subtitle: '',
+  heroImage: '',
+);
+
+final _distancePlaces = <({String id, String name, int distance, bool heard})>[
+  (id: 'south-gate', name: '南城门', distance: 120, heard: false),
+  (id: 'south-street', name: '中山南街', distance: 45, heard: true),
+  (id: 'dongguan-hall', name: '东莞会馆', distance: 260, heard: false),
+  (id: 'guandi-temple', name: '关帝庙', distance: 270, heard: true),
+  (id: 'county-office', name: '新安县衙', distance: 390, heard: false),
+  (id: 'baode-square', name: '报德广场', distance: 510, heard: true),
+  (id: 'ancient-museum', name: '南头古城博物馆', distance: 620, heard: false),
+  (id: 'shenzhen-street', name: '绅缙街', distance: 730, heard: false),
+  (id: 'north-gate', name: '北城门', distance: 860, heard: false),
+  (id: 'jiujie', name: '九街', distance: 960, heard: true),
+  (id: 'old-wall', name: '古城墙遗址', distance: 1120, heard: false),
+  (id: 'juxiu', name: '聚秀街', distance: 1260, heard: false),
+];
+
+final _distanceFragments = [
+  for (final (index, place) in _distancePlaces.indexed)
+    StoryFragment(
+      id: place.id,
+      position: index + 1,
+      placeName: place.name,
+      safePreview: '沿着城市，慢慢走。',
+      interactionType: 'listen',
+      reviewState: 'approved',
+      triggerRegion: TriggerRegion(
+        latitude: 22.54 + place.distance / 111194.92664455874,
+        longitude: 113.92,
+        entryRadiusM: 60,
+        exitRadiusM: 90,
+        maxAccuracyM: 50,
+        qualifyingSamples: 2,
+        sampleWindowSeconds: 15,
+        cooldownSeconds: 120,
+        auditState: 'approved',
+      ),
+      audio: _fragment.audio,
+      title: place.heard ? '${place.name}的故事' : null,
+      state: place.heard ? 'collected' : 'undiscovered',
+    ),
+];
+
+final _distanceRoute = RouteExperience(
+  id: 'nantou',
+  slug: 'nantou',
+  title: '南头古城',
+  subtitle: '',
+  description: '',
+  durationMinutes: 60,
+  distanceKm: 2,
+  difficulty: '轻松',
+  theme: '古城',
+  heroImage: '',
+  contentStatus: 'published',
+  stops: const [],
+  cityName: '深圳',
+  citySlug: 'shenzhen',
+  audioTour: AudioTourManifest(
+    title: '南头古城',
+    centralQuestion: '',
+    scriptVersion: 'distance-preview',
+    reviewState: 'approved',
+    fieldAuditState: 'approved',
+    productionReady: true,
+    demoLabel: null,
+    contentMethod: 'field',
+    downloadSizeBytes: 1,
+    fragments: _distanceFragments,
+  ),
+);
+
+_CompanionHarness _distanceHarness({bool playing = false}) => _CompanionHarness(
+      city: _distanceCity,
+      routes: [_distanceRoute],
+      initialTour: ActiveTourState(
+        status: 'listening',
+        route: _distanceRoute,
+        session: _session(_distanceRoute),
+        ledger: StoryLedger(
+          centralQuestion: '',
+          collectedCount: 4,
+          totalCount: 12,
+          reconstructionUnlocked: false,
+          entries: _distanceFragments,
+        ),
+        current: playing ? _distanceFragments[1] : null,
+        selectedFragmentId: playing ? _distanceFragments[1].id : null,
+        position: playing ? const Duration(seconds: 37) : Duration.zero,
+        isPlaying: playing,
+        locationMode: TourLocationMode.real,
+        latestLocationSample: LocationSample(
+          latitude: 22.54,
+          longitude: 113.92,
+          accuracyM: 8,
+          recordedAt: _distanceNow,
+        ),
+      ),
+    );

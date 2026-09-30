@@ -5,13 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../application/nearby_story_points.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'audio_ownership_controller.dart';
 import 'companion_walk_settings.dart';
+import 'companion_distance_controller.dart';
+import 'companion_point_picker.dart';
 import 'discovery_controller.dart';
 import 'experience_providers.dart';
 import 'offline_package_controller.dart';
@@ -22,6 +23,7 @@ part 'discovery_journal.dart';
 part 'discovery_atlas.dart';
 part 'discovery_shelf.dart';
 part 'discovery_companion.dart';
+part 'discovery_companion_distance.dart';
 
 class DiscoveryPage extends ConsumerStatefulWidget {
   const DiscoveryPage({
@@ -43,6 +45,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   final _busyFavorites = <String>{};
   RouteExperience? _lastOpened;
   String? _companionRouteId;
+  String? _distanceRouteSlug;
   bool _startingCompanion = false;
 
   @override
@@ -66,6 +69,20 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
         _section = TravelerSection.companion;
       }
     }
+  }
+
+  // This owner survives a pending/failed route handoff, unlike its point panel.
+  // Keep the requested slug during loading so leaving a route always clears it.
+  void _trackDistanceRoute(String? slug) {
+    if (slug == null || slug == _distanceRouteSlug) return;
+    final previous = _distanceRouteSlug;
+    _distanceRouteSlug = slug;
+    if (previous == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(companionDistanceControllerProvider(previous).notifier).reset();
+      ref.read(companionDistanceControllerProvider(slug).notifier).reset();
+    });
   }
 
   TravelerSection _parseTab(String? tab) => switch (tab) {
@@ -287,6 +304,11 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     final ownership = ref.watch(audioOwnershipProvider);
     final tour = ref.watch(activeTourControllerProvider);
     final requestedSlug = widget.initialCompanionRouteSlug;
+    if (!_companionRunning(tour) &&
+        _companionRouteId == null &&
+        requestedSlug != null) {
+      _trackDistanceRoute(requestedSlug);
+    }
     final requestedRoute = requestedSlug == null
         ? null
         : ref.watch(offlineAwareRouteProvider(requestedSlug));
@@ -312,6 +334,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
           }
         },
         onSelectRoute: (route) => setState(() => _companionRouteId = route.id),
+        onDistanceRoute: _trackDistanceRoute,
         onStart: _startCompanion,
         starting: _startingCompanion,
       ),
@@ -401,7 +424,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     ),
                   ),
           ),
-          if (resumeTitle != null)
+          if (resumeTitle != null && _section != TravelerSection.companion)
             Positioned(
               left: 23,
               right: 23,

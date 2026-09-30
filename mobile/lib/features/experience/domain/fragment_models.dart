@@ -183,6 +183,8 @@ class StoryFragment {
     required this.reviewState,
     required this.triggerRegion,
     required this.audio,
+    this.placeName,
+    this.stopId,
     this.title,
     this.transcript,
     this.keyClaim,
@@ -208,6 +210,10 @@ class StoryFragment {
   final String reviewState;
   final TriggerRegion triggerRegion;
   final NarrationAsset audio;
+
+  /// The public geographic label, independent of the locked story title.
+  final String? placeName;
+  final String? stopId;
   final String? title;
   final String? transcript;
   final String? keyClaim;
@@ -229,6 +235,18 @@ class StoryFragment {
   bool get isMissionPending => state == 'mission_pending';
   bool get isRevealed => title != null;
 
+  String get publicPlaceName {
+    final name = _nonEmptyString(placeName);
+    if (name != null) return name;
+    final preview = safePreview.trim();
+    if (preview.isNotEmpty &&
+        preview.runes.length <= 18 &&
+        !RegExp(r'[。！？!?，,；;：:\n\r]|线索|故事|未发现|待发现').hasMatch(preview)) {
+      return preview;
+    }
+    return '地点 ${position.toString().padLeft(2, '0')}';
+  }
+
   NarrationAsset narrationFor(String? profileId) =>
       narrationTracks[profileId]?.audio ?? audio;
 
@@ -240,6 +258,8 @@ class StoryFragment {
         reviewState: reviewState,
         triggerRegion: triggerRegion,
         audio: narrationFor(profileId),
+        placeName: placeName,
+        stopId: stopId,
         title: title,
         transcript: transcript,
         keyClaim: keyClaim,
@@ -266,6 +286,8 @@ class StoryFragment {
         reviewState: reviewState,
         triggerRegion: triggerRegion,
         audio: audio,
+        placeName: placeName,
+        stopId: stopId,
         state: 'undiscovered',
         mission: mission,
         sources: sources,
@@ -289,6 +311,8 @@ class StoryFragment {
         reviewState: reviewState,
         triggerRegion: triggerRegion,
         audio: audio,
+        placeName: placeName,
+        stopId: stopId,
         title: title,
         transcript: transcript,
         keyClaim: keyClaim,
@@ -318,6 +342,8 @@ class StoryFragment {
       triggerRegion: TriggerRegion.fromJson(
           json['trigger_region'] as Map<String, dynamic>),
       audio: NarrationAsset.fromJson(json['audio'] as Map<String, dynamic>),
+      placeName: _nonEmptyString(json['place_name']),
+      stopId: _nonEmptyString(json['stop_id']),
       title: json['title'] as String?,
       transcript: json['transcript'] as String?,
       keyClaim: json['key_claim'] as String?,

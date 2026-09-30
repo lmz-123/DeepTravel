@@ -861,10 +861,19 @@ class FragmentTourService:
         mission = fragment.photo_mission
         narration = narration or self._narration_context(session, fragment.arc)
         experience_tags = normalize_experience_tags(fragment.experience_tags_json or [])
-        route_theme = fragment.arc.route.theme if fragment.arc.route is not None else ""
+        route = fragment.arc.route
+        route_theme = route.theme if route is not None else ""
+        # Stops are public geographic labels. Never substitute the locked story title.
+        stop = (
+            next((item for item in route.stops if item.id == fragment.stop_id), None)
+            if route is not None and fragment.stop_id
+            else None
+        )
         return {
             "id": fragment.id,
             "position": fragment.position,
+            "stop_id": stop.id if stop is not None else None,
+            "place_name": (stop.title.strip() or None) if stop is not None else None,
             "safe_preview": fragment.safe_preview,
             "interaction_type": fragment.interaction_type,
             "review_state": fragment.review_state,

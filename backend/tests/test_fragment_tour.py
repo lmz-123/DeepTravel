@@ -17,6 +17,7 @@ from app.infrastructure.persistence.models import (
     NarrationVoiceProfileModel,
     PhotoMissionModel,
     RouteModel,
+    StopModel,
     StoryArcModel,
     StoryFragmentModel,
 )
@@ -60,6 +61,47 @@ def test_offline_package_is_hidden_when_published_audio_has_no_checksum(client):
     assert response.status_code == 404
 
 
+def test_public_place_name_and_ledger_use_linked_stop_without_revealing_story(
+    app, client, guest_headers
+):
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        fragment = session.get(StoryFragmentModel, "nantou-fragment-1")
+        stop = session.get(StopModel, fragment.stop_id)
+        stop.title = "南头古城南门"
+        fragment.title = "仍然锁定的故事标题"
+        fragment.transcript = "仍然锁定的故事正文"
+        stop_id = stop.id
+        session.commit()
+
+    route, journey = _start(client, guest_headers)
+    public = route["audio_tour"]["fragments"][0]
+    ledger = client.get(
+        f"/api/v1/journeys/{journey['id']}/ledger", headers=guest_headers
+    ).get_json()["data"]
+    for fragment in (public, ledger["entries"][0]):
+        assert fragment["stop_id"] == stop_id
+        assert fragment["place_name"] == "南头古城南门"
+        assert "title" not in fragment
+        assert "transcript" not in fragment
+
+
+def test_unlinked_fragment_does_not_substitute_its_private_story_title(app, client):
+    database = app.extensions["database"]
+    with database.session_factory() as session:
+        fragment = session.get(StoryFragmentModel, "nantou-fragment-1")
+        fragment.stop_id = None
+        fragment.title = "不应作为地点显示的故事标题"
+        session.commit()
+
+    route = client.get("/api/v1/routes/nantou-time-layers").get_json()["data"]
+    fragment = route["audio_tour"]["fragments"][0]
+    assert fragment["stop_id"] is None
+    assert fragment["place_name"] is None
+    assert "title" not in fragment
+    assert "transcript" not in fragment
+
+
 def test_offline_package_is_complete_versioned_and_canonical(app, client):
     database = app.extensions["database"]
     media_root = Path(app.config["MEDIA_ROOT"])
@@ -96,6 +138,11 @@ def test_offline_package_is_complete_versioned_and_canonical(app, client):
     assert all(item["transcript"] for item in fragments)
     assert all(item["state"] == "undiscovered" for item in fragments)
     assert all(len(item["audio"]["checksum_sha256"]) == 64 for item in fragments)
+    assert [(item["stop_id"], item["place_name"]) for item in fragments] == [
+        (item["stop_id"], item["place_name"])
+        for item in public_route["audio_tour"]["fragments"]
+    ]
+    assert all(item["place_name"] for item in fragments)
 
 
 def test_public_voice_profiles_require_complete_current_coverage_and_preserve_default(
