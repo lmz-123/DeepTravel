@@ -15,9 +15,9 @@
     "theme": "海岛与文化建筑",
     "hero_image": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
     "is_featured": false,
-    "content_status": "draft",
-    "published_at": null,
-    "is_public_visible": false,
+    "content_status": "published",
+    "published_at": "2026-09-30T13:02:45",
+    "is_public_visible": true,
     "managed_package_id": "researched-place-zhuhai-yeli-island",
     "managed_package_version": "2026.09-research-draft.1",
     "stop_count": 0
@@ -48,7 +48,7 @@
     "reviewed_by": null,
     "reviewed_at": null,
     "source_version": "2026.09-research-draft.1",
-    "publication_decision": null
+    "publication_decision": "field_test"
   },
   "home_story": null,
   "fragments": [

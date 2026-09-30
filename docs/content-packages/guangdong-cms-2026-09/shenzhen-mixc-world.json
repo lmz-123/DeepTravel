@@ -15,9 +15,9 @@
     "theme": "建筑与公共艺术",
     "hero_image": "public/content/2026/09/575f6d6dab367506c09d0e7c60212976ec0929a832c7bf23aa4f4ec911cba8d4.jpg",
     "is_featured": false,
-    "content_status": "draft",
-    "published_at": null,
-    "is_public_visible": false,
+    "content_status": "published",
+    "published_at": "2026-09-30T13:02:44",
+    "is_public_visible": true,
     "managed_package_id": "researched-place-shenzhen-mixc-world",
     "managed_package_version": "2026.09-research-draft.1",
     "stop_count": 0
@@ -48,7 +48,7 @@
     "reviewed_by": null,
     "reviewed_at": null,
     "source_version": "2026.09-research-draft.1",
-    "publication_decision": null
+    "publication_decision": "field_test"
   },
   "home_story": null,
   "fragments": [

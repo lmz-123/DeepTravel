@@ -15,9 +15,9 @@
     "theme": "建筑与街区生活",
     "hero_image": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
     "is_featured": false,
-    "content_status": "draft",
-    "published_at": null,
-    "is_public_visible": false,
+    "content_status": "published",
+    "published_at": "2026-09-30T13:02:46",
+    "is_public_visible": true,
     "managed_package_id": "researched-place-guangzhou-shamian",
     "managed_package_version": "2026.09-research-draft.1",
     "stop_count": 0
@@ -48,7 +48,7 @@
     "reviewed_by": null,
     "reviewed_at": null,
     "source_version": "2026.09-research-draft.1",
-    "publication_decision": null
+    "publication_decision": "field_test"
   },
   "home_story": null,
   "fragments": [

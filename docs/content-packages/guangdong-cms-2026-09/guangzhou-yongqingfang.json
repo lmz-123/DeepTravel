@@ -15,9 +15,9 @@
     "theme": "西关与岭南文化",
     "hero_image": "public/content/2026/09/f60d4e9c3cbb136b6545242e95c5564a0952caa55cdfda845903b8b2fd1d7d1b.jpg",
     "is_featured": false,
-    "content_status": "draft",
-    "published_at": null,
-    "is_public_visible": false,
+    "content_status": "published",
+    "published_at": "2026-09-30T13:02:48",
+    "is_public_visible": true,
     "managed_package_id": "researched-place-guangzhou-yongqingfang",
     "managed_package_version": "2026.09-research-draft.1",
     "stop_count": 0
@@ -48,7 +48,7 @@
     "reviewed_by": null,
     "reviewed_at": null,
     "source_version": "2026.09-research-draft.1",
-    "publication_decision": null
+    "publication_decision": "field_test"
   },
   "home_story": null,
   "fragments": [
