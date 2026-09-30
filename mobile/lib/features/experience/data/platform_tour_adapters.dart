@@ -26,14 +26,20 @@ class GeolocatorTracker implements LocationTracker {
     this.onDiagnostic,
     this.backgroundUpdatesEnabled = true,
     PositionStreamFactory? positionStreamFactory,
-  }) : _positionStreamFactory = positionStreamFactory ??
+    Future<Position> Function(LocationSettings)? firstPositionFactory,
+  })  : _positionStreamFactory = positionStreamFactory ??
             ((settings) => Geolocator.getPositionStream(
                   locationSettings: settings,
-                ));
+                )),
+        _firstPositionFactory = firstPositionFactory ??
+            ((settings) =>
+                Geolocator.getCurrentPosition(locationSettings: settings));
 
   final TourLocationDiagnosticCallback? onDiagnostic;
   final bool backgroundUpdatesEnabled;
   final PositionStreamFactory _positionStreamFactory;
+  final Future<Position> Function(LocationSettings) _firstPositionFactory;
+  DateTime? _lastPositionTime;
   StreamSubscription<Position>? _subscription;
   StreamController<LocationSample>? _controller;
   var _generation = 0;
@@ -69,6 +75,7 @@ class GeolocatorTracker implements LocationTracker {
   Future<void> _startStream() async {
     final generation = ++_generation;
     _starting = true;
+    _lastPositionTime = null;
     await _subscription?.cancel();
     _subscription = null;
     if (generation != _generation) return;
@@ -85,18 +92,11 @@ class GeolocatorTracker implements LocationTracker {
             'provider_strategy': strategy,
             'accuracy_bucket': _accuracyBucket(position.accuracy),
           });
-          _controller?.add(LocationSample(
-            latitude: position.latitude,
-            longitude: position.longitude,
-            accuracyM: position.accuracy,
-            recordedAt: position.timestamp,
-            headingDegrees:
-                position.hasHeading ? _validHeading(position.heading) : null,
-          ));
+          _emitPosition(position, generation);
         },
         onError: (Object error, StackTrace stackTrace) {
           if (generation != _generation) return;
-          _subscription = null;
+          // Keep the subscription so a retry/stop cancels the native listener.
           _diagnostic('warning', 'journey_location_stream_failed', {
             'provider_strategy': strategy,
             'failure_type': _failureType(error),
@@ -107,6 +107,7 @@ class GeolocatorTracker implements LocationTracker {
           if (generation == _generation) _subscription = null;
         },
       );
+      unawaited(_acquireFirstPosition(generation));
       _diagnostic('info', 'journey_location_stream_started', {
         'provider_strategy': strategy,
       });
@@ -122,17 +123,60 @@ class GeolocatorTracker implements LocationTracker {
     }
   }
 
+  Future<void> _acquireFirstPosition(int generation) async {
+    // Android's high-accuracy stream can wait for GPS indoors. A concurrent
+    // network-capable first fix gives the distance estimate a starting point;
+    // arrival detection still enforces its own precision and repeated samples.
+    const timeout = Duration(seconds: 12);
+    final settings = defaultTargetPlatform == TargetPlatform.android
+        ? AndroidSettings(
+            accuracy: LocationAccuracy.medium,
+            forceLocationManager: true,
+            timeLimit: timeout)
+        : const LocationSettings(
+            accuracy: LocationAccuracy.high, timeLimit: timeout);
+    try {
+      final position = await _firstPositionFactory(settings).timeout(timeout);
+      if (generation != _generation) return;
+      // Never replace an already received live fix with a one-shot result.
+      if (_lastPositionTime == null ||
+          DateTime.now().toUtc().difference(_lastPositionTime!.toUtc()) >
+              const Duration(seconds: 15)) {
+        _emitPosition(position, generation);
+      }
+    } catch (_) {
+      // A failed one-shot must not interrupt the independent continuous stream.
+    }
+  }
+
+  void _emitPosition(Position position, int generation) {
+    if (generation != _generation ||
+        (_lastPositionTime != null &&
+            position.timestamp.isBefore(_lastPositionTime!))) {
+      return;
+    }
+    _lastPositionTime = position.timestamp;
+    _controller?.add(LocationSample(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracyM: position.accuracy,
+      recordedAt: position.timestamp,
+      headingDegrees:
+          position.hasHeading ? _validHeading(position.heading) : null,
+    ));
+  }
+
   LocationSettings _settings() {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 3,
+        distanceFilter: 0,
         intervalDuration: const Duration(seconds: 3),
         forceLocationManager: true,
         foregroundNotificationConfig: backgroundUpdatesEnabled
             ? const ForegroundNotificationConfig(
                 notificationTitle: '见地正在陪你行走',
-                notificationText: '靠近线索时会自动播放故事，点按可回到旅程。',
+                notificationText: '靠近地点时提醒你，准备好再听。点按可回到随行。',
                 enableWakeLock: true,
                 setOngoing: true,
               )
@@ -143,13 +187,13 @@ class GeolocatorTracker implements LocationTracker {
       return AppleSettings(
           accuracy: LocationAccuracy.best,
           activityType: ActivityType.fitness,
-          distanceFilter: 8,
+          distanceFilter: 0,
           pauseLocationUpdatesAutomatically: false,
           showBackgroundLocationIndicator: backgroundUpdatesEnabled,
           allowBackgroundLocationUpdates: backgroundUpdatesEnabled);
     }
     return const LocationSettings(
-        accuracy: LocationAccuracy.high, distanceFilter: 8);
+        accuracy: LocationAccuracy.high, distanceFilter: 0);
   }
 
   void _diagnostic(

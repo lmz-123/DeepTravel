@@ -32,9 +32,66 @@ void main() {
     expect(settings, hasLength(1));
     expect(settings.first, isA<AndroidSettings>());
     expect((settings.single as AndroidSettings).forceLocationManager, isTrue);
-    expect(settings.single.distanceFilter, 3);
+    expect(settings.single.distanceFilter, 0);
     expect(settings.single.timeLimit, isNull);
     expect(diagnostics, contains('journey_location_stream_started'));
+  });
+
+  test('first fix supplies distance while the precise stream is waiting',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final tracker = GeolocatorTracker(
+      positionStreamFactory: (_) => const Stream.empty(),
+      firstPositionFactory: (settings) async {
+        expect(settings.accuracy, LocationAccuracy.medium);
+        return _position();
+      },
+    );
+    addTearDown(tracker.stop);
+    final sample = await tracker.samples().first;
+    expect(sample.latitude, 22.54);
+    expect(sample.accuracyM, 8);
+  });
+
+  test('late first fix cannot replace a live fix or survive stopping',
+      () async {
+    final first = Completer<Position>();
+    final stream = StreamController<Position>();
+    final tracker = GeolocatorTracker(
+      positionStreamFactory: (_) => stream.stream,
+      firstPositionFactory: (_) => first.future,
+    );
+    final samples = <Object>[];
+    final subscription = tracker.samples().listen(samples.add);
+    await Future<void>.delayed(Duration.zero);
+    stream.add(_position());
+    await Future<void>.delayed(Duration.zero);
+    expect(samples, hasLength(1));
+    await tracker.stop();
+    first.complete(_position());
+    await Future<void>.delayed(Duration.zero);
+    expect(samples, hasLength(1));
+    await subscription.cancel();
+    await stream.close();
+  });
+
+  test('stopping after a provider error still cancels the native listener',
+      () async {
+    var cancelled = false;
+    final native = StreamController<Position>(onCancel: () => cancelled = true);
+    final tracker = GeolocatorTracker(
+      positionStreamFactory: (_) => native.stream,
+      firstPositionFactory: (_) => Future.error(StateError('no first fix')),
+    );
+    final subscription = tracker.samples().listen((_) {}, onError: (_) {});
+    await Future<void>.delayed(Duration.zero);
+    native.addError(StateError('temporary provider failure'));
+    await Future<void>.delayed(Duration.zero);
+    await tracker.stop();
+    expect(cancelled, isTrue);
+    await subscription.cancel();
+    await native.close();
   });
 
   test('foreground-only preview does not enable background tracking', () async {

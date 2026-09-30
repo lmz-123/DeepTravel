@@ -27,6 +27,9 @@ import 'package:jiandi/features/experience/presentation/offline_package_controll
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
+    await (FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+        .load();
     for (final (family, file) in [
       ('Noto Serif SC', 'NotoSerifSC.ttf'),
       ('Noto Sans SC', 'NotoSansSC.ttf'),
@@ -99,9 +102,32 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byType(SnackBar), findsNothing);
       await _captureDistance(tester, 'manual', size.width.toInt());
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(180);
+      await tester.pump();
+      await _captureDistance(tester, 'actions', size.width.toInt());
       expect(harness.tour.startCalls, 0);
       expect(harness.tour.playCalls, 0);
       expect(harness.tour.stopCalls, 0);
+    });
+  }
+
+  for (final width in [320.0, 360.0, 390.0]) {
+    testWidgets('walk actions stay on one row at $width with larger text',
+        (tester) async {
+      await _pump(tester,
+          harness: _distanceHarness(), size: Size(width, 844), textScale: 1.3);
+      final actions = find.byKey(const ValueKey('companion-walk-actions'));
+      await _reveal(tester, actions);
+      final primary =
+          tester.getRect(find.byKey(const ValueKey('companion-primary')));
+      final end = tester.getRect(find.byKey(const ValueKey('companion-end')));
+      expect(primary.center.dy, closeTo(end.center.dy, .1));
+      expect(primary.right, lessThan(end.left));
+      expect(end.right, lessThanOrEqualTo(width - 20));
+      expect(tester.takeException(), isNull);
     });
   }
 
@@ -475,6 +501,7 @@ Future<GoRouter> _pump(
   Size size = const Size(390, 844),
   _CompanionHarness? harness,
   String? requestedSlug,
+  double textScale = 1,
 }) async {
   final fixture = harness ?? _CompanionHarness();
   tester.view.physicalSize = size;
@@ -540,6 +567,11 @@ Future<GoRouter> _pump(
           debugShowCheckedModeBanner: false,
           routerConfig: router,
           theme: AppTheme.light,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
         ),
       ),
     ),
@@ -604,7 +636,7 @@ Future<void> _captureDistance(
     WidgetTester tester, String mode, int width) async {
   final name = 'companion-distance-$mode-$width';
   final finder = find.byKey(const ValueKey('companion-screen'));
-  if (mode != 'picker') {
+  if (mode != 'picker' && mode != 'actions') {
     tester
         .state<ScrollableState>(find.byType(Scrollable).first)
         .position

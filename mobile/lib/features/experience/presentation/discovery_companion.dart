@@ -117,6 +117,9 @@ class _DiscoveryCompanion extends ConsumerWidget {
                   onTogglePlayback: () => ref
                       .read(activeTourControllerProvider.notifier)
                       .togglePlayback(),
+                  onStop: () => ref
+                      .read(activeTourControllerProvider.notifier)
+                      .stopTour(),
                   onDemo: () => ref
                       .read(activeTourControllerProvider.notifier)
                       .triggerNextDemo(autoPlay: false),
@@ -154,18 +157,6 @@ class _DiscoveryCompanion extends ConsumerWidget {
                   CompanionWalkSettingsEntry(
                     route: selectedRoute,
                     enabled: !running && !starting,
-                  ),
-                if (running && !starting)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: _CompanionTextButton(
-                      icon: DiscoveryMark.check,
-                      label: '结束本次随行',
-                      onTap: () => ref
-                          .read(activeTourControllerProvider.notifier)
-                          .stopTour(),
-                      muted: true,
-                    ),
                   ),
                 const SizedBox(height: 30),
                 Row(
@@ -574,6 +565,7 @@ class _CompanionStateSection extends StatelessWidget {
       required this.onPause,
       required this.onResume,
       required this.onTogglePlayback,
+      required this.onStop,
       required this.onDemo});
   final ActiveTourState state;
   final RouteExperience? selected;
@@ -583,6 +575,7 @@ class _CompanionStateSection extends StatelessWidget {
   final VoidCallback onResume;
   final VoidCallback onTogglePlayback;
   final VoidCallback onDemo;
+  final VoidCallback onStop;
 
   @override
   Widget build(BuildContext context) {
@@ -598,11 +591,12 @@ class _CompanionStateSection extends StatelessWidget {
           '正在准备\n沿途讲述。',
           '把声音和文字留在手机里，走到现场也能从容继续。'
         ),
-      _CompanionPhase.monitoring => state.status == 'permission_limited'
+      _CompanionPhase.monitoring => (state.status == 'permission_limited' ||
+              state.status == 'recoverable_error')
           ? (
               'LOCATION NEEDS PERMISSION',
               '让位置，\n找到你。',
-              '定位许可尚未打开。允许后，靠近线索时会先提醒你，声音不会突然闯进来。'
+              state.locationMessage ?? '定位尚未就绪，点按重新开启定位。'
             )
           : ('LISTENING FOR THE CITY', '沿着城市，慢慢走。', '靠近故事点时提醒你，准备好再听。'),
       _CompanionPhase.nearby => (
@@ -622,7 +616,16 @@ class _CompanionStateSection extends StatelessWidget {
         ),
     };
     if (phase == _CompanionPhase.playing) {
-      return _CompanionListeningStrip(state: state, onPause: onTogglePlayback);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _CompanionListeningStrip(state: state, onPause: onTogglePlayback),
+        Row(children: [
+          Flexible(
+              child: _CompanionTextButton(
+                  icon: DiscoveryMark.pause, label: '暂停随行', onTap: onPause)),
+          const SizedBox(width: 12),
+          _CompanionEndButton(onTap: onStop),
+        ]),
+      ]);
     }
     final compact =
         phase != _CompanionPhase.idle && phase != _CompanionPhase.preparing;
@@ -663,34 +666,56 @@ class _CompanionStateSection extends StatelessWidget {
                   _companionSans(11, height: 1.8, color: AppColors.terracotta)),
         ],
         SizedBox(height: compact ? 15 : 18),
-        Wrap(
-            spacing: 10,
-            runSpacing: 7,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _CompanionPrimaryButton(
-                  phase: phase,
-                  retryLocation: state.status == 'permission_limited',
-                  enabled: phase != _CompanionPhase.preparing &&
-                      (phase != _CompanionPhase.idle ||
-                          (selected != null && _supportsCompanion(selected!))),
-                  onStart: onStart,
-                  onPause: onPause,
-                  onResume: onResume,
-                  onTogglePlayback: onTogglePlayback),
-              if (phase == _CompanionPhase.monitoring &&
-                  state.locationMode == TourLocationMode.simulated)
-                _CompanionTextButton(
-                    icon: DiscoveryMark.pin, label: '模拟靠近一处线索', onTap: onDemo),
-              if (phase == _CompanionPhase.nearby)
-                _CompanionTextButton(
-                    icon: DiscoveryMark.arrowLeft,
-                    label: '继续寻找',
-                    onTap: onResume),
-            ]),
+        Row(
+          key: const ValueKey('companion-walk-actions'),
+          children: [
+            Flexible(
+              child: _CompanionPrimaryButton(
+                phase: phase,
+                retryLocation: state.status == 'permission_limited' ||
+                    state.status == 'recoverable_error',
+                enabled: phase != _CompanionPhase.preparing &&
+                    (phase != _CompanionPhase.idle ||
+                        (selected != null && _supportsCompanion(selected!))),
+                onStart: onStart,
+                onPause: onPause,
+                onResume: onResume,
+                onTogglePlayback: onTogglePlayback,
+              ),
+            ),
+            if (compact) ...[
+              const SizedBox(width: 12),
+              _CompanionEndButton(onTap: onStop),
+            ],
+          ],
+        ),
+        if (phase == _CompanionPhase.monitoring &&
+            state.locationMode == TourLocationMode.simulated)
+          _CompanionTextButton(
+              icon: DiscoveryMark.pin, label: '模拟靠近一处线索', onTap: onDemo),
+        if (phase == _CompanionPhase.nearby)
+          _CompanionTextButton(
+              icon: DiscoveryMark.arrowLeft, label: '继续寻找', onTap: onResume),
       ]),
     );
   }
+}
+
+class _CompanionEndButton extends StatelessWidget {
+  const _CompanionEndButton({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => DiscoveryTouch(
+        key: const ValueKey('companion-end'),
+        label: '结束本次随行',
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 44),
+          child: Center(
+              child: Text('结束本次随行',
+                  style: _companionSans(11, color: _distanceMuted))),
+        ),
+      );
 }
 
 class _CompanionPrimaryButton extends StatelessWidget {
@@ -794,14 +819,10 @@ class _CompanionPrimaryButton extends StatelessWidget {
 
 class _CompanionTextButton extends StatelessWidget {
   const _CompanionTextButton(
-      {required this.icon,
-      required this.label,
-      required this.onTap,
-      this.muted = false});
+      {required this.icon, required this.label, required this.onTap});
   final DiscoveryMark icon;
   final String label;
   final VoidCallback onTap;
-  final bool muted;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
       label: label,
@@ -810,13 +831,9 @@ class _CompanionTextButton extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 8),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            DiscoveryIcon(icon,
-                size: 15,
-                color: muted ? AppColors.textMuted : AppColors.terracotta),
+            DiscoveryIcon(icon, size: 15, color: AppColors.terracotta),
             const SizedBox(width: 5),
-            Text(label,
-                style: _companionSans(10,
-                    color: muted ? AppColors.textMuted : AppColors.terracotta))
+            Text(label, style: _companionSans(10, color: AppColors.terracotta))
           ])));
 }
 
@@ -854,12 +871,14 @@ class _CompanionSignalWidget extends StatelessWidget {
     required this.state,
     required this.horizontal,
     this.distance,
+    this.onRetry,
   });
 
   final bool active;
   final ActiveTourState state;
   final double horizontal;
   final CompanionDistanceState? distance;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -885,9 +904,11 @@ class _CompanionSignalWidget extends StatelessWidget {
         : active && state.locationMode == TourLocationMode.simulated
             ? '模拟定位'
             : active && distance?.hasLocation == true
-                ? '定位正常'
+                ? distance!.isApproximate
+                    ? '位置估算'
+                    : '定位正常'
                 : active
-                    ? '等待定位'
+                    ? distance?.locationIssue ?? '等待定位'
                     : '尚未定位';
     final screenWidth = MediaQuery.sizeOf(context).width;
     final fieldHeight = screenWidth <= 375 ? 164.0 : 178.0;
@@ -949,13 +970,32 @@ class _CompanionSignalWidget extends StatelessWidget {
             Positioned(
               right: horizontal,
               top: 16,
-              child: Row(children: [
-                const DiscoveryIcon(DiscoveryMark.pin,
-                    size: 12, stroke: 1.4, color: Color(0xFF65734E)),
-                const SizedBox(width: 5),
-                Text(locationLabel,
-                    style: _companionSans(9, color: const Color(0xFF65734E))),
-              ]),
+              child: Semantics(
+                button: onRetry != null,
+                label: onRetry != null ? '$locationLabel，重新定位' : locationLabel,
+                excludeSemantics: true,
+                child: InkWell(
+                  key: const ValueKey('companion-location-retry'),
+                  onTap: onRetry,
+                  child: SizedBox(
+                      height: 44,
+                      child: Align(
+                          alignment: Alignment.topRight,
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const DiscoveryIcon(DiscoveryMark.pin,
+                                size: 12,
+                                stroke: 1.4,
+                                color: Color(0xFF65734E)),
+                            const SizedBox(width: 5),
+                            Text(
+                                onRetry != null
+                                    ? '$locationLabel ↻'
+                                    : locationLabel,
+                                style: _companionSans(9,
+                                    color: const Color(0xFF65734E))),
+                          ]))),
+                ),
+              ),
             ),
             Positioned(
               left: horizontal,

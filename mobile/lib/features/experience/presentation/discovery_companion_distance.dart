@@ -155,10 +155,14 @@ class _CompanionDistancePanelState
         : !distance.hasLocation
             ? widget.activeTour.locationMode == TourLocationMode.simulated
                 ? '模拟预览 · 实地行走时显示距离'
-                : '定位恢复后更新距离'
+                : distance.locationIssue == '定位精度不足'
+                    ? '定位精度不足 · 点右上角重新定位'
+                    : '定位恢复后更新距离'
             : manual
                 ? '目标保持不变 · 直线约距'
-                : '直线约距 · 随脚步更新';
+                : distance.isApproximate
+                    ? '位置仍在校准 · 仅供估算'
+                    : '直线约距 · 随脚步更新';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -167,6 +171,14 @@ class _CompanionDistancePanelState
           state: widget.activeTour,
           horizontal: widget.horizontal,
           distance: distance,
+          onRetry: widget.signalActive &&
+                  !distance.isPaused &&
+                  !distance.hasLocation &&
+                  widget.activeTour.locationMode == TourLocationMode.real
+              ? () => ref
+                  .read(activeTourControllerProvider.notifier)
+                  .retryLocation()
+              : null,
         ),
         Semantics(
           button: true,

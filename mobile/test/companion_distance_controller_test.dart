@@ -102,7 +102,7 @@ void main() {
     fixture.tour.emit(fixture.live());
     expect(fixture.value.target?.fragment.id, 'near');
     final expiredSample = fixture.sample();
-    fixture.now = fixture.now.add(const Duration(seconds: 16));
+    fixture.now = fixture.now.add(const Duration(seconds: 61));
     fixture.tour.emit(fixture.live(ledger: [
       _revealed(fixture.route.audioTour!.fragments.first),
     ]).copyWith(latestLocationSample: expiredSample));
@@ -138,6 +138,29 @@ void main() {
     expect(fixture.value.points.every((p) => p.distanceMeters == null), isTrue);
   });
 
+  test(
+      'distance estimates accept ordinary fixes without arrival-level accuracy',
+      () {
+    final fixture = _Fixture();
+    fixture.tour.emit(fixture
+        .live()
+        .copyWith(latestLocationSample: fixture.sample(accuracy: 70)));
+    expect(fixture.value.hasLocation, isTrue);
+    expect(fixture.value.isApproximate, isTrue);
+    expect(fixture.value.target?.distanceMeters, isNotNull);
+    expect(fixture.tour.snapshot.current, isNull);
+    expect(fixture.tour.snapshot.isPlaying, isFalse);
+  });
+
+  test('a stationary recent fix remains an estimate after 15 seconds', () {
+    final fixture = _Fixture();
+    final live = fixture.live();
+    fixture.now = fixture.now.add(const Duration(seconds: 30));
+    fixture.tour.emit(live);
+    expect(fixture.value.hasLocation, isTrue);
+    expect(fixture.value.target?.distanceMeters, isNotNull);
+  });
+
   test('invalid and inaccurate samples leave distances unknown', () {
     final fixture = _Fixture();
     for (final sample in [
@@ -145,8 +168,8 @@ void main() {
       fixture.sample(latitude: 91),
       fixture.sample(accuracy: -1),
       fixture.sample(accuracy: double.infinity),
-      fixture.sample(accuracy: 70),
-      fixture.sample(time: fixture.now.subtract(const Duration(seconds: 16))),
+      fixture.sample(accuracy: 201),
+      fixture.sample(time: fixture.now.subtract(const Duration(seconds: 61))),
       fixture.sample(time: fixture.now.add(const Duration(seconds: 6))),
     ]) {
       fixture.tour.emit(fixture.live().copyWith(latestLocationSample: sample));
@@ -168,8 +191,8 @@ void main() {
     addTearDown(subscription.close);
     expect(fixture.value.hasLocation, isTrue);
 
-    fixture.now = fixture.now.add(const Duration(seconds: 16));
-    await tester.pump(const Duration(seconds: 16));
+    fixture.now = fixture.now.add(const Duration(seconds: 61));
+    await tester.pump(const Duration(seconds: 61));
     expect(fixture.value.target?.fragment.id, 'far');
     expect(fixture.value.target?.distanceMeters, isNull);
     expect(fixture.value.hasLocation, isFalse);

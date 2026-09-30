@@ -293,6 +293,8 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   int? _preparingPlaybackGeneration;
   int? _audioOwnershipGeneration;
   LocationSample? _latestLocationSample;
+  bool _locationStreamInterrupted = false;
+  bool _retryingLocation = false;
   int _lastOfflineCheckpointBucket = -1;
 
   ExperienceRepository get _repository =>
@@ -694,8 +696,15 @@ class ActiveTourController extends Notifier<ActiveTourState> {
 
   Future<void> _onLocation(LocationSample sample) async {
     if (state.locationMode != TourLocationMode.real ||
-        state.status != 'monitoring') {
+        (state.status != 'monitoring' &&
+            !(state.status == 'recoverable_error' &&
+                _locationStreamInterrupted))) {
       return;
+    }
+    if (_locationStreamInterrupted) {
+      _locationStreamInterrupted = false;
+      state = state.copyWith(
+          status: 'monitoring', locationMessage: '定位已恢复，继续寻找附近地点。');
     }
     final manifest = state.route?.audioTour;
     final ledger = state.ledger;
@@ -1693,10 +1702,11 @@ class ActiveTourController extends Notifier<ActiveTourState> {
       state = state.copyWith(
           status: 'simulated',
           locationMessage: '模拟定位已开启：不会读取真实位置，请手动模拟到达下一条线索。');
-    } else if (_locations != null) {
+    } else if (_locations != null && !_locationStreamInterrupted) {
       state = state.copyWith(
           status: 'monitoring', locationMessage: '定位正常，锁屏后会继续寻找附近线索');
     } else {
+      await _stopLocationMonitoring();
       await _activateRealLocation();
     }
     if (!resumeAudio) {
@@ -2032,10 +2042,33 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   Future<FragmentRecap> loadRecap() =>
       _repository.fragmentRecap(state.session!.id);
 
+  Future<void> retryLocation() async {
+    if (_retryingLocation ||
+        state.session == null ||
+        state.session!.isCompleted ||
+        state.locationMode != TourLocationMode.real ||
+        state.status == 'stopped' ||
+        state.status == 'idle' ||
+        state.status == 'paused') {
+      return;
+    }
+    _retryingLocation = true;
+    final transition = _transitionGeneration;
+    try {
+      await _stopLocationMonitoring();
+      if (!_isTransitionCurrent(transition)) return;
+      await _activateRealLocation();
+    } finally {
+      _retryingLocation = false;
+    }
+  }
+
   Future<void> _activateRealLocation() async {
+    final transition = _transitionGeneration;
     try {
       final permission =
           await ref.read(locationTrackerProvider).requestPermission();
+      if (!_isTransitionCurrent(transition)) return;
       state = state.copyWith(
           locationMode: TourLocationMode.real,
           status: permission == TourLocationPermission.granted
@@ -2050,6 +2083,7 @@ class ActiveTourController extends Notifier<ActiveTourState> {
         _refreshNearbyStoryPoints();
       }
     } catch (error) {
+      if (!_isTransitionCurrent(transition)) return;
       _latestLocationSample = null;
       state = state.copyWith(
           status: 'recoverable_error',
@@ -2061,14 +2095,20 @@ class ActiveTourController extends Notifier<ActiveTourState> {
   }
 
   void _listenToRealLocation() {
+    _locationStreamInterrupted = false;
+    final transition = _transitionGeneration;
     _locations ??= ref.read(locationTrackerProvider).samples().listen(
-      _onLocation,
+      (sample) {
+        if (_isTransitionCurrent(transition)) unawaited(_onLocation(sample));
+      },
       onError: (_) {
+        if (!_isTransitionCurrent(transition)) return;
+        _locationStreamInterrupted = true;
         _latestLocationSample = null;
         state = state.copyWith(
-            status: 'recoverable_error',
+            status: state.status == 'paused' ? 'paused' : 'recoverable_error',
             clearLatestLocationSample: true,
-            locationMessage: '定位暂时中断，回到应用后会继续尝试');
+            locationMessage: '定位暂时中断，可以点按重新定位。');
         _refreshNearbyStoryPoints();
       },
     );

@@ -22,6 +22,8 @@ class CompanionDistanceState {
     this.hasLocation = false,
     this.allExplored = false,
     this.isPaused = false,
+    this.isApproximate = false,
+    this.locationIssue,
   });
 
   final List<NearbyStoryPoint> points;
@@ -32,6 +34,8 @@ class CompanionDistanceState {
   final bool hasLocation;
   final bool allExplored;
   final bool isPaused;
+  final bool isApproximate;
+  final String? locationIssue;
 }
 
 /// Injectable clock also makes expiry independent of the next GPS update.
@@ -47,6 +51,11 @@ final companionDistanceControllerProvider = NotifierProvider.family<
 
 class CompanionDistanceController extends Notifier<CompanionDistanceState> {
   CompanionDistanceController(this.routeSlug);
+
+  // A distance estimate is not an arrival decision. Keep stricter accuracy
+  // and freshness requirements in StableTriggerEngine unchanged.
+  static const maximumDisplayAge = Duration(minutes: 1);
+  static const maximumDisplayAccuracyM = 200.0;
 
   final String routeSlug;
   String? _manualId;
@@ -90,9 +99,8 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
     final sample = _validSample(rawSample, now) ? rawSample : null;
     _expiry?.cancel();
     if (sample != null) {
-      final expiresIn = sample.recordedAt
-          .add(StableTriggerEngine.maximumSampleAge)
-          .difference(now);
+      final expiresIn =
+          sample.recordedAt.add(maximumDisplayAge).difference(now);
       _expiry = Timer(expiresIn + const Duration(milliseconds: 1), () {
         // No new GPS event is needed to clear an obsolete number on screen.
         ref.invalidateSelf();
@@ -119,8 +127,7 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
       final region = point.fragment.triggerRegion;
       final usable = sample != null &&
           _validCoordinate(region.latitude, region.longitude) &&
-          region.maxAccuracyM.isFinite &&
-          sample.accuracyM <= region.maxAccuracyM &&
+          sample.accuracyM <= maximumDisplayAccuracyM &&
           point.distanceMeters?.isFinite == true;
       return NearbyStoryPoint(
         fragment: point.fragment,
@@ -153,6 +160,14 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
       hasLocation: points.any((point) => point.distanceMeters != null),
       allExplored: points.isNotEmpty && points.every(_isExplored),
       isPaused: sameRoute && tour.status == 'paused',
+      isApproximate: sample != null && sample.accuracyM > 50,
+      locationIssue: rawSample == null
+          ? null
+          : rawSample.accuracyM > maximumDisplayAccuracyM
+              ? '定位精度不足'
+              : sample == null
+                  ? '定位更新中'
+                  : null,
     );
   }
 
@@ -219,11 +234,12 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
     if (sample == null ||
         !_validCoordinate(sample.latitude, sample.longitude) ||
         !sample.accuracyM.isFinite ||
+        sample.accuracyM > maximumDisplayAccuracyM ||
         sample.accuracyM < 0) {
       return false;
     }
     final age = now.toUtc().difference(sample.recordedAt.toUtc());
-    return age <= StableTriggerEngine.maximumSampleAge &&
+    return age <= maximumDisplayAge &&
         age >= -StableTriggerEngine.maximumFutureSkew;
   }
 

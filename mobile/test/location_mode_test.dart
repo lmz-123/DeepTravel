@@ -18,6 +18,7 @@ import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 import 'package:jiandi/features/experience/presentation/companion_walk_settings.dart';
+import 'package:jiandi/features/experience/presentation/companion_distance_controller.dart';
 import 'package:jiandi/features/experience/presentation/offline_package_controller.dart';
 import 'package:jiandi/features/experience/presentation/location_mode_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -136,6 +137,57 @@ void main() {
     expect(player.playedFragmentIds, isEmpty);
     expect(location.permissionRequests, 1);
     expect(location.sampleSubscriptions, 1);
+  });
+
+  test('real GPS reaches distance display, recovers after errors and can retry',
+      () async {
+    final store = _MemoryTourStore();
+    final location = _StreamingLocationTracker();
+    final player = _ControllableNarrationPlayer();
+    final container = ProviderContainer(overrides: [
+      experienceRepositoryProvider.overrideWithValue(_FragmentRepository()),
+      locationTrackerProvider.overrideWithValue(location),
+      narrationPlayerProvider.overrideWithValue(player),
+      tourStoreProvider.overrideWithValue(store),
+      preparedRouteServiceProvider
+          .overrideWithValue(_NoopPreparedRouteService(store)),
+      locationModeStoreProvider
+          .overrideWithValue(_MemoryLocationModeStore(TourLocationMode.real)),
+    ]);
+    addTearDown(() async {
+      container.dispose();
+      await location.dispose();
+      await player.dispose();
+    });
+    final subscription =
+        container.listen(activeTourControllerProvider, (_, __) {});
+    addTearDown(subscription.close);
+    final controller = container.read(activeTourControllerProvider.notifier);
+    await controller.start(_route, _session);
+    final distance = companionDistanceControllerProvider(_route.slug);
+    final fix = LocationSample(
+        latitude: _region.latitude,
+        longitude: _region.longitude,
+        accuracyM: 70,
+        recordedAt: DateTime.now().toUtc());
+    location.emit(fix);
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(distance).hasLocation, isTrue);
+    expect(container.read(distance).target?.distanceMeters, isNotNull);
+    expect(player.playedFragmentIds, isEmpty);
+    location._samples.addError(StateError('temporary provider failure'));
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(distance).hasLocation, isFalse);
+    location.emit(fix);
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(activeTourControllerProvider).status, 'monitoring');
+    expect(container.read(distance).hasLocation, isTrue);
+    await controller.retryLocation();
+    expect(location.sampleSubscriptions, 2);
+    expect(player.playedFragmentIds, isEmpty);
+    await controller.stopTour();
+    await controller.retryLocation();
+    expect(location.sampleSubscriptions, 2);
   });
 
   test('selecting an untriggered node is rejected without changing selection',
@@ -738,6 +790,15 @@ void main() {
     expect(container.read(activeTourControllerProvider).playbackMode,
         TourPlaybackMode.liveReplay);
 
+    final beforeRetry = container.read(activeTourControllerProvider);
+    await controller.retryLocation();
+    final afterRetry = container.read(activeTourControllerProvider);
+    expect(afterRetry.current?.id, beforeRetry.current?.id);
+    expect(afterRetry.isPlaying, beforeRetry.isPlaying);
+    expect(afterRetry.position, beforeRetry.position);
+    expect(player.playedFragmentIds, ['fragment-1']);
+    expect(location.sampleSubscriptions, 2);
+
     final time = DateTime.now().toUtc();
     location.emit(LocationSample(
       latitude: _region.latitude,
@@ -755,7 +816,7 @@ void main() {
     await _waitUntil(() => repository.isTriggered('fragment-2'));
 
     var state = container.read(activeTourControllerProvider);
-    expect(location.sampleSubscriptions, 1);
+    expect(location.sampleSubscriptions, 2);
     expect(state.latestLocationSample?.recordedAt,
         time.add(const Duration(seconds: 5)));
     expect(state.queue.map((fragment) => fragment.id), ['fragment-2']);
