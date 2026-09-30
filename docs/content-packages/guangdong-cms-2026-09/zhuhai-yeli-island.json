@@ -1,0 +1,393 @@
+{
+  "package_id": "researched-place-zhuhai-yeli-island",
+  "package_version": "2026.09-research-draft.1",
+  "route": {
+    "id": "0e7fa50a-9928-4cb4-a2c7-cca99fbc280c",
+    "city_id": "193c5124-11b7-47e3-b06f-28dd4144af64",
+    "city_name": null,
+    "slug": "zhuhai-yeli-island",
+    "title": "野狸岛·日月贝",
+    "subtitle": "海岛与文化建筑 · 慢行观察",
+    "description": "从与城市相连的海岛步道走向日月贝，在海岸转折处观察建筑与海面的关系。",
+    "duration_minutes": 70,
+    "distance_km": 2.5,
+    "difficulty": "轻松",
+    "theme": "海岛与文化建筑",
+    "hero_image": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+    "is_featured": false,
+    "content_status": "draft",
+    "published_at": null,
+    "is_public_visible": false,
+    "managed_package_id": "researched-place-zhuhai-yeli-island",
+    "managed_package_version": "2026.09-research-draft.1",
+    "stop_count": 0
+  },
+  "story_arc": {
+    "id": "6c3e80a7-8f0f-5b4d-8c11-1bd8bee9eb3a",
+    "title": "野狸岛·日月贝",
+    "central_question": "海岛与文化建筑 · 慢行观察",
+    "complete_story": "海燕桥连接香洲城区与野狸岛。沿允许步行的通道上岛，在桥头认一认身后的城区与前方的海岛。\n\n沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。这里的停留以公共岸边空间为主，无需进入餐饮场所；转身再看，城区已经在水的另一边。\n\n珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。可先在室外公共区域观察建筑轮廓；入场参观和演出以剧院安排为准。",
+    "causal_model": [
+      {
+        "id": "4a142f48-a2c1-52f9-8d3e-1d56c8f459c6",
+        "text": "海燕桥连接香洲城区与野狸岛。"
+      },
+      {
+        "id": "795d5a68-e9c2-5a5f-bb42-bb116c58b06c",
+        "text": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。"
+      },
+      {
+        "id": "3e2a4457-917b-5e1b-962d-581663a82115",
+        "text": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。"
+      }
+    ],
+    "pronunciation_notes": [],
+    "script_version": "2026.09-research-draft.1",
+    "review_state": "in_review",
+    "field_audit_state": "required",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "source_version": "2026.09-research-draft.1",
+    "publication_decision": null
+  },
+  "home_story": null,
+  "fragments": [
+    {
+      "id": "f8ee6517-0101-51c9-9791-2656b291466e",
+      "position": 1,
+      "title": "海燕桥",
+      "safe_preview": "海燕桥连接香洲城区与野狸岛。沿允许步行的通道上岛，在桥头认一认身后的城区与前方的海岛。",
+      "narration_script": "海燕桥连接香洲城区与野狸岛。沿允许步行的通道上岛，在桥头认一认身后的城区与前方的海岛。",
+      "transcript": "海燕桥连接香洲城区与野狸岛。沿允许步行的通道上岛，在桥头认一认身后的城区与前方的海岛。",
+      "audio_path": "public/narration/f8ee6517-0101-51c9-9791-2656b291466e/shenzhen-warm-companion/a0b067107fc57866-2026.09-research-draft.1-f2d7f7472d8a-019459f38e7d.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 173940,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "海燕桥连接香洲城区与野狸岛。",
+      "answers_question": "海燕桥连接香洲城区与野狸岛。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "9c352c22-f8ae-5f53-9d9d-ce9cd335c3c6",
+        "ef205c2e-c0aa-598b-b787-f6ec56a8502b"
+      ],
+      "stop": {
+        "id": "8ecd13e2-a841-5e49-ad93-5fe9da22ac75",
+        "title": "海燕桥",
+        "kicker": "海燕桥连接香洲城区与野狸岛。沿允许步行的通道上岛，在桥头认一认身后的城区与前方的海岛。",
+        "address": "海燕桥",
+        "latitude": 22.2783351,
+        "longitude": 113.5787698,
+        "arrival_radius_m": 60,
+        "story_title": "海燕桥",
+        "story_body": "海燕桥连接香洲城区与野狸岛。沿允许步行的通道上岛，在桥头认一认身后的城区与前方的海岛。",
+        "audio_url": "",
+        "image": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+        "insight": "海燕桥连接香洲城区与野狸岛。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "866bbcd5-af92-513f-9036-06ca2e7c0307",
+        "latitude": 22.2783351,
+        "longitude": 113.5787698,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://www.openstreetmap.org/way/668039043",
+        "field_notes": "公开来源候选坐标，未现场复核。海燕桥为 OSM 桥线代表点；得月舫为 OSM 具体 POI 点；珠海大剧院为 Wikidata 建筑点。海语路没有取得具体节点，已改为同区域可核实的真实地标得月舫。三点距离足够，仍仅草稿，需现场检查桥边和餐饮建筑旁的公共步行可达性。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "5e64c457-98a8-560e-900d-82f5805bd544",
+      "position": 2,
+      "title": "得月舫",
+      "safe_preview": "在野狸岛西侧临水地标旁，回看城市与日月贝。",
+      "narration_script": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。这里的停留以公共岸边空间为主，无需进入餐饮场所；转身再看，城区已经在水的另一边。",
+      "transcript": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。这里的停留以公共岸边空间为主，无需进入餐饮场所；转身再看，城区已经在水的另一边。",
+      "audio_path": "public/narration/5e64c457-98a8-560e-900d-82f5805bd544/shenzhen-warm-companion/104be8d71cb572f6-2026.09-research-draft.1-f2d7f7472d8a-62659adfa1e3.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 271284,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。",
+      "answers_question": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "2c9468ab-6dab-52f1-8f47-9545a2423abe"
+      ],
+      "stop": {
+        "id": "cce17c4e-ae8e-5dc7-a096-0313e250dbcd",
+        "title": "得月舫",
+        "kicker": "在野狸岛西侧临水地标旁，回看城市与日月贝。",
+        "address": "得月舫",
+        "latitude": 22.2810945,
+        "longitude": 113.5804143,
+        "arrival_radius_m": 60,
+        "story_title": "得月舫",
+        "story_body": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。这里的停留以公共岸边空间为主，无需进入餐饮场所；转身再看，城区已经在水的另一边。",
+        "audio_url": "",
+        "image": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+        "insight": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "5a62df80-3b4e-5826-9030-c5c04f0007a1",
+        "latitude": 22.2810945,
+        "longitude": 113.5804143,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://www.openstreetmap.org/node/1986998263",
+        "field_notes": "公开来源候选坐标，未现场复核。海燕桥为 OSM 桥线代表点；得月舫为 OSM 具体 POI 点；珠海大剧院为 Wikidata 建筑点。海语路没有取得具体节点，已改为同区域可核实的真实地标得月舫。三点距离足够，仍仅草稿，需现场检查桥边和餐饮建筑旁的公共步行可达性。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "d67d2b35-c926-53b7-8d4b-1b20369d9874",
+      "position": 3,
+      "title": "珠海大剧院",
+      "safe_preview": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。可先在室外公共区域观察建筑轮廓；入场参观和演出以剧院安排为准。",
+      "narration_script": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。可先在室外公共区域观察建筑轮廓；入场参观和演出以剧院安排为准。",
+      "transcript": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。可先在室外公共区域观察建筑轮廓；入场参观和演出以剧院安排为准。",
+      "audio_path": "public/narration/d67d2b35-c926-53b7-8d4b-1b20369d9874/shenzhen-warm-companion/960002b9932a4996-2026.09-research-draft.1-f2d7f7472d8a-ed70ff493e21.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 235572,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。",
+      "answers_question": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "21e17313-b4a8-5b4f-b1e9-9dbaa0caaf7e"
+      ],
+      "stop": {
+        "id": "1fe6e790-6abe-5560-a4da-a4a31544f2a2",
+        "title": "珠海大剧院",
+        "kicker": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。可先在室外公共区域观察建筑轮廓；入场参观和演出以剧院安排为准。",
+        "address": "珠海大剧院",
+        "latitude": 22.28628,
+        "longitude": 113.58419,
+        "arrival_radius_m": 60,
+        "story_title": "珠海大剧院",
+        "story_body": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。可先在室外公共区域观察建筑轮廓；入场参观和演出以剧院安排为准。",
+        "audio_url": "",
+        "image": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+        "insight": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "57e7b36e-d6c1-5692-a894-edc2a67d74a6",
+        "latitude": 22.28628,
+        "longitude": 113.58419,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://www.wikidata.org/wiki/Q30941469",
+        "field_notes": "公开来源候选坐标，未现场复核。海燕桥为 OSM 桥线代表点；得月舫为 OSM 具体 POI 点；珠海大剧院为 Wikidata 建筑点。海语路没有取得具体节点，已改为同区域可核实的真实地标得月舫。三点距离足够，仍仅草稿，需现场检查桥边和餐饮建筑旁的公共步行可达性。"
+      },
+      "photo_mission": null
+    }
+  ],
+  "sources": [
+    {
+      "id": "4b251c19-a765-5e43-883e-e18b5b5557ff",
+      "title": "OpenStreetMap way 163223430",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/way/163223430",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:50",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "7e67f301-b32e-5c65-b436-1e97d0b3678e",
+      "title": "野狸岛",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/野狸岛",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:50",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "8c8490c0-a444-57fa-86d3-652f1060f4d7",
+      "title": "File:Zhuhai Grand Theatre 34.jpg",
+      "publisher": "Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/wiki/File:Zhuhai_Grand_Theatre_34.jpg",
+      "source_type": "photograph",
+      "accessed_at": "2026-09-30T12:52:50",
+      "review_state": "in_review",
+      "summary": "作者：钉钉；许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。"
+    },
+    {
+      "id": "ba091369-b804-564c-8791-40176e7089aa",
+      "title": "OpenStreetMap node 1986998263",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/node/1986998263",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:50",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "c6b84e4e-2d69-53d8-bb05-d6f29e69f2e6",
+      "title": "珠海大劇院",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/珠海大劇院",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:50",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "21e17313-b4a8-5b4f-b1e9-9dbaa0caaf7e",
+      "canonical_text": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "c6b84e4e-2d69-53d8-bb05-d6f29e69f2e6"
+      ],
+      "support_notes": {
+        "c6b84e4e-2d69-53d8-bb05-d6f29e69f2e6": "珠海大剧院位于野狸岛北部，一大一小的贝壳形体被称为日月贝。"
+      }
+    },
+    {
+      "id": "2c9468ab-6dab-52f1-8f47-9545a2423abe",
+      "canonical_text": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "4b251c19-a765-5e43-883e-e18b5b5557ff",
+        "7e67f301-b32e-5c65-b436-1e97d0b3678e",
+        "ba091369-b804-564c-8791-40176e7089aa"
+      ],
+      "support_notes": {
+        "4b251c19-a765-5e43-883e-e18b5b5557ff": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。",
+        "7e67f301-b32e-5c65-b436-1e97d0b3678e": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。",
+        "ba091369-b804-564c-8791-40176e7089aa": "沿野狸岛西侧慢慢走，看看临水的得月舫与远处日月贝之间的关系。"
+      }
+    },
+    {
+      "id": "9c352c22-f8ae-5f53-9d9d-ce9cd335c3c6",
+      "canonical_text": "作者：钉钉；许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。",
+      "claim_kind": "media_attribution",
+      "certainty": "attribution_record",
+      "review_state": "in_review",
+      "boundary_note": "仅为封面媒体署名及许可，不作为地点历史依据。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "8c8490c0-a444-57fa-86d3-652f1060f4d7"
+      ],
+      "support_notes": {
+        "8c8490c0-a444-57fa-86d3-652f1060f4d7": "原摄影作品的作者、来源和许可记录。"
+      }
+    },
+    {
+      "id": "ef205c2e-c0aa-598b-b787-f6ec56a8502b",
+      "canonical_text": "海燕桥连接香洲城区与野狸岛。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "7e67f301-b32e-5c65-b436-1e97d0b3678e"
+      ],
+      "support_notes": {
+        "7e67f301-b32e-5c65-b436-1e97d0b3678e": "海燕桥连接香洲城区与野狸岛。"
+      }
+    }
+  ],
+  "required_photo_mission_count": 0,
+  "city": {
+    "id": "193c5124-11b7-47e3-b06f-28dd4144af64",
+    "slug": "zhuhai",
+    "name": "珠海",
+    "subtitle": "沿海岸与海岛慢行，在城市和海之间留一点时间。",
+    "hero_image": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+    "latitude": 22.2711,
+    "longitude": 113.577
+  },
+  "media": [
+    {
+      "key": "cms-20260930-zhuhai-yeli-island-cover",
+      "storage_path": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+      "mime_type": "image/jpeg",
+      "sha256": "b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b"
+    },
+    {
+      "key": "narration-5e64c457-98a8-560e-900d--shenzhen-warm-comp-104be8d71c-62659adfa1e3",
+      "storage_path": "public/narration/5e64c457-98a8-560e-900d-82f5805bd544/shenzhen-warm-companion/104be8d71cb572f6-2026.09-research-draft.1-f2d7f7472d8a-62659adfa1e3.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "62659adfa1e34030f8258c11ae53d2c388a241e54fac0bddd180b4c3e56f1b85"
+    },
+    {
+      "key": "narration-d67d2b35-c926-53b7-8d4b--shenzhen-warm-comp-960002b993-ed70ff493e21",
+      "storage_path": "public/narration/d67d2b35-c926-53b7-8d4b-1b20369d9874/shenzhen-warm-companion/960002b9932a4996-2026.09-research-draft.1-f2d7f7472d8a-ed70ff493e21.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "ed70ff493e21fd7ab860fcdc4433a05be14679b3b37bc16e3cbade5c0b18b233"
+    },
+    {
+      "key": "narration-f8ee6517-0101-51c9-9791--shenzhen-warm-comp-a0b067107f-019459f38e7d",
+      "storage_path": "public/narration/f8ee6517-0101-51c9-9791-2656b291466e/shenzhen-warm-companion/a0b067107fc57866-2026.09-research-draft.1-f2d7f7472d8a-019459f38e7d.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "019459f38e7dbb800f2238d13e779c0252c88eaa84a705fc9024ea58da99fac0"
+    }
+  ]
+}

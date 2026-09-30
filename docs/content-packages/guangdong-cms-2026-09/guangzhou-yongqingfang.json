@@ -1,0 +1,397 @@
+{
+  "package_id": "researched-place-guangzhou-yongqingfang",
+  "package_version": "2026.09-research-draft.1",
+  "route": {
+    "id": "40ff11e7-07c2-46f7-b99a-24942de809af",
+    "city_id": "b269e45a-d1c5-4ced-887b-1f9c023fa29e",
+    "city_name": null,
+    "slug": "guangzhou-yongqingfang",
+    "title": "永庆坊",
+    "subtitle": "西关与岭南文化 · 慢行观察",
+    "description": "从恩宁路的骑楼与巷道走向粤剧文化空间，在日常生活中读广州的街区更新。",
+    "duration_minutes": 45,
+    "distance_km": 0.9,
+    "difficulty": "轻松",
+    "theme": "西关与岭南文化",
+    "hero_image": "public/content/2026/09/f60d4e9c3cbb136b6545242e95c5564a0952caa55cdfda845903b8b2fd1d7d1b.jpg",
+    "is_featured": false,
+    "content_status": "draft",
+    "published_at": null,
+    "is_public_visible": false,
+    "managed_package_id": "researched-place-guangzhou-yongqingfang",
+    "managed_package_version": "2026.09-research-draft.1",
+    "stop_count": 0
+  },
+  "story_arc": {
+    "id": "27881ba7-1a38-55b0-b81f-c0bd24fead9d",
+    "title": "永庆坊",
+    "central_question": "西关与岭南文化 · 慢行观察",
+    "complete_story": "金声电影院旧址位于恩宁路。外立面与更新后的空间并置，让人看见一段街区记忆如何留在新的日常里。沿街观察即可，不影响入口通行。\n\n八和会馆位于恩宁路，是广州粤剧文化的重要场所。先在公共街道上观察它的门面和骑楼尺度，再想一想，舞台上的声音怎样与一条街的日常相连。室内参观以现场开放安排为准。\n\n粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。室外与室内的参观安排不同，请以场馆当日开放信息为准。",
+    "causal_model": [
+      {
+        "id": "02c8a4b2-b8fb-57ff-b5da-8b65a1159ef4",
+        "text": "金声电影院旧址位于恩宁路。"
+      },
+      {
+        "id": "0619a2e0-d555-5e56-abba-9018454a3745",
+        "text": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。"
+      },
+      {
+        "id": "397dec5a-581f-5f2e-8ff0-e4d92d7390ad",
+        "text": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。"
+      }
+    ],
+    "pronunciation_notes": [],
+    "script_version": "2026.09-research-draft.1",
+    "review_state": "in_review",
+    "field_audit_state": "required",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "source_version": "2026.09-research-draft.1",
+    "publication_decision": null
+  },
+  "home_story": null,
+  "fragments": [
+    {
+      "id": "2d0bcbe6-95c7-58e4-b37d-274e5069ad4d",
+      "position": 1,
+      "title": "金声电影院旧址",
+      "safe_preview": "金声电影院旧址位于恩宁路。外立面与更新后的空间并置，让人看见一段街区记忆如何留在新的日常里。沿街观察即可，不影响入口通行。",
+      "narration_script": "金声电影院旧址位于恩宁路。外立面与更新后的空间并置，让人看见一段街区记忆如何留在新的日常里。沿街观察即可，不影响入口通行。",
+      "transcript": "金声电影院旧址位于恩宁路。外立面与更新后的空间并置，让人看见一段街区记忆如何留在新的日常里。沿街观察即可，不影响入口通行。",
+      "audio_path": "public/narration/2d0bcbe6-95c7-58e4-b37d-274e5069ad4d/shenzhen-warm-companion/c89aba3b02208403-2026.09-research-draft.1-f2d7f7472d8a-947b93eda8af.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 239028,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "金声电影院旧址位于恩宁路。",
+      "answers_question": "金声电影院旧址位于恩宁路。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "38c410e5-3082-5571-b9ff-b26cfeb31ae2",
+        "af798947-39df-5c55-9b14-99f9a7dc1638"
+      ],
+      "stop": {
+        "id": "64ef8750-e6b6-51fe-ac13-ebae4063f995",
+        "title": "金声电影院旧址",
+        "kicker": "金声电影院旧址位于恩宁路。外立面与更新后的空间并置，让人看见一段街区记忆如何留在新的日常里。沿街观察即可，不影响入口通行。",
+        "address": "金声电影院旧址",
+        "latitude": 23.11614722,
+        "longitude": 113.23602778,
+        "arrival_radius_m": 60,
+        "story_title": "金声电影院旧址",
+        "story_body": "金声电影院旧址位于恩宁路。外立面与更新后的空间并置，让人看见一段街区记忆如何留在新的日常里。沿街观察即可，不影响入口通行。",
+        "audio_url": "",
+        "image": "public/content/2026/09/f60d4e9c3cbb136b6545242e95c5564a0952caa55cdfda845903b8b2fd1d7d1b.jpg",
+        "insight": "金声电影院旧址位于恩宁路。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "68cc4c49-a886-5d49-b85b-ed68a8b26e5d",
+        "latitude": 23.11614722,
+        "longitude": 113.23602778,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://zh.wikipedia.org/w/api.php?action=query&prop=coordinates&titles=金声电影院&format=json",
+        "field_notes": "公开来源候选坐标，未现场复核。金声电影院旧址、八和会馆、粤剧艺术博物馆均有公开坐标；三点两两间距均超过150米。删除本路线祖居点是为避免60米触发圈距离过近，未移造坐标。全部草稿，需现场复核实际公共步行触发位置。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "56ea8176-b101-541f-aae5-44eff8402025",
+      "position": 2,
+      "title": "八和会馆",
+      "safe_preview": "在恩宁路的粤剧会馆前，读一读街道与舞台的关系。",
+      "narration_script": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。先在公共街道上观察它的门面和骑楼尺度，再想一想，舞台上的声音怎样与一条街的日常相连。室内参观以现场开放安排为准。",
+      "transcript": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。先在公共街道上观察它的门面和骑楼尺度，再想一想，舞台上的声音怎样与一条街的日常相连。室内参观以现场开放安排为准。",
+      "audio_path": "public/narration/56ea8176-b101-541f-aae5-44eff8402025/shenzhen-warm-companion/9f342ee37c345767-2026.09-research-draft.1-f2d7f7472d8a-b14a3bbcceb5.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 299508,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。",
+      "answers_question": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "01676ba3-ddcc-542e-a767-014ac39c4f14"
+      ],
+      "stop": {
+        "id": "3ac30941-0cd3-54d9-8363-001ff83936dd",
+        "title": "八和会馆",
+        "kicker": "在恩宁路的粤剧会馆前，读一读街道与舞台的关系。",
+        "address": "八和会馆",
+        "latitude": 23.1167659,
+        "longitude": 113.2340879,
+        "arrival_radius_m": 60,
+        "story_title": "八和会馆",
+        "story_body": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。先在公共街道上观察它的门面和骑楼尺度，再想一想，舞台上的声音怎样与一条街的日常相连。室内参观以现场开放安排为准。",
+        "audio_url": "",
+        "image": "public/content/2026/09/f60d4e9c3cbb136b6545242e95c5564a0952caa55cdfda845903b8b2fd1d7d1b.jpg",
+        "insight": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "907550ca-8b10-51aa-80ee-c5b37d188d5d",
+        "latitude": 23.1167659,
+        "longitude": 113.2340879,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://www.openstreetmap.org/way/1466687990",
+        "field_notes": "公开来源候选坐标，未现场复核。金声电影院旧址、八和会馆、粤剧艺术博物馆均有公开坐标；三点两两间距均超过150米。删除本路线祖居点是为避免60米触发圈距离过近，未移造坐标。全部草稿，需现场复核实际公共步行触发位置。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "f9b11875-b0e1-5498-b81a-e0a06f14ec59",
+      "position": 3,
+      "title": "粤剧艺术博物馆",
+      "safe_preview": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。室外与室内的参观安排不同，请以场馆当日开放信息为准。",
+      "narration_script": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。室外与室内的参观安排不同，请以场馆当日开放信息为准。",
+      "transcript": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。室外与室内的参观安排不同，请以场馆当日开放信息为准。",
+      "audio_path": "public/narration/f9b11875-b0e1-5498-b81a-e0a06f14ec59/shenzhen-warm-companion/1c5bf790004f6f03-2026.09-research-draft.1-f2d7f7472d8a-3935f5bf07cc.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 211956,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。",
+      "answers_question": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "d3fd6e22-0891-5243-ab02-42c5a50abb47"
+      ],
+      "stop": {
+        "id": "b5256fef-3881-573d-823f-175c7c24cd96",
+        "title": "粤剧艺术博物馆",
+        "kicker": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。室外与室内的参观安排不同，请以场馆当日开放信息为准。",
+        "address": "粤剧艺术博物馆",
+        "latitude": 23.11852,
+        "longitude": 113.23265,
+        "arrival_radius_m": 60,
+        "story_title": "粤剧艺术博物馆",
+        "story_body": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。室外与室内的参观安排不同，请以场馆当日开放信息为准。",
+        "audio_url": "",
+        "image": "public/content/2026/09/f60d4e9c3cbb136b6545242e95c5564a0952caa55cdfda845903b8b2fd1d7d1b.jpg",
+        "insight": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "92bd7f9d-11a6-59ac-91ed-bd84f232ab72",
+        "latitude": 23.11852,
+        "longitude": 113.23265,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://www.wikidata.org/wiki/Q27670238",
+        "field_notes": "公开来源候选坐标，未现场复核。金声电影院旧址、八和会馆、粤剧艺术博物馆均有公开坐标；三点两两间距均超过150米。删除本路线祖居点是为避免60米触发圈距离过近，未移造坐标。全部草稿，需现场复核实际公共步行触发位置。"
+      },
+      "photo_mission": null
+    }
+  ],
+  "sources": [
+    {
+      "id": "32ebeef0-74c4-5459-9c84-cd17858eb8b8",
+      "title": "OpenStreetMap way 1466687990",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/way/1466687990",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "39c7e5de-dcb8-5137-8069-c8594770e6f2",
+      "title": "粵劇藝術博物館",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/粵劇藝術博物館",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "ab5231cf-72ea-5a3c-b0cc-e8e4e283c992",
+      "title": "金声电影院",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/金声电影院",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "c38243a1-4fa7-5d7f-984c-7c6d8e5e29da",
+      "title": "八和会馆 (广州)",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/八和会馆_(广州)",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "c74924ab-c451-5444-85a9-11ea99029cd6",
+      "title": "File:WingHingFong.jpg",
+      "publisher": "Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/wiki/File:WingHingFong.jpg",
+      "source_type": "photograph",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "作者：PQ77wd；许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "01676ba3-ddcc-542e-a767-014ac39c4f14",
+      "canonical_text": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "32ebeef0-74c4-5459-9c84-cd17858eb8b8",
+        "c38243a1-4fa7-5d7f-984c-7c6d8e5e29da"
+      ],
+      "support_notes": {
+        "32ebeef0-74c4-5459-9c84-cd17858eb8b8": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。",
+        "c38243a1-4fa7-5d7f-984c-7c6d8e5e29da": "八和会馆位于恩宁路，是广州粤剧文化的重要场所。"
+      }
+    },
+    {
+      "id": "38c410e5-3082-5571-b9ff-b26cfeb31ae2",
+      "canonical_text": "金声电影院旧址位于恩宁路。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "ab5231cf-72ea-5a3c-b0cc-e8e4e283c992"
+      ],
+      "support_notes": {
+        "ab5231cf-72ea-5a3c-b0cc-e8e4e283c992": "金声电影院旧址位于恩宁路。"
+      }
+    },
+    {
+      "id": "af798947-39df-5c55-9b14-99f9a7dc1638",
+      "canonical_text": "作者：PQ77wd；许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。",
+      "claim_kind": "media_attribution",
+      "certainty": "attribution_record",
+      "review_state": "in_review",
+      "boundary_note": "仅为封面媒体署名及许可，不作为地点历史依据。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "c74924ab-c451-5444-85a9-11ea99029cd6"
+      ],
+      "support_notes": {
+        "c74924ab-c451-5444-85a9-11ea99029cd6": "原摄影作品的作者、来源和许可记录。"
+      }
+    },
+    {
+      "id": "d3fd6e22-0891-5243-ab02-42c5a50abb47",
+      "canonical_text": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "39c7e5de-dcb8-5137-8069-c8594770e6f2"
+      ],
+      "support_notes": {
+        "39c7e5de-dcb8-5137-8069-c8594770e6f2": "粤剧艺术博物馆位于永庆坊附近，以园林与展览空间呈现粤剧文化。"
+      }
+    }
+  ],
+  "required_photo_mission_count": 0,
+  "city": {
+    "id": "b269e45a-d1c5-4ced-887b-1f9c023fa29e",
+    "slug": "guangzhou",
+    "name": "广州",
+    "subtitle": "穿过骑楼、巷道与江岸，在日常里读一座城市。",
+    "hero_image": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+    "latitude": 23.128795,
+    "longitude": 113.258976
+  },
+  "media": [
+    {
+      "key": "cms-20260930-guangzhou-shamian-cover",
+      "storage_path": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+      "mime_type": "image/jpeg",
+      "sha256": "c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3"
+    },
+    {
+      "key": "cms-20260930-guangzhou-yongqingfang-cover",
+      "storage_path": "public/content/2026/09/f60d4e9c3cbb136b6545242e95c5564a0952caa55cdfda845903b8b2fd1d7d1b.jpg",
+      "mime_type": "image/jpeg",
+      "sha256": "f60d4e9c3cbb136b6545242e95c5564a0952caa55cdfda845903b8b2fd1d7d1b"
+    },
+    {
+      "key": "narration-2d0bcbe6-95c7-58e4-b37d--shenzhen-warm-comp-c89aba3b02-947b93eda8af",
+      "storage_path": "public/narration/2d0bcbe6-95c7-58e4-b37d-274e5069ad4d/shenzhen-warm-companion/c89aba3b02208403-2026.09-research-draft.1-f2d7f7472d8a-947b93eda8af.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "947b93eda8af583866a97597dc25643e5cb565bc710783fb4e2c95a773ffcadc"
+    },
+    {
+      "key": "narration-56ea8176-b101-541f-aae5--shenzhen-warm-comp-9f342ee37c-b14a3bbcceb5",
+      "storage_path": "public/narration/56ea8176-b101-541f-aae5-44eff8402025/shenzhen-warm-companion/9f342ee37c345767-2026.09-research-draft.1-f2d7f7472d8a-b14a3bbcceb5.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "b14a3bbcceb5539071ea9db0c255e4d2b253d8a18393d30b3935a584c2091a5a"
+    },
+    {
+      "key": "narration-f9b11875-b0e1-5498-b81a--shenzhen-warm-comp-1c5bf79000-3935f5bf07cc",
+      "storage_path": "public/narration/f9b11875-b0e1-5498-b81a-e0a06f14ec59/shenzhen-warm-companion/1c5bf790004f6f03-2026.09-research-draft.1-f2d7f7472d8a-3935f5bf07cc.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "3935f5bf07cc67289af28d31b5e8a2c7a6c446df52eed80cc31335a858d27e52"
+    }
+  ]
+}

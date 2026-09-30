@@ -1,0 +1,433 @@
+{
+  "package_id": "researched-place-zhuhai-lovers-road",
+  "package_version": "2026.09-research-draft.1",
+  "route": {
+    "id": "4d0b1349-4b13-490f-b5a6-eb6b7a322293",
+    "city_id": "193c5124-11b7-47e3-b06f-28dd4144af64",
+    "city_name": null,
+    "slug": "zhuhai-lovers-road",
+    "title": "情侣路海滨",
+    "subtitle": "海岸与城市记忆 · 慢行观察",
+    "description": "沿香炉湾海岸散步，从渔女雕像走向海滨绿地，把城市与海放进同一个视野。",
+    "duration_minutes": 60,
+    "distance_km": 2.0,
+    "difficulty": "轻松",
+    "theme": "海岸与城市记忆",
+    "hero_image": "public/content/2026/09/45a5633e7edb90a8940b034d6baacc2d5da9593d347f99b2bdb787bf04fe2ee0.jpg",
+    "is_featured": false,
+    "content_status": "draft",
+    "published_at": null,
+    "is_public_visible": false,
+    "managed_package_id": "researched-place-zhuhai-lovers-road",
+    "managed_package_version": "2026.09-research-draft.1",
+    "stop_count": 0
+  },
+  "story_arc": {
+    "id": "1ec2b898-e130-552f-8e72-1381fee247d6",
+    "title": "情侣路海滨",
+    "central_question": "海岸与城市记忆 · 慢行观察",
+    "complete_story": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。沿岸观察雕像与海面的关系，再留意远处的山和近处的步道，感受这段海岸的开阔。\n\n走进海滨公园，在园内步桥上把脚步放慢。与海岸的开阔相比，这里的步道、绿地与水面把视线拉近。让出通道，在允许停留的位置观察桥两侧的景色。\n\n爱情邮局是这段情侣路上的醒目地标。沿开放的公共通道走近，在海岸转折处回看刚才走过的方向，让城市与海面进入同一个视野。",
+    "causal_model": [
+      {
+        "id": "7f6a8436-b4a2-52e2-b946-3a31209d2082",
+        "text": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。"
+      },
+      {
+        "id": "6735feb2-fe24-5ef1-aa5f-9d9af8ba3d52",
+        "text": "走进海滨公园，在园内步桥上把脚步放慢。"
+      },
+      {
+        "id": "d81b0f4c-4946-53d6-8329-711fac45ec0c",
+        "text": "爱情邮局是这段情侣路上的醒目地标。"
+      }
+    ],
+    "pronunciation_notes": [],
+    "script_version": "2026.09-research-draft.1",
+    "review_state": "in_review",
+    "field_audit_state": "required",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "source_version": "2026.09-research-draft.1",
+    "publication_decision": null
+  },
+  "home_story": null,
+  "fragments": [
+    {
+      "id": "a330b9e2-36a9-5f26-b29c-60707c896656",
+      "position": 1,
+      "title": "珠海渔女",
+      "safe_preview": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。沿岸观察雕像与海面的关系，再留意远处的山和近处的步道，感受这段海岸的开阔。",
+      "narration_script": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。沿岸观察雕像与海面的关系，再留意远处的山和近处的步道，感受这段海岸的开阔。",
+      "transcript": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。沿岸观察雕像与海面的关系，再留意远处的山和近处的步道，感受这段海岸的开阔。",
+      "audio_path": "public/narration/a330b9e2-36a9-5f26-b29c-60707c896656/shenzhen-warm-companion/e7e0c89f48ba45e6-2026.09-research-draft.1-f2d7f7472d8a-8f8b99f5d4ca.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 226356,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。",
+      "answers_question": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "26dfac8e-dbdf-5613-bf37-918b2a79301d",
+        "2aaeee59-073f-5776-bce0-1da36fc9816b"
+      ],
+      "stop": {
+        "id": "3d3642ab-082b-562e-81a2-729ba4d38eb0",
+        "title": "珠海渔女",
+        "kicker": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。沿岸观察雕像与海面的关系，再留意远处的山和近处的步道，感受这段海岸的开阔。",
+        "address": "珠海渔女",
+        "latitude": 22.26539,
+        "longitude": 113.58322,
+        "arrival_radius_m": 60,
+        "story_title": "珠海渔女",
+        "story_body": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。沿岸观察雕像与海面的关系，再留意远处的山和近处的步道，感受这段海岸的开阔。",
+        "audio_url": "",
+        "image": "public/content/2026/09/45a5633e7edb90a8940b034d6baacc2d5da9593d347f99b2bdb787bf04fe2ee0.jpg",
+        "insight": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "83e546b4-9d12-522e-ba97-4565bbe6f45d",
+        "latitude": 22.26539,
+        "longitude": 113.58322,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://zh.wikipedia.org/w/api.php?action=query&prop=coordinates&titles=珠海渔女&format=json",
+        "field_notes": "公开来源候选坐标，未现场复核。珠海渔女为公开 GeoData 坐标；海滨公园步桥与爱情邮局均为 OSM 具体节点，没有使用公园中心。所有点未现场复核。正文是草稿，不承诺历史细节或进入建筑内部。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "1ab6da99-ae69-5369-a7c6-3bf6710f653d",
+      "position": 2,
+      "title": "海滨公园步桥",
+      "safe_preview": "走进海滨公园，在园内步桥上把脚步放慢。与海岸的开阔相比，这里的步道、绿地与水面把视线拉近。让出通道，在允许停留的位置观察桥两侧的景色。",
+      "narration_script": "走进海滨公园，在园内步桥上把脚步放慢。与海岸的开阔相比，这里的步道、绿地与水面把视线拉近。让出通道，在允许停留的位置观察桥两侧的景色。",
+      "transcript": "走进海滨公园，在园内步桥上把脚步放慢。与海岸的开阔相比，这里的步道、绿地与水面把视线拉近。让出通道，在允许停留的位置观察桥两侧的景色。",
+      "audio_path": "public/narration/1ab6da99-ae69-5369-a7c6-3bf6710f653d/shenzhen-warm-companion/cc802bffad0efa94-2026.09-research-draft.1-f2d7f7472d8a-208074726fde.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 260340,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "走进海滨公园，在园内步桥上把脚步放慢。",
+      "answers_question": "走进海滨公园，在园内步桥上把脚步放慢。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "f7168d6d-d1b8-53e0-881e-4a86db00844e"
+      ],
+      "stop": {
+        "id": "aa365efd-ce08-577f-8efc-1f7ebb9b94bd",
+        "title": "海滨公园步桥",
+        "kicker": "走进海滨公园，在园内步桥上把脚步放慢。与海岸的开阔相比，这里的步道、绿地与水面把视线拉近。让出通道，在允许停留的位置观察桥两侧的景色。",
+        "address": "海滨公园步桥",
+        "latitude": 22.2632312,
+        "longitude": 113.5805743,
+        "arrival_radius_m": 60,
+        "story_title": "海滨公园步桥",
+        "story_body": "走进海滨公园，在园内步桥上把脚步放慢。与海岸的开阔相比，这里的步道、绿地与水面把视线拉近。让出通道，在允许停留的位置观察桥两侧的景色。",
+        "audio_url": "",
+        "image": "public/content/2026/09/45a5633e7edb90a8940b034d6baacc2d5da9593d347f99b2bdb787bf04fe2ee0.jpg",
+        "insight": "走进海滨公园，在园内步桥上把脚步放慢。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "c65d11ba-5ceb-53ab-b216-c0cd0d820d86",
+        "latitude": 22.2632312,
+        "longitude": 113.5805743,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://www.openstreetmap.org/node/12865478290",
+        "field_notes": "公开来源候选坐标，未现场复核。珠海渔女为公开 GeoData 坐标；海滨公园步桥与爱情邮局均为 OSM 具体节点，没有使用公园中心。所有点未现场复核。正文是草稿，不承诺历史细节或进入建筑内部。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "0127fd26-4c4d-55a0-b60e-54a3fe9d4123",
+      "position": 3,
+      "title": "爱情邮局",
+      "safe_preview": "走向情侣路海边的地标，在海风中回望这段岸线。",
+      "narration_script": "爱情邮局是这段情侣路上的醒目地标。沿开放的公共通道走近，在海岸转折处回看刚才走过的方向，让城市与海面进入同一个视野。",
+      "transcript": "爱情邮局是这段情侣路上的醒目地标。沿开放的公共通道走近，在海岸转折处回看刚才走过的方向，让城市与海面进入同一个视野。",
+      "audio_path": "public/narration/0127fd26-4c4d-55a0-b60e-54a3fe9d4123/shenzhen-warm-companion/693a1b8f146b69c1-2026.09-research-draft.1-f2d7f7472d8a-a1f68c1992d3.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 221748,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "爱情邮局是这段情侣路上的醒目地标。",
+      "answers_question": "爱情邮局是这段情侣路上的醒目地标。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "e96baae1-01ce-5d86-93fc-721fdddc4aca"
+      ],
+      "stop": {
+        "id": "6f4e3422-3c93-5f14-acee-5bda1cd8b252",
+        "title": "爱情邮局",
+        "kicker": "走向情侣路海边的地标，在海风中回望这段岸线。",
+        "address": "爱情邮局",
+        "latitude": 22.2601318,
+        "longitude": 113.587021,
+        "arrival_radius_m": 60,
+        "story_title": "爱情邮局",
+        "story_body": "爱情邮局是这段情侣路上的醒目地标。沿开放的公共通道走近，在海岸转折处回看刚才走过的方向，让城市与海面进入同一个视野。",
+        "audio_url": "",
+        "image": "public/content/2026/09/45a5633e7edb90a8940b034d6baacc2d5da9593d347f99b2bdb787bf04fe2ee0.jpg",
+        "insight": "爱情邮局是这段情侣路上的醒目地标。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "525a3d73-bdf7-527a-bc18-89524aaff345",
+        "latitude": 22.2601318,
+        "longitude": 113.587021,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://www.openstreetmap.org/node/9183201601",
+        "field_notes": "公开来源候选坐标，未现场复核。珠海渔女为公开 GeoData 坐标；海滨公园步桥与爱情邮局均为 OSM 具体节点，没有使用公园中心。所有点未现场复核。正文是草稿，不承诺历史细节或进入建筑内部。"
+      },
+      "photo_mission": null
+    }
+  ],
+  "sources": [
+    {
+      "id": "00c647ab-bd97-5620-b36c-7232bdb4a610",
+      "title": "OpenStreetMap way 1389924513",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/way/1389924513",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "11076ba0-e760-5e96-9d36-886466a6ba01",
+      "title": "OpenStreetMap node 12865478290",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/node/12865478290",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "165c7083-5343-5834-8355-6e1b95c6faa7",
+      "title": "OpenStreetMap way 1389924512",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/way/1389924512",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "1c902e69-7829-5a0b-9ce5-2219aad4d85e",
+      "title": "OpenStreetMap node 9183201601",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/node/9183201601",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "2a6a1857-40bc-5b3e-87b2-9574a2590c09",
+      "title": "OpenStreetMap way 1507519726",
+      "publisher": "OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/way/1507519726",
+      "source_type": "map_reference",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "48425ca8-b0cf-5b9f-aebb-c5e35d688f60",
+      "title": "珠海渔女",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/珠海渔女",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "d60c1be8-70bd-507c-b08d-237fd5d7f19a",
+      "title": "File:Zhuhai Fisher Girl statue.jpg",
+      "publisher": "Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/wiki/File:Zhuhai_Fisher_Girl_statue.jpg",
+      "source_type": "photograph",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "作者：钉钉；许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。"
+    },
+    {
+      "id": "f0765d34-f59d-5c5d-9c53-1020c2e85f38",
+      "title": "珠海市",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/珠海市",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:49",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "26dfac8e-dbdf-5613-bf37-918b2a79301d",
+      "canonical_text": "作者：钉钉；许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。",
+      "claim_kind": "media_attribution",
+      "certainty": "attribution_record",
+      "review_state": "in_review",
+      "boundary_note": "仅为封面媒体署名及许可，不作为地点历史依据。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "d60c1be8-70bd-507c-b08d-237fd5d7f19a"
+      ],
+      "support_notes": {
+        "d60c1be8-70bd-507c-b08d-237fd5d7f19a": "原摄影作品的作者、来源和许可记录。"
+      }
+    },
+    {
+      "id": "2aaeee59-073f-5776-bce0-1da36fc9816b",
+      "canonical_text": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "48425ca8-b0cf-5b9f-aebb-c5e35d688f60"
+      ],
+      "support_notes": {
+        "48425ca8-b0cf-5b9f-aebb-c5e35d688f60": "珠海渔女雕像位于香炉湾畔，是城市的标志之一。"
+      }
+    },
+    {
+      "id": "e96baae1-01ce-5d86-93fc-721fdddc4aca",
+      "canonical_text": "爱情邮局是这段情侣路上的醒目地标。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "1c902e69-7829-5a0b-9ce5-2219aad4d85e"
+      ],
+      "support_notes": {
+        "1c902e69-7829-5a0b-9ce5-2219aad4d85e": "爱情邮局是这段情侣路上的醒目地标。"
+      }
+    },
+    {
+      "id": "f7168d6d-d1b8-53e0-881e-4a86db00844e",
+      "canonical_text": "走进海滨公园，在园内步桥上把脚步放慢。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "00c647ab-bd97-5620-b36c-7232bdb4a610",
+        "11076ba0-e760-5e96-9d36-886466a6ba01",
+        "165c7083-5343-5834-8355-6e1b95c6faa7",
+        "2a6a1857-40bc-5b3e-87b2-9574a2590c09",
+        "f0765d34-f59d-5c5d-9c53-1020c2e85f38"
+      ],
+      "support_notes": {
+        "00c647ab-bd97-5620-b36c-7232bdb4a610": "走进海滨公园，在园内步桥上把脚步放慢。",
+        "11076ba0-e760-5e96-9d36-886466a6ba01": "走进海滨公园，在园内步桥上把脚步放慢。",
+        "165c7083-5343-5834-8355-6e1b95c6faa7": "走进海滨公园，在园内步桥上把脚步放慢。",
+        "2a6a1857-40bc-5b3e-87b2-9574a2590c09": "走进海滨公园，在园内步桥上把脚步放慢。",
+        "f0765d34-f59d-5c5d-9c53-1020c2e85f38": "走进海滨公园，在园内步桥上把脚步放慢。"
+      }
+    }
+  ],
+  "required_photo_mission_count": 0,
+  "city": {
+    "id": "193c5124-11b7-47e3-b06f-28dd4144af64",
+    "slug": "zhuhai",
+    "name": "珠海",
+    "subtitle": "沿海岸与海岛慢行，在城市和海之间留一点时间。",
+    "hero_image": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+    "latitude": 22.2711,
+    "longitude": 113.577
+  },
+  "media": [
+    {
+      "key": "cms-20260930-zhuhai-lovers-road-cover",
+      "storage_path": "public/content/2026/09/45a5633e7edb90a8940b034d6baacc2d5da9593d347f99b2bdb787bf04fe2ee0.jpg",
+      "mime_type": "image/jpeg",
+      "sha256": "45a5633e7edb90a8940b034d6baacc2d5da9593d347f99b2bdb787bf04fe2ee0"
+    },
+    {
+      "key": "cms-20260930-zhuhai-yeli-island-cover",
+      "storage_path": "public/content/2026/09/b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b.jpg",
+      "mime_type": "image/jpeg",
+      "sha256": "b46e75e45ee4c39271f3ac6a2f3dc4ed1d94aff984853e412c48c4a3e1da7b7b"
+    },
+    {
+      "key": "narration-0127fd26-4c4d-55a0-b60e--shenzhen-warm-comp-693a1b8f14-a1f68c1992d3",
+      "storage_path": "public/narration/0127fd26-4c4d-55a0-b60e-54a3fe9d4123/shenzhen-warm-companion/693a1b8f146b69c1-2026.09-research-draft.1-f2d7f7472d8a-a1f68c1992d3.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "a1f68c1992d330f4425a23a00cc35d124858059fb74184b6b33d0ae2e76a757d"
+    },
+    {
+      "key": "narration-1ab6da99-ae69-5369-a7c6--shenzhen-warm-comp-cc802bffad-208074726fde",
+      "storage_path": "public/narration/1ab6da99-ae69-5369-a7c6-3bf6710f653d/shenzhen-warm-companion/cc802bffad0efa94-2026.09-research-draft.1-f2d7f7472d8a-208074726fde.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "208074726fdef82beed787228c11f174226a443fd4979609845d98cf6b5ae754"
+    },
+    {
+      "key": "narration-a330b9e2-36a9-5f26-b29c--shenzhen-warm-comp-e7e0c89f48-8f8b99f5d4ca",
+      "storage_path": "public/narration/a330b9e2-36a9-5f26-b29c-60707c896656/shenzhen-warm-companion/e7e0c89f48ba45e6-2026.09-research-draft.1-f2d7f7472d8a-8f8b99f5d4ca.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "8f8b99f5d4caf7994876e3ed62e83a7e0768861b2bd05d7e6ff57173803e5c58"
+    }
+  ]
+}

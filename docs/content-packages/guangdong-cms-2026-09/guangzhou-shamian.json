@@ -1,0 +1,379 @@
+{
+  "package_id": "researched-place-guangzhou-shamian",
+  "package_version": "2026.09-research-draft.1",
+  "route": {
+    "id": "b9635356-ec64-4a75-abc0-6e239774f927",
+    "city_id": "b269e45a-d1c5-4ced-887b-1f9c023fa29e",
+    "city_name": null,
+    "slug": "guangzhou-shamian",
+    "title": "沙面",
+    "subtitle": "建筑与街区生活 · 慢行观察",
+    "description": "从教堂外立面到江边街道，在树荫里观察沙面的建筑尺度与临水生活。",
+    "duration_minutes": 45,
+    "distance_km": 1.0,
+    "difficulty": "轻松",
+    "theme": "建筑与街区生活",
+    "hero_image": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+    "is_featured": false,
+    "content_status": "draft",
+    "published_at": null,
+    "is_public_visible": false,
+    "managed_package_id": "researched-place-guangzhou-shamian",
+    "managed_package_version": "2026.09-research-draft.1",
+    "stop_count": 0
+  },
+  "story_arc": {
+    "id": "d1be9efa-b00b-5b5f-aa7a-539c8d8712be",
+    "title": "沙面",
+    "central_question": "建筑与街区生活 · 慢行观察",
+    "complete_story": "沙面堂位于沙面南街。站在公共街道上观察建筑的门窗、屋顶与前院，看看这座教堂怎样融入街巷尺度。进入室内需遵守场所开放安排。\n\n白天鹅宾馆位于沙面岛南侧。沿周边开放的公共空间观察江面与建筑，感受沙面从林荫街道走向水岸时的视野变化。\n\n露德圣母堂位于沙面大街东段。先在公共街道观察立面细节，再与刚才见过的街区建筑作比较；保持安静，尊重场所使用者。",
+    "causal_model": [
+      {
+        "id": "7e27a509-c552-5ccf-9993-44a75d4aa6f1",
+        "text": "沙面堂位于沙面南街。"
+      },
+      {
+        "id": "d8bafd73-1bf4-5a45-b6e2-3f0bd7f5384b",
+        "text": "白天鹅宾馆位于沙面岛南侧。"
+      },
+      {
+        "id": "b43465b9-2bcc-50d8-85b9-c7ae27ce43f4",
+        "text": "露德圣母堂位于沙面大街东段。"
+      }
+    ],
+    "pronunciation_notes": [],
+    "script_version": "2026.09-research-draft.1",
+    "review_state": "in_review",
+    "field_audit_state": "required",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "source_version": "2026.09-research-draft.1",
+    "publication_decision": null
+  },
+  "home_story": null,
+  "fragments": [
+    {
+      "id": "b66b287e-968b-55e1-ae4c-140a626a8e11",
+      "position": 1,
+      "title": "沙面堂",
+      "safe_preview": "沙面堂位于沙面南街。站在公共街道上观察建筑的门窗、屋顶与前院，看看这座教堂怎样融入街巷尺度。进入室内需遵守场所开放安排。",
+      "narration_script": "沙面堂位于沙面南街。站在公共街道上观察建筑的门窗、屋顶与前院，看看这座教堂怎样融入街巷尺度。进入室内需遵守场所开放安排。",
+      "transcript": "沙面堂位于沙面南街。站在公共街道上观察建筑的门窗、屋顶与前院，看看这座教堂怎样融入街巷尺度。进入室内需遵守场所开放安排。",
+      "audio_path": "public/narration/b66b287e-968b-55e1-ae4c-140a626a8e11/shenzhen-warm-companion/afbcd3417c3414b3-2026.09-research-draft.1-f2d7f7472d8a-0d5f01453f56.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 232692,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "沙面堂位于沙面南街。",
+      "answers_question": "沙面堂位于沙面南街。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "7941ecdd-dc87-500f-83f8-723301eaae69",
+        "91f9622d-c9a7-5bdd-83cf-2a797e1189a9"
+      ],
+      "stop": {
+        "id": "280140bd-7c9f-5d0f-91c8-7790e7854ea4",
+        "title": "沙面堂",
+        "kicker": "沙面堂位于沙面南街。站在公共街道上观察建筑的门窗、屋顶与前院，看看这座教堂怎样融入街巷尺度。进入室内需遵守场所开放安排。",
+        "address": "沙面堂",
+        "latitude": 23.10955833,
+        "longitude": 113.23631667,
+        "arrival_radius_m": 60,
+        "story_title": "沙面堂",
+        "story_body": "沙面堂位于沙面南街。站在公共街道上观察建筑的门窗、屋顶与前院，看看这座教堂怎样融入街巷尺度。进入室内需遵守场所开放安排。",
+        "audio_url": "",
+        "image": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+        "insight": "沙面堂位于沙面南街。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "0f7d4209-9dbe-5716-aa03-99684515625a",
+        "latitude": 23.10955833,
+        "longitude": 113.23631667,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://zh.wikipedia.org/w/api.php?action=query&prop=coordinates&titles=沙面堂&format=json",
+        "field_notes": "公开来源候选坐标，未现场复核。三个坐标为公开百科建筑代表点，非现场采集。白天鹅宾馆江畔需在地图上改落于实际可达公共步道后发布，不能直接把建筑中心当江边。沙面堂与白天鹅代表点约169m，仍须现场检查60m触发。官方街区内容来源待补。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "ac38f001-2dfe-57a4-8984-df5d757f2532",
+      "position": 2,
+      "title": "白天鹅宾馆江畔",
+      "safe_preview": "白天鹅宾馆位于沙面岛南侧。沿周边开放的公共空间观察江面与建筑，感受沙面从林荫街道走向水岸时的视野变化。",
+      "narration_script": "白天鹅宾馆位于沙面岛南侧。沿周边开放的公共空间观察江面与建筑，感受沙面从林荫街道走向水岸时的视野变化。",
+      "transcript": "白天鹅宾馆位于沙面岛南侧。沿周边开放的公共空间观察江面与建筑，感受沙面从林荫街道走向水岸时的视野变化。",
+      "audio_path": "public/narration/ac38f001-2dfe-57a4-8984-df5d757f2532/shenzhen-warm-companion/2a221e1089c0df4a-2026.09-research-draft.1-f2d7f7472d8a-35647218754d.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 193524,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "白天鹅宾馆位于沙面岛南侧。",
+      "answers_question": "白天鹅宾馆位于沙面岛南侧。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "489b9045-7463-5c31-aa87-40e81fa62643"
+      ],
+      "stop": {
+        "id": "b8c14de1-ce0e-5590-84fd-7db91576e712",
+        "title": "白天鹅宾馆江畔",
+        "kicker": "白天鹅宾馆位于沙面岛南侧。沿周边开放的公共空间观察江面与建筑，感受沙面从林荫街道走向水岸时的视野变化。",
+        "address": "白天鹅宾馆江畔",
+        "latitude": 23.10853333,
+        "longitude": 113.23754444,
+        "arrival_radius_m": 60,
+        "story_title": "白天鹅宾馆江畔",
+        "story_body": "白天鹅宾馆位于沙面岛南侧。沿周边开放的公共空间观察江面与建筑，感受沙面从林荫街道走向水岸时的视野变化。",
+        "audio_url": "",
+        "image": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+        "insight": "白天鹅宾馆位于沙面岛南侧。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "8676d60e-22d0-53b7-b0d8-8f5089b39d38",
+        "latitude": 23.10853333,
+        "longitude": 113.23754444,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://zh.wikipedia.org/w/api.php?action=query&prop=coordinates&titles=白天鹅宾馆&format=json",
+        "field_notes": "公开来源候选坐标，未现场复核。三个坐标为公开百科建筑代表点，非现场采集。白天鹅宾馆江畔需在地图上改落于实际可达公共步道后发布，不能直接把建筑中心当江边。沙面堂与白天鹅代表点约169m，仍须现场检查60m触发。官方街区内容来源待补。"
+      },
+      "photo_mission": null
+    },
+    {
+      "id": "c9687052-a403-5d76-9391-e60e5fb131f3",
+      "position": 3,
+      "title": "露德圣母堂",
+      "safe_preview": "露德圣母堂位于沙面大街东段。先在公共街道观察立面细节，再与刚才见过的街区建筑作比较；保持安静，尊重场所使用者。",
+      "narration_script": "露德圣母堂位于沙面大街东段。先在公共街道观察立面细节，再与刚才见过的街区建筑作比较；保持安静，尊重场所使用者。",
+      "transcript": "露德圣母堂位于沙面大街东段。先在公共街道观察立面细节，再与刚才见过的街区建筑作比较；保持安静，尊重场所使用者。",
+      "audio_path": "public/narration/c9687052-a403-5d76-9391-e60e5fb131f3/shenzhen-warm-companion/f248c6f18c3082b3-2026.09-research-draft.1-f2d7f7472d8a-b6c944be6497.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 221748,
+      "script_version": "2026.09-research-draft.1",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "露德圣母堂位于沙面大街东段。",
+      "answers_question": "露德圣母堂位于沙面大街东段。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "bfd1a8dd-cc8a-5483-89e1-dfad1af0e574"
+      ],
+      "stop": {
+        "id": "8c575640-8fbc-5457-80f2-13c3f1359b1d",
+        "title": "露德圣母堂",
+        "kicker": "露德圣母堂位于沙面大街东段。先在公共街道观察立面细节，再与刚才见过的街区建筑作比较；保持安静，尊重场所使用者。",
+        "address": "露德圣母堂",
+        "latitude": 23.10994444,
+        "longitude": 113.242375,
+        "arrival_radius_m": 60,
+        "story_title": "露德圣母堂",
+        "story_body": "露德圣母堂位于沙面大街东段。先在公共街道观察立面细节，再与刚才见过的街区建筑作比较；保持安静，尊重场所使用者。",
+        "audio_url": "",
+        "image": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+        "insight": "露德圣母堂位于沙面大街东段。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "27a94c9e-412b-5ca0-b185-9654a5279966",
+        "latitude": 23.10994444,
+        "longitude": 113.242375,
+        "entry_radius_m": 60,
+        "exit_radius_m": 90,
+        "max_accuracy_m": 35,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://en.wikipedia.org/w/api.php?action=query&prop=coordinates&titles=Our%20Lady%20of%20Lourdes%20Chapel%2C%20Shamian%20Island&format=json",
+        "field_notes": "公开来源候选坐标，未现场复核。三个坐标为公开百科建筑代表点，非现场采集。白天鹅宾馆江畔需在地图上改落于实际可达公共步道后发布，不能直接把建筑中心当江边。沙面堂与白天鹅代表点约169m，仍须现场检查60m触发。官方街区内容来源待补。"
+      },
+      "photo_mission": null
+    }
+  ],
+  "sources": [
+    {
+      "id": "15dff0f4-7b75-5ee9-9e6f-8fb6afc1008b",
+      "title": "Our Lady of Lourdes Chapel, Shamian Island",
+      "publisher": "维基百科",
+      "url": "https://en.wikipedia.org/wiki/Our_Lady_of_Lourdes_Chapel,_Shamian_Island",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "b4085624-7600-5174-afe6-4e1565903dd3",
+      "title": "白天鹅宾馆",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/白天鹅宾馆",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "bf2d1281-716d-53f3-9d00-5926baa4e7ee",
+      "title": "沙面堂",
+      "publisher": "维基百科",
+      "url": "https://zh.wikipedia.org/wiki/沙面堂",
+      "source_type": "reference",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "用于核对地点事实或坐标的公开资料；页面标题未单独复核的条目已标注为来源描述。"
+    },
+    {
+      "id": "c55db10a-33d5-5587-8f83-982f35cbcf29",
+      "title": "File:ShaMianBuildings.JPG",
+      "publisher": "Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/wiki/File:ShaMianBuildings.JPG",
+      "source_type": "photograph",
+      "accessed_at": "2026-09-30T12:52:47",
+      "review_state": "in_review",
+      "summary": "作者：Ricky Chow；许可：CC BY-SA 3.0（http://creativecommons.org/licenses/by-sa/3.0/）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "489b9045-7463-5c31-aa87-40e81fa62643",
+      "canonical_text": "白天鹅宾馆位于沙面岛南侧。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "b4085624-7600-5174-afe6-4e1565903dd3"
+      ],
+      "support_notes": {
+        "b4085624-7600-5174-afe6-4e1565903dd3": "白天鹅宾馆位于沙面岛南侧。"
+      }
+    },
+    {
+      "id": "7941ecdd-dc87-500f-83f8-723301eaae69",
+      "canonical_text": "作者：Ricky Chow；许可：CC BY-SA 3.0（http://creativecommons.org/licenses/by-sa/3.0/）；修改：CMS JPEG normalization; source photo otherwise unchanged。仅为景区封面署名，不作为子点照片或历史事实依据。",
+      "claim_kind": "media_attribution",
+      "certainty": "attribution_record",
+      "review_state": "in_review",
+      "boundary_note": "仅为封面媒体署名及许可，不作为地点历史依据。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "c55db10a-33d5-5587-8f83-982f35cbcf29"
+      ],
+      "support_notes": {
+        "c55db10a-33d5-5587-8f83-982f35cbcf29": "原摄影作品的作者、来源和许可记录。"
+      }
+    },
+    {
+      "id": "91f9622d-c9a7-5bdd-83cf-2a797e1189a9",
+      "canonical_text": "沙面堂位于沙面南街。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "bf2d1281-716d-53f3-9d00-5926baa4e7ee"
+      ],
+      "support_notes": {
+        "bf2d1281-716d-53f3-9d00-5926baa4e7ee": "沙面堂位于沙面南街。"
+      }
+    },
+    {
+      "id": "bfd1a8dd-cc8a-5483-89e1-dfad1af0e574",
+      "canonical_text": "露德圣母堂位于沙面大街东段。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料研究稿；坐标可能为建筑或道路代表点，公共步行可达位置与触发范围均待现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "15dff0f4-7b75-5ee9-9e6f-8fb6afc1008b"
+      ],
+      "support_notes": {
+        "15dff0f4-7b75-5ee9-9e6f-8fb6afc1008b": "露德圣母堂位于沙面大街东段。"
+      }
+    }
+  ],
+  "required_photo_mission_count": 0,
+  "city": {
+    "id": "b269e45a-d1c5-4ced-887b-1f9c023fa29e",
+    "slug": "guangzhou",
+    "name": "广州",
+    "subtitle": "穿过骑楼、巷道与江岸，在日常里读一座城市。",
+    "hero_image": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+    "latitude": 23.128795,
+    "longitude": 113.258976
+  },
+  "media": [
+    {
+      "key": "cms-20260930-guangzhou-shamian-cover",
+      "storage_path": "public/content/2026/09/c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3.jpg",
+      "mime_type": "image/jpeg",
+      "sha256": "c2e708ccb1cb82edf89b83e5c2da46835e5ff9b7340d15295c2c0b25ac03d0b3"
+    },
+    {
+      "key": "narration-ac38f001-2dfe-57a4-8984--shenzhen-warm-comp-2a221e1089-35647218754d",
+      "storage_path": "public/narration/ac38f001-2dfe-57a4-8984-df5d757f2532/shenzhen-warm-companion/2a221e1089c0df4a-2026.09-research-draft.1-f2d7f7472d8a-35647218754d.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "35647218754dfb6dd464a1f933f31727d3eec5d8eaf3a409a9aec70ca345b716"
+    },
+    {
+      "key": "narration-b66b287e-968b-55e1-ae4c--shenzhen-warm-comp-afbcd3417c-0d5f01453f56",
+      "storage_path": "public/narration/b66b287e-968b-55e1-ae4c-140a626a8e11/shenzhen-warm-companion/afbcd3417c3414b3-2026.09-research-draft.1-f2d7f7472d8a-0d5f01453f56.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "0d5f01453f56f88d2218e6d51387d835a648607c0ffa60cb30da550124219995"
+    },
+    {
+      "key": "narration-c9687052-a403-5d76-9391--shenzhen-warm-comp-f248c6f18c-b6c944be6497",
+      "storage_path": "public/narration/c9687052-a403-5d76-9391-e60e5fb131f3/shenzhen-warm-companion/f248c6f18c3082b3-2026.09-research-draft.1-f2d7f7472d8a-b6c944be6497.mp3",
+      "mime_type": "audio/mpeg",
+      "sha256": "b6c944be6497b82e17e6f775b5a8406fac502fce4036523f4f573d0114b865b9"
+    }
+  ]
+}
