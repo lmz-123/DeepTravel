@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -563,35 +562,4 @@ class DiscoveryPaperButton extends StatelessWidget {
           ),
         ),
       );
-}
-
-/// Retains the physical paper silhouette independently of photo dimensions.
-class JournalPhotoClipper extends CustomClipper<Path> {
-  const JournalPhotoClipper({this.town = false});
-  final bool town;
-  @override
-  Path getClip(Size s) {
-    final radius = math.min(town ? 145.0 : 165.0, s.width);
-    final rounded = Path()
-      ..addRRect(
-        RRect.fromRectAndCorners(
-          Offset.zero & s,
-          topLeft: Radius.circular(town ? 4 : radius),
-          topRight: Radius.circular(town ? radius : 0),
-          bottomLeft: const Radius.circular(4),
-          bottomRight: const Radius.circular(4),
-        ),
-      );
-    final fold = Path()
-      ..moveTo(0, 0)
-      ..lineTo(s.width, 0)
-      ..lineTo(s.width, s.height * .92)
-      ..lineTo(s.width * .85, s.height)
-      ..lineTo(0, s.height)
-      ..close();
-    return Path.combine(ui.PathOperation.intersect, rounded, fold);
-  }
-
-  @override
-  bool shouldReclip(JournalPhotoClipper old) => town != old.town;
 }

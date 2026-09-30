@@ -23,24 +23,150 @@ class _DiscoveryJournal extends StatefulWidget {
   State<_DiscoveryJournal> createState() => _DiscoveryJournalState();
 }
 
-class _DiscoveryJournalState extends State<_DiscoveryJournal> {
+class _DiscoveryJournalState extends State<_DiscoveryJournal>
+    with SingleTickerProviderStateMixin {
   int _edition = 0;
-  double _drag = 0;
+  late final AnimationController _turn =
+      AnimationController.unbounded(vsync: this);
+  int _motionEpoch = 0;
+  bool _dragging = false;
+  bool _reduceMotion = false;
+  int? _destination;
+  double _quietDrag = 0;
+  final Set<String> _warmedImages = {};
+
+  List<RouteExperience> _issues(DiscoveryState state) {
+    final routes = state.cards
+        .map((card) => card.route)
+        .where((route) => route.isPublished)
+        .toList();
+    return [
+      ...routes.where((route) => route.isFeatured),
+      ...routes.where((route) => !route.isFeatured),
+    ];
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    if (reduce && !_reduceMotion) {
+      final target = _destination ?? 0;
+      _resetMotion();
+      final issues = _issues(widget.state);
+      if (issues.isNotEmpty) _edition = (_edition + target) % issues.length;
+    }
+    _reduceMotion = reduce;
+    _warmNeighbors();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DiscoveryJournal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final before = _issues(oldWidget.state);
+    final after = _issues(widget.state);
+    final sameOrder = before.length == after.length &&
+        List.generate(before.length, (i) => before[i].id == after[i].id)
+            .every((same) => same);
+    if (!sameOrder) {
+      final selected =
+          before.isEmpty ? null : before[_edition % before.length].id;
+      _resetMotion();
+      final index = after.indexWhere((route) => route.id == selected);
+      _edition = index < 0 ? 0 : index;
+    }
+    _warmNeighbors();
+  }
+
+  void _warmNeighbors() {
+    final issues = _issues(widget.state);
+    if (issues.isEmpty) return;
+    for (final delta in [-1, 0, 1]) {
+      final source = issues[(_edition + delta) % issues.length].heroImage;
+      if (source.isNotEmpty && _warmedImages.add(source)) {
+        precacheImage(NetworkImage(source), context, onError: (_, __) {});
+      }
+    }
+  }
+
+  void _resetMotion() {
+    _motionEpoch++;
+    _turn.stop();
+    _turn.value = 0;
+    _dragging = false;
+    _destination = null;
+    _quietDrag = 0;
+  }
+
   void _change(int delta, int length) {
-    if (length > 1) setState(() => _edition = (_edition + delta) % length);
+    if (length < 2 || _turn.isAnimating || _dragging) return;
+    _settle(delta, length);
+  }
+
+  void _settle(int destination, int length) {
+    _dragging = false;
+    _destination = destination;
+    final epoch = ++_motionEpoch;
+    void finish() {
+      if (!mounted || epoch != _motionEpoch) return;
+      setState(() {
+        _edition = (_edition + destination) % length;
+        _destination = null;
+        _turn.value = 0;
+      });
+      _warmNeighbors();
+    }
+
+    if (_reduceMotion || (_turn.value - destination).abs() < .001) {
+      finish();
+      return;
+    }
+    // Match the approved collage timeline, including its minimum settle time.
+    final remaining = (_turn.value - destination).abs();
+    _turn
+        .animateTo(
+          destination.toDouble(),
+          duration:
+              Duration(milliseconds: math.max(220, (820 * remaining).round())),
+          curve: const _JournalTurnCurve(),
+        )
+        .then((_) => finish());
+  }
+
+  void _startDrag() {
+    _motionEpoch++;
+    _turn.stop();
+    _destination = null;
+    _dragging = true;
+    _quietDrag = 0;
+  }
+
+  void _dragBy(double dx, double width) {
+    if (_reduceMotion) {
+      _quietDrag = (_quietDrag - dx / (width * .78)).clamp(-1.0, 1.0);
+    } else {
+      _turn.value = (_turn.value - dx / (width * .78)).clamp(-1.0, 1.0);
+    }
+  }
+
+  void _endDrag(int length) {
+    if (!_dragging) return;
+    final progress = _reduceMotion ? _quietDrag : _turn.value;
+    _settle(progress.abs() > .18 ? progress.sign.toInt() : 0, length);
+  }
+
+  @override
+  void dispose() {
+    _motionEpoch++;
+    _turn.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final routes = widget.state.cards
-        .map((card) => card.route)
-        .where((route) => route.isPublished)
-        .toList();
-    final issues = [
-      ...routes.where((route) => route.isFeatured),
-      ...routes.where((route) => !route.isFeatured),
-    ];
-    final narrow = MediaQuery.sizeOf(context).width <= 360;
+    final issues = _issues(widget.state);
+    final width = MediaQuery.sizeOf(context).width;
+    final narrow = width <= 360;
     final pad = narrow ? 20.0 : 23.0;
     final route = issues.isEmpty ? null : issues[_edition % issues.length];
     return RefreshIndicator(
@@ -57,15 +183,18 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal> {
             ),
           ),
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(pad, 0, pad, 155),
+            padding: const EdgeInsets.only(bottom: 155),
             sliver: SliverToBoxAdapter(
               child: route == null
-                  ? _empty()
+                  ? Padding(
+                      padding: EdgeInsets.symmetric(horizontal: pad),
+                      child: _empty())
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
                           height: 48,
+                          margin: EdgeInsets.symmetric(horizontal: pad),
                           decoration: const BoxDecoration(
                             border: Border(
                               top: BorderSide(color: Color(0x35252824)),
@@ -84,17 +213,29 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal> {
                               const SizedBox(width: 10),
                               Text('·', style: discoverySans(10)),
                               const SizedBox(width: 10),
-                              Text(
-                                '${_edition % issues.length + 1}'.padLeft(
-                                  2,
-                                  '0',
+                              AnimatedBuilder(
+                                animation: _turn,
+                                child: Text(
+                                  '${_edition % issues.length + 1}'.padLeft(
+                                    2,
+                                    '0',
+                                  ),
+                                  style: const TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontStyle: FontStyle.italic,
+                                    fontSize: 18,
+                                    color: AppColors.terracotta,
+                                  ),
                                 ),
-                                style: const TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontStyle: FontStyle.italic,
-                                  fontSize: 18,
-                                  color: AppColors.terracotta,
-                                ),
+                                builder: (context, child) {
+                                  final pulse =
+                                      math.sin(math.pi * _turn.value.abs());
+                                  return Transform.translate(
+                                    offset: Offset(0, -pulse * 3 * width / 390),
+                                    child: Opacity(
+                                        opacity: 1 - pulse * .65, child: child),
+                                  );
+                                },
                               ),
                               Text(
                                 ' / ${issues.length.toString().padLeft(2, '0')}',
@@ -125,103 +266,86 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal> {
                             ],
                           ),
                         ),
-                        GestureDetector(
-                          onHorizontalDragStart: (_) => _drag = 0,
-                          onHorizontalDragUpdate: (details) =>
-                              _drag += details.delta.dx,
-                          onHorizontalDragEnd: (_) {
-                            if (_drag.abs() > 55) {
-                              _change(_drag < 0 ? 1 : -1, issues.length);
+                        Listener(
+                          // Flutter can report an accepted pointer cancellation
+                          // as drag-end. Always restore the issue in that case.
+                          onPointerCancel: (_) {
+                            if (_dragging) {
+                              _settle(0, issues.length);
                             }
                           },
-                          child: _JournalCover(
-                            route: route,
-                            city: widget.state.city,
-                            narrow: narrow,
-                            onOpen: () => widget.onOpen(route),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(0, 14, 0, 13),
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: Color(0x222d3026)),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: DiscoveryTouch(
-                                  key: ValueKey('route-card-${route.slug}'),
-                                  label: '查看${route.title}',
-                                  onTap: () => widget.onOpen(route),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${widget.state.city?.name ?? ''}  /  ${route.theme}',
-                                        style: discoverySans(
-                                          10,
-                                          color: const Color(0xff897661),
-                                        ),
-                                      ),
-                                      Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(
-                                              route.title,
-                                              style: discoverySerif(
-                                                narrow ? 24 : 26,
-                                                weight: FontWeight.w600,
-                                                height: 1.7,
-                                                spacing: -1,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          const DiscoveryIcon(
-                                            DiscoveryMark.arrowUpRight,
-                                            size: 19,
-                                            color: AppColors.terracotta,
-                                          ),
-                                        ],
-                                      ),
-                                      Text(
-                                        _routeMetadata(route),
-                                        style: discoverySans(
-                                          11,
-                                          height: 1.8,
-                                          color: const Color(0xff796f5e),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              _DiscoveryIconButton(
-                                mark: DiscoveryMark.bookmark,
-                                label:
-                                    '${widget.saved.contains(route.id) ? '取消收藏' : '收藏'}${route.title}',
-                                onTap: widget.busyFavorites.contains(route.id)
+                          child: GestureDetector(
+                            key: const ValueKey('journal-swipe'),
+                            dragStartBehavior: DragStartBehavior.down,
+                            behavior: HitTestBehavior.opaque,
+                            onHorizontalDragStart:
+                                issues.length < 2 ? null : (_) => _startDrag(),
+                            onHorizontalDragUpdate: issues.length < 2
+                                ? null
+                                : (details) => _dragBy(details.delta.dx, width),
+                            onHorizontalDragEnd: issues.length < 2
+                                ? null
+                                : (_) => _endDrag(issues.length),
+                            onHorizontalDragCancel: issues.length < 2
+                                ? null
+                                : () {
+                                    if (_dragging) _settle(0, issues.length);
+                                  },
+                            child: AnimatedBuilder(
+                              animation: _turn,
+                              builder: (context, _) {
+                                final progress = _turn.value;
+                                final neighbor = progress < 0 ? -1 : 1;
+                                final next = progress == 0
                                     ? null
-                                    : () => widget.onFavorite(route),
-                                size: 23,
-                                selected: widget.saved.contains(route.id),
-                                filled: widget.saved.contains(route.id),
-                                color: widget.saved.contains(route.id)
-                                    ? AppColors.terracotta
-                                    : const Color(0xff817761),
-                              ),
-                            ],
+                                    : issues[
+                                        (_edition + neighbor) % issues.length];
+                                final pages = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _JournalCollageCover(
+                                      route: route,
+                                      nextRoute: next,
+                                      city: widget.state.city,
+                                      progress: progress.abs(),
+                                      direction: neighbor,
+                                      onOpen: () => widget.onOpen(route),
+                                    ),
+                                    Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(horizontal: pad),
+                                      child: _issueDetails(
+                                          route,
+                                          next,
+                                          width / 390,
+                                          progress.abs(),
+                                          neighbor),
+                                    ),
+                                  ],
+                                );
+                                // Reserve space for either title while turning;
+                                // long names must never collide with the footer.
+                                return ClipRect(
+                                  child: _reduceMotion
+                                      ? pages
+                                      : AnimatedSize(
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          curve: Curves.easeOutQuart,
+                                          alignment: Alignment.topCenter,
+                                          clipBehavior: Clip.none,
+                                          child: pages,
+                                        ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                         DiscoveryTouch(
                           label: '打开城市索引',
                           onTap: widget.onAtlas,
-                          child: SizedBox(
+                          child: Container(
+                            margin: EdgeInsets.symmetric(horizontal: pad),
                             height: 50,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -261,6 +385,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal> {
                           onTap: widget.onCompanion,
                           child: Container(
                             width: double.infinity,
+                            margin: EdgeInsets.symmetric(horizontal: pad),
                             padding: const EdgeInsets.symmetric(
                               vertical: 11,
                               horizontal: 2,
@@ -338,6 +463,95 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal> {
     );
   }
 
+  Widget _issueDetails(RouteExperience route, RouteExperience? next,
+          double scale, double progress, int direction) =>
+      Container(
+        padding: const EdgeInsets.fromLTRB(0, 14, 0, 13),
+        decoration: const BoxDecoration(
+            border: Border(
+          bottom: BorderSide(color: Color(0x222d3026)),
+        )),
+        child: Row(children: [
+          Expanded(
+              child: Stack(children: [
+            _detailsLayer(route, scale, progress, direction, false),
+            if (next != null)
+              _detailsLayer(next, scale, progress, direction, true),
+          ])),
+          IgnorePointer(
+            ignoring: progress != 0,
+            child: Opacity(
+              opacity: 1 - math.sin(math.pi * progress) * .78,
+              child: _DiscoveryIconButton(
+                mark: DiscoveryMark.bookmark,
+                label:
+                    '${widget.saved.contains(route.id) ? '取消收藏' : '收藏'}${route.title}',
+                onTap: widget.busyFavorites.contains(route.id)
+                    ? null
+                    : () => widget.onFavorite(route),
+                size: 23,
+                selected: widget.saved.contains(route.id),
+                filled: widget.saved.contains(route.id),
+                color: widget.saved.contains(route.id)
+                    ? AppColors.terracotta
+                    : const Color(0xff817761),
+              ),
+            ),
+          ),
+        ]),
+      );
+
+  Widget _detailsLayer(RouteExperience route, double scale, double progress,
+      int direction, bool incoming) {
+    final remaining = incoming ? 1 - progress : progress;
+    final dir = incoming ? direction : -direction;
+    final alpha = incoming
+        ? _journalInterval(.5, .95, progress)
+        : 1 - _journalInterval(.08, .45, progress);
+    return ExcludeSemantics(
+      excluding: progress != 0,
+      child: IgnorePointer(
+        ignoring: progress != 0,
+        child: Transform.translate(
+          key: ValueKey('journal-page-${route.id}'),
+          offset: Offset(dir * remaining * 16 * scale,
+              (incoming ? 1 : -1) * remaining * 6 * scale),
+          child: Opacity(
+            opacity: alpha,
+            child: DiscoveryTouch(
+              key: ValueKey('route-card-${route.slug}'),
+              label: '查看${route.title}',
+              onTap: () => widget.onOpen(route),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${widget.state.city?.name ?? ''}  /  ${route.theme}',
+                        style: discoverySans(10 * scale,
+                            color: const Color(0xff887962))),
+                    Row(children: [
+                      Flexible(
+                          child: Text(route.title,
+                              style: discoverySerif(26 * scale,
+                                  weight: FontWeight.w600,
+                                  height: 1.65,
+                                  spacing: -1 * scale),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis)),
+                      SizedBox(width: 15.6 * scale),
+                      DiscoveryIcon(DiscoveryMark.arrowUpRight,
+                          size: 17.55 * scale, color: const Color(0xffcf4630)),
+                    ]),
+                    Text(_routeMetadata(route),
+                        style: discoverySans(11 * scale,
+                            height: 1.8, color: const Color(0xff796f5e))),
+                  ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _empty() => Padding(
         padding: const EdgeInsets.symmetric(vertical: 60),
         child: Column(
@@ -358,203 +572,6 @@ String _routeMetadata(RouteExperience route) => !route.isPublished
     : '${route.durationMinutes} 分钟 · ${route.distanceKm.toStringAsFixed(1)} km · ${_routeFormat(route)}';
 String _routeFormat(RouteExperience route) =>
     route.audioTour != null ? '声音导览' : '文字漫游';
-
-class _JournalCover extends StatelessWidget {
-  const _JournalCover({
-    required this.route,
-    required this.city,
-    required this.narrow,
-    required this.onOpen,
-  });
-  final RouteExperience route;
-  final CityExperience? city;
-  final bool narrow;
-  final VoidCallback onOpen;
-  @override
-  Widget build(BuildContext context) {
-    final copy = _JournalCopy.forRoute(route, city);
-    final size = narrow ? 57.0 : 62.0;
-    final pad = narrow ? 20.0 : 23.0;
-    return SizedBox(
-      height: narrow ? 440 : 463,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: -38,
-            bottom: narrow ? 3 : 0,
-            child: ExcludeSemantics(
-              child: Transform.rotate(
-                angle: -.2094,
-                child: Text(
-                  copy.print,
-                  style: discoverySerif(
-                    narrow ? 180 : 193,
-                    weight: FontWeight.w900,
-                    height: 1,
-                    color: copy.printColor,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: narrow ? 125 : 131,
-            left: narrow ? 30 : 37,
-            right: -pad,
-            height: narrow ? 286 : 307,
-            child: DiscoveryTouch(
-              label: '打开${route.title}',
-              onTap: onOpen,
-              child: Stack(
-                clipBehavior: Clip.none,
-                fit: StackFit.expand,
-                children: [
-                  ClipPath(
-                    clipper: JournalPhotoClipper(town: copy.town),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        DiscoveryPhoto(
-                          source: route.heroImage,
-                          alignment: copy.town
-                              ? const Alignment(-.2, .2)
-                              : const Alignment(.12, .12),
-                        ),
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, Color(0x7a12221a)],
-                              stops: [.64, 1],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    left: 22,
-                    bottom: 25,
-                    right: 52,
-                    child: Text(
-                      copy.caption,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: discoverySans(
-                        11,
-                        color: const Color(0xfffff8ed),
-                        height: 1.7,
-                      ).copyWith(
-                        shadows: const [
-                          Shadow(
-                            color: Color(0x77000000),
-                            blurRadius: 5,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 17,
-                    bottom: -19,
-                    child: Transform.rotate(
-                      angle: -.1222,
-                      child: Container(
-                        width: 63,
-                        height: 63,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: copy.sealColor,
-                          border: Border.all(color: AppColors.paper, width: 5),
-                        ),
-                        child: Center(
-                          child: DiscoveryIcon(
-                            DiscoveryMark.arrowUpRight,
-                            size: 31,
-                            color: copy.sealColor == AppColors.terracotta
-                                ? Colors.white
-                                : const Color(0xff3c4329),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: 194,
-            child: ExcludeSemantics(
-              child: SizedBox(
-                width: 15,
-                child: Text(
-                  copy.note.split('').join('\n'),
-                  textAlign: TextAlign.center,
-                  style: discoverySans(
-                    narrow ? 9 : 10,
-                    height: 1.6,
-                    color: const Color(0xff8f7b65),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 10,
-            left: 0,
-            right: -6,
-            child: IgnorePointer(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    copy.first,
-                    style: discoverySerif(
-                      size,
-                      weight: FontWeight.w700,
-                      height: 1.15,
-                      spacing: -size * .065,
-                      color: copy.color,
-                    ),
-                    maxLines: 1,
-                  ),
-                  Padding(
-                    padding: EdgeInsets.only(left: narrow ? 42 : 53),
-                    child: Container(
-                      padding: const EdgeInsets.only(right: 12, bottom: 2),
-                      decoration: const BoxDecoration(
-                        color: AppColors.paper,
-                        borderRadius: BorderRadius.only(
-                          bottomRight: Radius.circular(23),
-                        ),
-                      ),
-                      child: Text(
-                        copy.second,
-                        style: discoverySerif(
-                          size,
-                          weight: FontWeight.w700,
-                          height: 1.15,
-                          spacing: -size * .065,
-                          color: copy.color,
-                        ),
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _JournalCopy {
   const _JournalCopy(
@@ -728,4 +745,15 @@ class _DiscoveryStoryIndex extends StatelessWidget {
                     ]))));
     if (selected != null && context.mounted) context.push('/story/$selected');
   }
+}
+
+// Exact easing functions used by journal-photographic-montage.html.
+double _journalInterval(double start, double end, double value) =>
+    ((value - start) / (end - start)).clamp(0.0, 1.0);
+
+class _JournalTurnCurve extends Curve {
+  const _JournalTurnCurve();
+  @override
+  double transformInternal(double t) =>
+      t < .5 ? 4 * t * t * t : 1 - math.pow(-2 * t + 2, 3) / 2;
 }

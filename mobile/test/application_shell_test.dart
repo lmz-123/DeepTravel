@@ -13,10 +13,9 @@ import 'package:jiandi/features/experience/presentation/active_tour_controller.d
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 import 'package:jiandi/features/experience/presentation/profile_page.dart';
-import 'package:jiandi/features/experience/presentation/traveler_shell.dart';
 
 void main() {
-  testWidgets('brand opens the personal file and navigation keeps player',
+  testWidgets('personal file owns navigation without a legacy drawer',
       (tester) async {
     final player = _Player();
     final container = ProviderContainer(overrides: [
@@ -27,23 +26,18 @@ void main() {
     ]);
     addTearDown(container.dispose);
     final router = GoRouter(routes: [
-      ShellRoute(
-        builder: (_, __, child) => TravelerShell(child: child),
-        routes: [
-          GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
-          GoRoute(
-            path: '/profile',
-            builder: (_, __) => const ProfilePage(),
-          ),
-          GoRoute(
-            path: '/footprints',
-            builder: (_, __) => const Scaffold(body: Text('足迹页已打开')),
-          ),
-          GoRoute(
-            path: '/settings',
-            builder: (_, __) => const Scaffold(body: Text('设置页已打开')),
-          ),
-        ],
+      GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const ProfilePage(),
+      ),
+      GoRoute(
+        path: '/footprints',
+        builder: (_, __) => const Scaffold(body: Text('足迹页已打开')),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (_, __) => const Scaffold(body: Text('设置页已打开')),
       ),
     ]);
     addTearDown(router.dispose);
@@ -55,27 +49,23 @@ void main() {
     final originalPlayer = container.read(narrationPlayerProvider);
 
     final profileTrigger = find.bySemanticsLabel(RegExp('打开个人档案'));
-    final menuTrigger = find.byTooltip('打开旅行者菜单');
     expect(profileTrigger, findsOneWidget);
     await tester.tap(profileTrigger);
     await tester.pumpAndSettle();
     expect(find.text('PRIVATE FILE / 见地档案'), findsOneWidget);
-    expect(menuTrigger, findsOneWidget);
-    expect(menuTrigger.hitTestable(), findsOneWidget);
-    await tester.tap(menuTrigger);
-    await tester.pumpAndSettle();
-    expect(find.byTooltip('账号'), findsNothing);
-    expect(find.text('见地现场'), findsNothing);
-    expect(find.text('动态'), findsNothing);
-    expect(find.text('见地旅行者'), findsOneWidget);
-    final drawerFootprints = find.widgetWithText(ListTile, '足迹');
-    expect(drawerFootprints, findsOneWidget);
-    expect(find.text('设置'), findsOneWidget);
-    expect(find.text('退出登录'), findsOneWidget);
-    expect(find.text('见地现场'), findsNothing);
-    expect(find.text('动态'), findsNothing);
+    expect(find.byTooltip('打开旅行者菜单'), findsNothing);
+    expect(find.byType(Drawer), findsNothing);
+    expect(find.byIcon(Icons.menu_rounded), findsNothing);
 
-    await tester.tap(drawerFootprints);
+    await tester.dragFrom(const Offset(1, 300), const Offset(250, 0));
+    await tester.pumpAndSettle();
+    expect(find.byType(Drawer), findsNothing);
+    expect(find.text('PRIVATE FILE / 见地档案'), findsOneWidget);
+
+    final footprints = find.text('还没有留下足迹');
+    await tester.ensureVisible(footprints);
+    await tester.pumpAndSettle();
+    await tester.tap(footprints);
     await tester.pumpAndSettle();
     expect(find.text('足迹页已打开'), findsOneWidget);
     expect(container.read(narrationPlayerProvider), same(originalPlayer));
@@ -83,9 +73,8 @@ void main() {
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('足迹页已打开'), findsNothing);
-    await tester.tap(find.byTooltip('打开旅行者菜单'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('设置'));
+    await tester.scrollUntilVisible(find.byTooltip('设置'), -300);
+    await tester.tap(find.byTooltip('设置'));
     await tester.pumpAndSettle();
     expect(find.text('设置页已打开'), findsOneWidget);
     expect(container.read(narrationPlayerProvider), same(originalPlayer));
@@ -95,7 +84,8 @@ void main() {
     expect(find.text('设置页已打开'), findsNothing);
   });
 
-  testWidgets('drawer account switch and logout clear private local state',
+  testWidgets(
+      'personal file account switch and logout clear private local state',
       (tester) async {
     final auth = _Auth();
     final store = _Store();
@@ -109,15 +99,10 @@ void main() {
     ]);
     addTearDown(container.dispose);
     final router = GoRouter(routes: [
-      ShellRoute(
-        builder: (_, __, child) => TravelerShell(child: child),
-        routes: [
-          GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
-          GoRoute(
-            path: '/profile',
-            builder: (_, __) => const ProfilePage(),
-          ),
-        ],
+      GoRoute(path: '/', builder: (_, __) => const DiscoveryPage()),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const ProfilePage(),
       ),
     ]);
     addTearDown(router.dispose);
@@ -130,12 +115,9 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('打开旅行者菜单'));
+    expect(find.text('tester-a'), findsOneWidget);
+    await tester.ensureVisible(find.text('切换测试账号 B'));
     await tester.pumpAndSettle();
-    expect(
-      find.descendant(of: find.byType(Drawer), matching: find.text('tester-a')),
-      findsOneWidget,
-    );
     await tester.tap(find.text('切换测试账号 B'));
     await tester.pumpAndSettle();
     expect(auth.session?.user.id, 'tester-b');
@@ -143,9 +125,9 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('打开旅行者菜单'));
+    await tester.ensureVisible(find.text('退出这个账号'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('退出登录'));
+    await tester.tap(find.text('退出这个账号'));
     await tester.pumpAndSettle();
     expect(auth.session, isNull);
     expect(store.clearCalls, 2);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/presentation/auth_provider.dart';
@@ -9,7 +10,6 @@ import '../domain/city_story.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'home_story_controller.dart';
-import 'traveler_shell.dart';
 import 'widgets/discovery_art.dart';
 
 /// The personal page is the home behind the brand mark. It gathers private
@@ -21,15 +21,12 @@ class ProfilePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authControllerProvider).asData?.value;
     final userId = session?.user.id;
-    final favorites = userId == null
-        ? null
-        : ref.watch(travelerFavoritesProvider(userId));
+    final favorites =
+        userId == null ? null : ref.watch(travelerFavoritesProvider(userId));
     final footprints = ref.watch(currentFootprintsProvider);
     final name = session?.user.username?.trim();
-    final savedCount = favorites?.value
-            ?.where((item) => item.kind == 'route')
-            .length ??
-        0;
+    final savedCount =
+        favorites?.value?.where((item) => item.kind == 'route').length ?? 0;
     return RouteBackScope(
       fallbackLocation: '/',
       child: Scaffold(
@@ -48,16 +45,13 @@ class ProfilePage extends ConsumerWidget {
                         icon: const Icon(Icons.arrow_back_rounded),
                       ),
                       const Spacer(),
-                      Text('PRIVATE FILE / 见地档案', style: discoverySans(9, spacing: .9, color: AppColors.textMuted)),
+                      Text('PRIVATE FILE / 见地档案',
+                          style: discoverySans(9,
+                              spacing: .9, color: AppColors.textMuted)),
                       IconButton(
                         tooltip: '设置',
                         onPressed: () => context.push('/settings'),
                         icon: const Icon(Icons.tune_rounded, size: 20),
-                      ),
-                      IconButton(
-                        tooltip: '打开旅行者菜单',
-                        onPressed: () => TravelerShellScope.showDrawer(context),
-                        icon: const Icon(Icons.menu_rounded, size: 20),
                       ),
                     ],
                   ),
@@ -73,32 +67,39 @@ class ProfilePage extends ConsumerWidget {
                       const SizedBox(height: 30),
                       Row(
                         children: [
-                          _ProfileMetric(value: favorites == null ? '—' : savedCount.toString().padLeft(2, '0'), label: '书架'),
+                          _ProfileMetric(
+                              value: favorites == null
+                                  ? '—'
+                                  : savedCount.toString().padLeft(2, '0'),
+                              label: '书架'),
                           const SizedBox(width: 28),
                           _ProfileMetric(
                             value: footprints.when(
-                              data: (result) => result.total
-                                  .toString()
-                                  .padLeft(2, '0'),
+                              data: (result) =>
+                                  result.total.toString().padLeft(2, '0'),
                               loading: () => '—',
                               error: (_, __) => '—',
                             ),
                             label: '足迹',
                           ),
                           const SizedBox(width: 28),
-                          _ProfileMetric(value: session == null ? '访' : '01', label: session == null ? '访客' : '账号'),
+                          _ProfileMetric(
+                              value: session == null ? '访' : '01',
+                              label: session == null ? '访客' : '账号'),
                         ],
                       ),
                       const SizedBox(height: 34),
                       const _ProfileSectionLabel(label: '01 / KEPT FOR LATER'),
                       const SizedBox(height: 10),
                       _ShelfSummary(
-                        favorites: favorites?.value ?? const <TravelerFavorite>[],
+                        favorites:
+                            favorites?.value ?? const <TravelerFavorite>[],
                         loading: favorites?.isLoading == true,
                         onOpenShelf: () => context.go('/?tab=shelf'),
                       ),
                       const SizedBox(height: 30),
-                      const _ProfileSectionLabel(label: '02 / WHAT YOU HAVE SEEN'),
+                      const _ProfileSectionLabel(
+                          label: '02 / WHAT YOU HAVE SEEN'),
                       const SizedBox(height: 10),
                       _ProfileEmptyFootprints(
                         onOpen: () => context.push('/footprints'),
@@ -109,9 +110,35 @@ class ProfilePage extends ConsumerWidget {
                       const SizedBox(height: 30),
                       const _ProfileSectionLabel(label: '03 / YOUR SETTINGS'),
                       const SizedBox(height: 10),
-                      _ProfileLinkRow(icon: Icons.settings_outlined, title: '播放、定位与离线内容', subtitle: '让随行按你的方式发生', onTap: () => context.push('/settings')),
+                      _ProfileLinkRow(
+                          icon: Icons.settings_outlined,
+                          title: '播放、定位与离线内容',
+                          subtitle: '让随行按你的方式发生',
+                          onTap: () => context.push('/settings')),
                       const SizedBox(height: 9),
-                      _ProfileLinkRow(icon: Icons.logout_rounded, title: '退出这个账号', subtitle: '清除本机的私人展示记录', onTap: () => _logout(context, ref)),
+                      _ProfileLinkRow(
+                          icon: Icons.logout_rounded,
+                          title: '退出这个账号',
+                          subtitle: '清除本机的私人展示记录',
+                          onTap: () => _logout(context, ref)),
+                      if (AppConfig.testAuthEnabled ||
+                          session?.user.accountKind == 'test') ...[
+                        const SizedBox(height: 30),
+                        const _ProfileSectionLabel(label: '04 / TEST ACCOUNTS'),
+                        const SizedBox(height: 10),
+                        _ProfileLinkRow(
+                          icon: Icons.science_outlined,
+                          title: '切换测试账号 A',
+                          subtitle: '使用独立的测试足迹与收藏',
+                          onTap: () => _switchAccount(context, ref, 'tester-a'),
+                        ),
+                        _ProfileLinkRow(
+                          icon: Icons.science_outlined,
+                          title: '切换测试账号 B',
+                          subtitle: '使用独立的测试足迹与收藏',
+                          onTap: () => _switchAccount(context, ref, 'tester-b'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -124,6 +151,19 @@ class ProfilePage extends ConsumerWidget {
   }
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    await _clearPrivatePresentation(ref);
+    await ref.read(authControllerProvider.notifier).logout();
+    if (context.mounted) context.go('/');
+  }
+
+  Future<void> _switchAccount(
+      BuildContext context, WidgetRef ref, String alias) async {
+    await _clearPrivatePresentation(ref);
+    await ref.read(authControllerProvider.notifier).switchTestUser(alias);
+    if (context.mounted) context.go('/');
+  }
+
+  Future<void> _clearPrivatePresentation(WidgetRef ref) async {
     await ref
         .read(homeStoryPlaybackControllerProvider.notifier)
         .clearForAccountExit();
@@ -133,8 +173,6 @@ class ProfilePage extends ConsumerWidget {
     ref.invalidate(activeTourControllerProvider);
     ref.invalidate(archivedActiveJourneysProvider);
     invalidatePrivateExperienceFromWidget(ref);
-    await ref.read(authControllerProvider.notifier).logout();
-    if (context.mounted) context.go('/');
   }
 }
 
@@ -161,7 +199,12 @@ class _ProfileIdentity extends StatelessWidget {
                 ),
               ),
               alignment: Alignment.center,
-              child: Text('见', style: TextStyle(fontFamily: 'Noto Serif SC', fontSize: 31, color: AppColors.paper, fontWeight: FontWeight.w600)),
+              child: Text('见',
+                  style: TextStyle(
+                      fontFamily: 'Noto Serif SC',
+                      fontSize: 31,
+                      color: AppColors.paper,
+                      fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(width: 17),
@@ -169,11 +212,20 @@ class _ProfileIdentity extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('我的城市随身页', style: discoverySans(10, color: AppColors.textMuted, spacing: .8)),
+                Text('我的城市随身页',
+                    style: discoverySans(10,
+                        color: AppColors.textMuted, spacing: .8)),
                 const SizedBox(height: 5),
-                Text(name?.isNotEmpty == true ? name! : '还没有署名', maxLines: 1, overflow: TextOverflow.ellipsis, style: discoverySerif(29, weight: FontWeight.w600)),
+                Text(name?.isNotEmpty == true ? name! : '还没有署名',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: discoverySerif(29, weight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text(name?.isNotEmpty == true ? '把走过的地方，留成自己的见识。' : '登录以后，收藏与足迹会在这里留下。', style: discoverySans(11, color: AppColors.textMuted)),
+                Text(
+                    name?.isNotEmpty == true
+                        ? '把走过的地方，留成自己的见识。'
+                        : '登录以后，收藏与足迹会在这里留下。',
+                    style: discoverySans(11, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -186,31 +238,72 @@ class _ProfileMetric extends StatelessWidget {
   final String value;
   final String label;
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(value, style: const TextStyle(fontFamily: 'Georgia', fontSize: 26, fontStyle: FontStyle.italic, color: AppColors.terracotta)), const SizedBox(height: 2), Text(label, style: discoverySans(10, color: AppColors.textMuted))]);
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value,
+            style: const TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 26,
+                fontStyle: FontStyle.italic,
+                color: AppColors.terracotta)),
+        const SizedBox(height: 2),
+        Text(label, style: discoverySans(10, color: AppColors.textMuted))
+      ]);
 }
 
 class _ProfileSectionLabel extends StatelessWidget {
   const _ProfileSectionLabel({required this.label});
   final String label;
   @override
-  Widget build(BuildContext context) => Text(label, style: discoverySans(9, color: AppColors.terracotta, spacing: 1.1));
+  Widget build(BuildContext context) => Text(label,
+      style: discoverySans(9, color: AppColors.terracotta, spacing: 1.1));
 }
 
 class _ShelfSummary extends StatelessWidget {
-  const _ShelfSummary({required this.favorites, required this.loading, required this.onOpenShelf});
+  const _ShelfSummary(
+      {required this.favorites,
+      required this.loading,
+      required this.onOpenShelf});
   final List<TravelerFavorite> favorites;
   final bool loading;
   final VoidCallback onOpenShelf;
   @override
   Widget build(BuildContext context) {
-    final routes = favorites.where((item) => item.kind == 'route').take(3).toList();
+    final routes =
+        favorites.where((item) => item.kind == 'route').take(3).toList();
     return Column(children: [
-      if (loading) const LinearProgressIndicator(minHeight: 2, color: AppColors.terracotta),
+      if (loading)
+        const LinearProgressIndicator(
+            minHeight: 2, color: AppColors.terracotta),
       if (!loading && routes.isEmpty)
-        Container(width: double.infinity, padding: const EdgeInsets.fromLTRB(15, 16, 15, 16), decoration: const BoxDecoration(color: AppColors.white, border: Border(bottom: BorderSide(color: AppColors.line))), child: Row(children: [const DiscoveryIcon(DiscoveryMark.bookmark, size: 21, color: AppColors.terracotta), const SizedBox(width: 11), Expanded(child: Text('还没有收藏。去路线里留下一本想翻的城市手册。', style: discoverySans(11, height: 1.65))), const Icon(Icons.arrow_forward, size: 17, color: AppColors.terracotta)])),
-      ...routes.map((item) => _ProfileLinkRow(icon: Icons.bookmark_outline, title: item.label, subtitle: item.available ? '已收进私人书架' : '内容暂时不可用', onTap: onOpenShelf)),
+        Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(15, 16, 15, 16),
+            decoration: const BoxDecoration(
+                color: AppColors.white,
+                border: Border(bottom: BorderSide(color: AppColors.line))),
+            child: Row(children: [
+              const DiscoveryIcon(DiscoveryMark.bookmark,
+                  size: 21, color: AppColors.terracotta),
+              const SizedBox(width: 11),
+              Expanded(
+                  child: Text('还没有收藏。去路线里留下一本想翻的城市手册。',
+                      style: discoverySans(11, height: 1.65))),
+              const Icon(Icons.arrow_forward,
+                  size: 17, color: AppColors.terracotta)
+            ])),
+      ...routes.map((item) => _ProfileLinkRow(
+          icon: Icons.bookmark_outline,
+          title: item.label,
+          subtitle: item.available ? '已收进私人书架' : '内容暂时不可用',
+          onTap: onOpenShelf)),
       const SizedBox(height: 9),
-      Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: onOpenShelf, icon: const Icon(Icons.arrow_outward, size: 16), label: const Text('打开完整书架'))),
+      Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+              onPressed: onOpenShelf,
+              icon: const Icon(Icons.arrow_outward, size: 16),
+              label: const Text('打开完整书架'))),
     ]);
   }
 }
@@ -269,11 +362,13 @@ class _ProfileEmptyFootprints extends StatelessWidget {
                 children: [
                   Text(title, style: discoverySerif(16)),
                   const SizedBox(height: 3),
-                  Text(message, style: discoverySans(10, color: AppColors.textMuted)),
+                  Text(message,
+                      style: discoverySans(10, color: AppColors.textMuted)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward, size: 17, color: AppColors.terracotta),
+            const Icon(Icons.arrow_forward,
+                size: 17, color: AppColors.terracotta),
           ],
         ),
       ),
@@ -282,11 +377,37 @@ class _ProfileEmptyFootprints extends StatelessWidget {
 }
 
 class _ProfileLinkRow extends StatelessWidget {
-  const _ProfileLinkRow({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  const _ProfileLinkRow(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap, child: Container(width: double.infinity, constraints: const BoxConstraints(minHeight: 64), padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11), decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.line))), child: Row(children: [Icon(icon, size: 19, color: AppColors.terracotta), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: discoverySerif(15)), const SizedBox(height: 2), Text(subtitle, style: discoverySans(10, color: AppColors.textMuted))])), const Icon(Icons.arrow_forward, size: 17, color: AppColors.terracotta)])));
+  Widget build(BuildContext context) => InkWell(
+      onTap: onTap,
+      child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.line))),
+          child: Row(children: [
+            Icon(icon, size: 19, color: AppColors.terracotta),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title, style: discoverySerif(15)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: discoverySans(10, color: AppColors.textMuted))
+                ])),
+            const Icon(Icons.arrow_forward,
+                size: 17, color: AppColors.terracotta)
+          ])));
 }

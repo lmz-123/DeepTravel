@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,7 @@ import 'widgets/discovery_art.dart';
 import 'widgets/traveler_bottom_navigation.dart';
 
 part 'discovery_journal.dart';
+part 'discovery_journal_collage.dart';
 part 'discovery_atlas.dart';
 part 'discovery_shelf.dart';
 part 'discovery_companion.dart';

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/app.dart';
 import 'package:jiandi/core/router/app_router.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
+import 'package:jiandi/features/experience/data/demo_content.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/domain/discovery_location.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
@@ -12,6 +13,34 @@ import 'package:jiandi/features/experience/presentation/discovery_controller.dar
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 
 void main() {
+  testWidgets('app routes cannot reopen the retired traveler drawer',
+      (tester) async {
+    await _pumpApp(tester);
+    await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
+    await tester.pumpAndSettle();
+    expect(find.text('PRIVATE FILE / 见地档案'), findsOneWidget);
+    expect(find.byTooltip('打开旅行者菜单'), findsNothing);
+    expect(find.byType(Drawer, skipOffstage: false), findsNothing);
+
+    await tester.dragFrom(const Offset(1, 300), const Offset(280, 0));
+    await tester.pumpAndSettle();
+    expect(find.byType(Drawer, skipOffstage: false), findsNothing);
+    expect(find.text('PRIVATE FILE / 见地档案'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(appRouter.routeInformationProvider.value.uri.path, '/');
+    expect(find.bySemanticsLabel(RegExp('打开个人档案')), findsOneWidget);
+
+    appRouter.go('/profile');
+    await tester.pumpAndSettle();
+    expect(find.text('PRIVATE FILE / 见地档案'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(appRouter.routeInformationProvider.value.uri.path, '/');
+    expect(find.bySemanticsLabel(RegExp('打开个人档案')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('journal route opens a quiet full chapter directory',
       (tester) async {
     await _pumpApp(tester);
@@ -29,6 +58,9 @@ void main() {
     final entrance = find.byKey(const ValueKey('city-short-stories-action'));
     await tester.scrollUntilVisible(entrance, 420,
         scrollable: _verticalScrollable().first);
+    // Bring it above the floating navigation, not merely inside the viewport.
+    await Scrollable.ensureVisible(tester.element(entrance), alignment: .35);
+    await tester.pumpAndSettle();
     await tester.tap(entrance);
     await tester.pumpAndSettle();
     await tester
@@ -65,7 +97,7 @@ void main() {
       'saved reading-only journey link returns to its manual without GPS and supports back',
       (tester) async {
     final tracker = _NoTourLocation();
-    final repository = DemoExperienceRepository(latency: Duration.zero);
+    final repository = _PublishedDemoRepository();
     await _pumpApp(tester, repository: repository, locationTracker: tracker);
     final container = ProviderScope.containerOf(
         tester.element(find.byType(JiandiApp)),
@@ -171,8 +203,8 @@ Future<void> _pumpApp(WidgetTester tester,
   addTearDown(() => tester.binding.setSurfaceSize(null));
   appRouter.go('/');
   await tester.pumpWidget(ProviderScope(overrides: [
-    experienceRepositoryProvider.overrideWithValue(
-        repository ?? DemoExperienceRepository(latency: Duration.zero)),
+    experienceRepositoryProvider
+        .overrideWithValue(repository ?? _PublishedDemoRepository()),
     currentLocationSourceProvider.overrideWithValue(_NoLocation()),
     if (locationTracker != null)
       locationTrackerProvider.overrideWithValue(locationTracker),
@@ -183,6 +215,7 @@ Future<void> _pumpApp(WidgetTester tester,
 Future<void> _openFeatured(WidgetTester tester) async {
   final card = find.byKey(const ValueKey('route-card-wukang-urban-slices'));
   await tester.ensureVisible(card);
+  await tester.pumpAndSettle();
   await tester.tap(card);
   await tester.pumpAndSettle();
 }
@@ -201,9 +234,49 @@ class _NoLocation implements CurrentLocationSource {
           DiscoveryLocationFailureReason.serviceDisabled);
 }
 
-class _RecordingRepository extends DemoExperienceRepository {
-  _RecordingRepository() : super(latency: Duration.zero);
+// The production demo stays unverified. Navigation tests explicitly use a
+// published fixture so they exercise the same journal eligibility as the API.
+class _PublishedDemoRepository extends DemoExperienceRepository {
+  _PublishedDemoRepository() : super(latency: Duration.zero);
 
+  @override
+  Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async =>
+      CityDiscoveryCatalog(routes: [_publishedDemoRoute]);
+
+  @override
+  Future<RouteExperience> routeBySlug(String slug) async {
+    if (slug != demoRoute.slug) throw StateError('路线不存在');
+    return _publishedDemoRoute;
+  }
+}
+
+final _publishedDemoRoute = RouteExperience(
+  id: demoRoute.id,
+  slug: demoRoute.slug,
+  title: demoRoute.title,
+  subtitle: demoRoute.subtitle,
+  description: demoRoute.description,
+  durationMinutes: demoRoute.durationMinutes,
+  distanceKm: demoRoute.distanceKm,
+  difficulty: demoRoute.difficulty,
+  theme: demoRoute.theme,
+  heroImage: demoRoute.heroImage,
+  contentStatus: 'published',
+  stops: demoRoute.stops,
+  isFeatured: demoRoute.isFeatured,
+  stopCount: demoRoute.stopCount,
+  audioTour: demoRoute.audioTour,
+  manualChapters: demoRoute.manualChapters,
+  district: demoRoute.district,
+  cityName: demoRoute.cityName,
+  citySlug: demoRoute.citySlug,
+  pretrip: demoRoute.pretrip,
+  predeparture: demoRoute.predeparture,
+  centerLatitude: demoRoute.centerLatitude,
+  centerLongitude: demoRoute.centerLongitude,
+);
+
+class _RecordingRepository extends _PublishedDemoRepository {
   String? requestedCity;
 
   @override

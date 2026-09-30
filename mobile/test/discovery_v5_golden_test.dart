@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -100,10 +102,85 @@ void main() {
             find.byKey(const ValueKey('golden-screen')),
             matchesGoldenFile('goldens/discovery-$tab-${width.toInt()}.png'),
           );
+          const motionOutput = String.fromEnvironment('JOURNAL_MOTION_OUTPUT');
+          if (motionOutput.isNotEmpty && tab == 'journal' && width == 390) {
+            await _captureJournalMotion(tester, motionOutput);
+          }
+          if (tab == 'journal' && width == 390) {
+            await _checkCollageKeyframes(tester);
+          }
         }, createHttpClient: (_) => _FixtureClient(pictures));
       });
     }
   }
+}
+
+/// Lock the approved layering at early/middle/late positions in both directions.
+/// Driving the real gesture also covers the full-width hit area and finger sync.
+Future<void> _checkCollageKeyframes(WidgetTester tester) async {
+  for (final direction in [1, -1]) {
+    final gesture =
+        await tester.startGesture(Offset(direction > 0 ? 385 : 5, 390));
+    var previous = 0.0;
+    for (final progress in direction > 0 ? [.24, .48, .76] : [.48]) {
+      await gesture
+          .moveBy(Offset(-direction * (progress - previous) * 390 * .78, 0));
+      previous = progress;
+      await tester.pump(const Duration(milliseconds: 200));
+      await expectLater(
+        find.byKey(const ValueKey('golden-screen')),
+        matchesGoldenFile(
+            'goldens/discovery-collage-${direction > 0 ? 'next' : 'previous'}-${(progress * 100).round()}.png'),
+      );
+    }
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(find.text('大梅沙'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  }
+}
+
+/// Optional real-widget filmstrip, using the same images and fonts as goldens.
+/// flutter test --dart-define=JOURNAL_MOTION_OUTPUT=/tmp/journal-motion \
+///   test/discovery_v5_golden_test.dart --plain-name "journal approved typography 390"
+Future<void> _captureJournalMotion(WidgetTester tester, String output) async {
+  final directory = Directory(output)..createSync(recursive: true);
+  var frame = 0;
+  Future<void> capture() async {
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('golden-screen')),
+    );
+    await tester.runAsync(() async {
+      final image = await boundary.toImage();
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      await File(
+        '${directory.path}/frame-${(frame++).toString().padLeft(3, '0')}.png',
+      ).writeAsBytes(bytes!.buffer.asUint8List());
+    });
+  }
+
+  Future<void> frames(int count) async {
+    for (var i = 0; i < count; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      await capture();
+    }
+  }
+
+  await frames(25);
+  final gesture = await tester.startGesture(const Offset(285, 390));
+  await gesture.moveBy(const Offset(-20, 0));
+  for (var i = 0; i < 16; i++) {
+    await gesture.moveBy(const Offset(-9, 0),
+        timeStamp: Duration(milliseconds: (i + 1) * 20));
+    await frames(1);
+  }
+  await gesture.up(timeStamp: const Duration(milliseconds: 360));
+  await frames(50);
+  await tester.tap(find.byTooltip('上一期随刊'));
+  await frames(55);
+  expect(find.text('大梅沙'), findsOneWidget);
+  expect(tester.takeException(), isNull);
 }
 
 class _GoldenTour extends ActiveTourController {
