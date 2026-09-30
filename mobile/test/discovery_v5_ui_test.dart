@@ -86,12 +86,78 @@ void main() {
     expect(find.text('不赶路，'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('journal includes all four Shenzhen routes with featured first', (
+    tester,
+  ) async {
+    await _pump(tester, controller: _JournalDiscovery(_shenzhenRoutes));
+    const order = [
+      'nantou-time-layers',
+      'shenzhen-mixc-world',
+      'shenzhen-dameisha',
+      'shenzhen-wutong-mountain',
+    ];
+    for (var i = 0; i < order.length; i++) {
+      expect(find.text(' / 04'), findsOneWidget);
+      expect(find.text('${i + 1}'.padLeft(2, '0')), findsOneWidget);
+      expect(find.byKey(ValueKey('route-card-${order[i]}')), findsOneWidget);
+      await tester.tap(find.byTooltip('下一期随刊'));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const ValueKey('route-card-nantou-time-layers')),
+        findsOneWidget);
+    await tester.tap(find.byTooltip('上一期随刊'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('route-card-shenzhen-wutong-mountain')),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('journal without featured routes preserves every route and order',
+      (
+    tester,
+  ) async {
+    final routes = _shenzhenRoutes.where((route) => !route.isFeatured).toList();
+    await _pump(tester, controller: _JournalDiscovery(routes));
+    for (final route in routes) {
+      expect(find.text(' / 03'), findsOneWidget);
+      expect(find.byKey(ValueKey('route-card-${route.slug}')), findsOneWidget);
+      await tester.drag(
+        find.byWidgetPredicate((widget) =>
+            widget is GestureDetector && widget.onHorizontalDragEnd != null),
+        const Offset(-160, 0),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(ValueKey('route-card-${routes.first.slug}')),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('switching cities resets the journal to its first issue', (
+    tester,
+  ) async {
+    await _pump(tester, controller: _JournalDiscovery(_shenzhenRoutes));
+    await tester.tap(find.byTooltip('下一期随刊'));
+    await tester.pumpAndSettle();
+    expect(find.text('02'), findsOneWidget);
+    await tester.tap(find.byTooltip('选择城市'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('广州'));
+    await tester.pumpAndSettle();
+    expect(find.text('01'), findsOneWidget);
+    expect(find.text(' / 02'), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-card-guangzhou-first')),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pump(
   WidgetTester tester, {
   Size size = const Size(390, 844),
   String? tab,
+  DiscoveryController? controller,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -119,7 +185,9 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         currentUserIdProvider.overrideWithValue(null),
-        discoveryControllerProvider.overrideWith(_TestDiscovery.new),
+        discoveryControllerProvider.overrideWith(
+          () => controller ?? _TestDiscovery(),
+        ),
         activeTourControllerProvider.overrideWith(_TestTour.new),
       ],
       child: MaterialApp.router(routerConfig: router, theme: AppTheme.light),
@@ -175,3 +243,74 @@ const _city = CityExperience(
   subtitle: '城市故事',
   heroImage: '',
 );
+
+const _shenzhen = CityExperience(
+  id: 'shenzhen',
+  slug: 'shenzhen',
+  name: '深圳',
+  subtitle: '',
+  heroImage: '',
+);
+const _guangzhou = CityExperience(
+  id: 'guangzhou',
+  slug: 'guangzhou',
+  name: '广州',
+  subtitle: '',
+  heroImage: '',
+);
+
+// Reproduce the original Shenzhen failure: only Nantou was featured. Place it
+// after two regular routes to verify promotion preserves each group's order.
+final _shenzhenRoutes = [
+  _journalRoute('shenzhen-mixc-world', '万象天地'),
+  _journalRoute('shenzhen-dameisha', '大梅沙'),
+  _journalRoute('nantou-time-layers', '南头古城', featured: true),
+  _journalRoute('shenzhen-wutong-mountain', '梧桐山'),
+];
+
+RouteExperience _journalRoute(String slug, String title,
+        {bool featured = false}) =>
+    RouteExperience(
+      id: slug,
+      slug: slug,
+      title: title,
+      subtitle: '城市故事',
+      description: '步行路线',
+      durationMinutes: 45,
+      distanceKm: 1.5,
+      difficulty: '轻松',
+      theme: '街区',
+      heroImage: '',
+      contentStatus: 'published',
+      stops: const [],
+      isFeatured: featured,
+    );
+
+class _JournalDiscovery extends DiscoveryController {
+  _JournalDiscovery(this.routes);
+  final List<RouteExperience> routes;
+
+  DiscoveryState _state(CityExperience city, List<RouteExperience> routes) =>
+      DiscoveryState(
+        cities: const [_shenzhen, _guangzhou],
+        city: city,
+        catalog: CityDiscoveryCatalog(routes: routes),
+        cards: routes.map((route) => ScenicAreaCard(route: route)).toList(),
+        revision: 0,
+      );
+
+  @override
+  Future<DiscoveryState> build() async => _state(_shenzhen, routes);
+
+  @override
+  Future<DiscoveryStartupAction> prepareColdStart() async =>
+      DiscoveryStartupAction.completed;
+
+  @override
+  Future<void> switchCity(String citySlug) async {
+    state = AsyncData(_state(_guangzhou, [
+      _journalRoute('guangzhou-first', '广州第一站'),
+      _journalRoute('guangzhou-second', '广州第二站'),
+    ]));
+  }
+}

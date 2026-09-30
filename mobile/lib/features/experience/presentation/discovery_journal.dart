@@ -32,9 +32,14 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal> {
 
   @override
   Widget build(BuildContext context) {
-    final routes = widget.state.cards.map((card) => card.route).toList();
-    final featured = routes.where((route) => route.isFeatured).toList();
-    final issues = featured.isEmpty ? routes : featured;
+    final routes = widget.state.cards
+        .map((card) => card.route)
+        .where((route) => route.isPublished)
+        .toList();
+    final issues = [
+      ...routes.where((route) => route.isFeatured),
+      ...routes.where((route) => !route.isFeatured),
+    ];
     final narrow = MediaQuery.sizeOf(context).width <= 360;
     final pad = narrow ? 20.0 : 23.0;
     final route = issues.isEmpty ? null : issues[_edition % issues.length];

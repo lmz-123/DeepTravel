@@ -14,7 +14,7 @@
     "difficulty": "轻松",
     "theme": "建筑与公共艺术",
     "hero_image": "public/content/2026/09/575f6d6dab367506c09d0e7c60212976ec0929a832c7bf23aa4f4ec911cba8d4.jpg",
-    "is_featured": false,
+    "is_featured": true,
     "content_status": "published",
     "published_at": "2026-09-30T13:02:44",
     "is_public_visible": true,

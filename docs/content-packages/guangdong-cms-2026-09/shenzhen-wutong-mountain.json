@@ -14,7 +14,7 @@
     "difficulty": "山地徒步",
     "theme": "山林与城市边界",
     "hero_image": "public/content/2026/09/b43bf1c695c393a3b32db698e11e679bbc7510b09117f75fa6080c93e98ced54.jpg",
-    "is_featured": false,
+    "is_featured": true,
     "content_status": "published",
     "published_at": "2026-09-30T13:02:43",
     "is_public_visible": true,

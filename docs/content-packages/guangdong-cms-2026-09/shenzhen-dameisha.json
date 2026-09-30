@@ -14,7 +14,7 @@
     "difficulty": "轻松",
     "theme": "海岸与公共空间",
     "hero_image": "public/content/2026/09/63950cddafd925b9befb9ab991cd8b863fc6abe2665a05dd723d0dfcaed85b1e.jpg",
-    "is_featured": false,
+    "is_featured": true,
     "content_status": "published",
     "published_at": "2026-09-30T13:02:42",
     "is_public_visible": true,
