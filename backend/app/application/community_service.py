@@ -10,6 +10,7 @@ from uuid import uuid4
 from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
+from app.application.community_discovery import CommunityDiscovery
 from app.domain.errors import FragmentOperationError, JourneyNotFoundError, ValidationError
 from app.infrastructure.persistence.models import (
     CommunityCommentModel,
@@ -21,6 +22,8 @@ from app.infrastructure.persistence.models import (
     JourneyFragmentModel,
     JourneyModel,
     PhotoMissionModel,
+    StoryFragmentModel,
+    TravelerFavoriteModel,
     UserModel,
 )
 
@@ -29,7 +32,7 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
-class CommunityService:
+class CommunityService(CommunityDiscovery):
     def __init__(
         self,
         session_factory,
@@ -132,7 +135,7 @@ class CommunityService:
     def create_post(
         self,
         user_id: str,
-        journey_id: str,
+        journey_id: str | None,
         fragment_id: str,
         *,
         category: str,
@@ -141,6 +144,7 @@ class CommunityService:
         idempotency_key: str,
         files: list,
         evidence_ids: list[str],
+        visited_on: str | None = None,
     ) -> dict:
         self._require_enabled()
         title = (title or "").strip() or None
@@ -158,9 +162,15 @@ class CommunityService:
         if not title and not body and not files and not evidence_ids:
             raise ValidationError("动态需要标题、文字或图片")
 
+        visited_on = self._visit_date(visited_on)
         staged: list[tuple[object, str]] = []
         with self.session_factory() as session:
-            self._authorize_journey_fragment(session, user_id, journey_id, fragment_id)
+            if journey_id is None:
+                self._published_place(session, fragment_id)
+                if evidence_ids:
+                    raise ValidationError("足迹照片需要从原旅程中选择")
+            else:
+                self._authorize_journey_fragment(session, user_id, journey_id, fragment_id)
             duplicate = session.scalar(
                 select(CommunityPostModel).where(
                     CommunityPostModel.author_user_id == user_id,
@@ -213,6 +223,7 @@ class CommunityService:
                     fragment_id=fragment_id,
                     author_user_id=user_id,
                     category=category,
+                    visited_on=visited_on,
                     title=title,
                     body=body,
                     status="visible",
@@ -580,9 +591,7 @@ class CommunityService:
             reply_to_author = (
                 session.get(UserModel, reply_to.author_user_id) if reply_to is not None else None
             )
-            return self._comment_payload(
-                comment, author, user_id, reply_to_author=reply_to_author
-            )
+            return self._comment_payload(comment, author, user_id, reply_to_author=reply_to_author)
 
     def delete_post(self, user_id: str, post_id: str) -> dict:
         self._require_enabled()
@@ -749,12 +758,30 @@ class CommunityService:
                 )
             )
         )
+        places = {
+            row[0].id: self._place_payload(row)
+            for row in session.execute(
+                self._place_query().where(StoryFragmentModel.id.in_({p.fragment_id for p in posts}))
+            )
+        }
+        saved = set(
+            session.scalars(
+                select(TravelerFavoriteModel.target_id).where(
+                    TravelerFavoriteModel.user_id == user_id,
+                    TravelerFavoriteModel.target_kind == "community_post",
+                    TravelerFavoriteModel.target_id.in_(post_ids),
+                )
+            )
+        )
         result = []
         for post in posts:
             body = post.body or ""
             item = {
                 "id": post.id,
                 "fragment_id": post.fragment_id,
+                "place": places.get(post.fragment_id),
+                "visited_on": post.visited_on,
+                "viewer_has_saved": post.id in saved,
                 "category": post.category,
                 "category_label": self._category_label(post.category),
                 "traveler_content": True,
@@ -962,8 +989,12 @@ class CommunityService:
             )
         return state
 
-    @staticmethod
-    def _authorize_fragment(session, user_id: str, fragment_id: str):
+    def _authorize_fragment(self, session, user_id: str, fragment_id: str):
+        # Explicitly published copies can be read before starting a walk.
+        try:
+            return self._published_place(session, fragment_id)
+        except FragmentOperationError:
+            pass
         state = session.scalar(
             select(JourneyFragmentModel)
             .join(JourneyModel, JourneyModel.id == JourneyFragmentModel.journey_id)

@@ -44,6 +44,7 @@ void main() {
     addTearDown(() => directory.delete(recursive: true));
     final store = SqliteTourStore(
       databasePath: paths.join(directory.path, 'tour.db'),
+      draftDirectory: paths.join(directory.path, 'community_drafts'),
     );
     await store.saveJson('active_tour', {'journey_id': 'tester-a-journey'});
     await store.saveJson('offline_package_route-a', {
@@ -63,7 +64,16 @@ void main() {
       128,
     );
 
+    final draftPhoto = File(
+        paths.join(directory.path, 'community_drafts', 'user', 'photo.jpg'));
+    await draftPhoto.parent.create(recursive: true);
+    await draftPhoto.writeAsBytes([1, 2, 3]);
+    await store.saveJson('community_draft_user', {
+      'photos': [draftPhoto.path]
+    });
     await store.clearPrivateData();
+    expect(await draftPhoto.exists(), isFalse);
+    expect(await store.readJson('community_draft_user'), isNull);
 
     expect(await store.readJson('active_tour'), isNull);
     expect(
@@ -89,6 +99,7 @@ void main() {
     addTearDown(() => directory.delete(recursive: true));
     final store = SqliteTourStore(
       databasePath: paths.join(directory.path, 'tour.db'),
+      draftDirectory: paths.join(directory.path, 'community_drafts'),
     );
     final firstFile = File(paths.join(directory.path, 'first.m4a'));
     final secondFile = File(paths.join(directory.path, 'second.m4a'));

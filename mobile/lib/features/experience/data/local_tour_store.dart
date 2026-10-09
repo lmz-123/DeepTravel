@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:path/path.dart' as paths;
 import 'package:sqflite/sqflite.dart';
@@ -6,9 +8,10 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/tour_runtime.dart';
 
 class SqliteTourStore implements TourStore {
-  SqliteTourStore({this.databasePath});
+  SqliteTourStore({this.databasePath, this.draftDirectory});
 
   final String? databasePath;
+  final String? draftDirectory;
   Database? _database;
 
   Future<Database> get _db async {
@@ -40,6 +43,11 @@ class SqliteTourStore implements TourStore {
       );
       await transaction.delete('outbox');
     });
+    final root = draftDirectory ??
+        paths.join(
+            (await getApplicationSupportDirectory()).path, 'community_drafts');
+    final drafts = Directory(root);
+    if (await drafts.exists()) await drafts.delete(recursive: true);
   }
 
   @override

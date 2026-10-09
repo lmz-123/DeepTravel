@@ -883,6 +883,7 @@ class CommunityPostModel(Base):
     author_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     category: Mapped[str] = mapped_column(String(40), index=True)
     title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    visited_on: Mapped[str | None] = mapped_column(String(10), nullable=True)
     body: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="visible", index=True)
     report_count: Mapped[int] = mapped_column(Integer, default=0)

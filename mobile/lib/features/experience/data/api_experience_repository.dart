@@ -561,6 +561,42 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
+  Future<List<CommunityPlace>> communityPlaces() async {
+    await _ensureAuth();
+    final response = await _request(
+        () => _dio.get('/community-places', options: _authorized));
+    return (response.data['data'] as List)
+        .map((item) =>
+            CommunityPlace.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList();
+  }
+
+  @override
+  Future<CommunityPage<CommunityPost>> discoverCommunity(
+      {String? citySlug, String? cursor, int limit = 12}) async {
+    await _ensureAuth();
+    final response = await _request(() =>
+        _dio.get('/community-posts', options: _authorized, queryParameters: {
+          'limit': limit,
+          if (citySlug != null) 'city': citySlug,
+          if (cursor != null) 'cursor': cursor
+        }));
+    return _communityPage(response.data['data'], CommunityPost.fromJson);
+  }
+
+  @override
+  Future<CommunityPost> shareCommunityPost(
+          String fragmentId, CommunityPostDraft draft) =>
+      createCommunityPost('', fragmentId, draft);
+
+  @override
+  Future<void> setCommunitySaved(String postId, bool saved) async {
+    await _ensureAuth();
+    await _request(() => _dio.request('/community-posts/$postId/saved',
+        options: _authorized.copyWith(method: saved ? 'PUT' : 'DELETE')));
+  }
+
+  @override
   Future<CommunityPolicy> communityPolicy() async {
     await _ensureAuth();
     final response = await _request(
@@ -668,6 +704,7 @@ class ApiExperienceRepository implements ExperienceRepository {
     form.fields.addAll([
       MapEntry('category', draft.category.id),
       MapEntry('idempotency_key', draft.idempotencyKey),
+      if (draft.visitedOn != null) MapEntry('visited_on', draft.visitedOn!),
       if (draft.title != null) MapEntry('title', draft.title!),
       if (draft.body != null) MapEntry('body', draft.body!),
       ...draft.evidenceIds.map((id) => MapEntry('evidence_ids[]', id)),
@@ -676,7 +713,9 @@ class ApiExperienceRepository implements ExperienceRepository {
       form.files.add(MapEntry('photos[]', await MultipartFile.fromFile(path)));
     }
     final response = await _request(() => _dio.post(
-          '/journeys/$journeyId/fragments/$fragmentId/community-posts',
+          journeyId.isEmpty
+              ? '/community-places/$fragmentId/posts'
+              : '/journeys/$journeyId/fragments/$fragmentId/community-posts',
           data: form,
           options: _authorized.copyWith(
             contentType: 'multipart/form-data',

@@ -1,4 +1,6 @@
 import 'package:go_router/go_router.dart';
+import '../../features/experience/presentation/community/note_detail_page.dart';
+import '../../features/experience/presentation/community/note_compose_page.dart';
 
 import '../../features/experience/presentation/discovery_page.dart';
 import '../../features/experience/presentation/footprint_detail_page.dart';
@@ -13,9 +15,18 @@ import '../../features/experience/presentation/profile_page.dart';
 final appRouter = GoRouter(
   routes: [
     GoRoute(
+        path: '/community/write',
+        builder: (context, state) =>
+            NoteComposePage(fragmentId: state.uri.queryParameters['fragment'])),
+    GoRoute(
+        path: '/community/post/:id',
+        builder: (context, state) =>
+            NoteDetailPage(postId: state.pathParameters['id']!)),
+    GoRoute(
       path: '/',
       builder: (context, state) => DiscoveryPage(
         initialTab: state.uri.queryParameters['tab'],
+        initialCompanionFragmentId: state.uri.queryParameters['fragment'],
         initialCompanionRouteSlug: state.uri.queryParameters['route'],
         initialCompanionRequestId: state.uri.queryParameters['selection'],
       ),

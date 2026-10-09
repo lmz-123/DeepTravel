@@ -1,0 +1,288 @@
+<div id="jd-community-preview" class="viz-dotted-background">
+  <div class="jc-phone" aria-label="见地 · 见闻社区设计">
+    <div class="jc-stage"></div>
+    <div class="jc-toast" role="status" aria-live="polite"></div>
+  </div>
+</div>
+<style>
+#jd-community-preview{padding:20px 0; color-scheme:light;}
+#jd-community-preview .jc-phone{--paper:#f5f0e7;--ink:#30372d;--red:#c84832;--quiet:#807664;--line:#d7d2c5;--lime:#dce58d;--serif:'Songti SC','Noto Serif SC','STSong',serif;position:relative;width:100%;max-width:390px;margin:auto;background:var(--paper);color:var(--ink);font-family:-apple-system,'PingFang SC',sans-serif;border-radius:6px;overflow:hidden;box-shadow:0 12px 45px #30372d0d;font-size:14px;line-height:1.6;}
+#jd-community-preview *{box-sizing:border-box;}
+#jd-community-preview button,#jd-community-preview input,#jd-community-preview textarea,#jd-community-preview select{font:inherit;color:inherit;}
+#jd-community-preview button{background:none;border:0;padding:0;cursor:pointer;text-align:inherit;}
+#jd-community-preview button:focus-visible,#jd-community-preview a:focus-visible{outline:2px solid var(--red);outline-offset:4px;}
+#jd-community-preview button:disabled{opacity:.4;cursor:default;}
+#jd-community-preview button svg{flex:none;width:17px;height:17px;stroke-width:1.5;}
+#jd-community-preview p,#jd-community-preview h1,#jd-community-preview h2,#jd-community-preview h3{margin:0;}
+#jd-community-preview img{display:block;max-width:100%;object-fit:cover;}
+#jd-community-preview .jc-serif{font-family:var(--serif);}
+#jd-community-preview .jc-en{font:italic 12px Georgia,serif;letter-spacing:.6px;}
+#jd-community-preview .jc-muted{color:var(--quiet);font-size:11px;}
+#jd-community-preview .jc-red{color:var(--red);}
+#jd-community-preview .jc-header{height:78px;margin:0 23px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+#jd-community-preview .jc-brand{display:flex;align-items:center;gap:12px;}
+#jd-community-preview .jc-brand strong{display:block;font:600 26px/1.15 var(--serif);letter-spacing:1px;}
+#jd-community-preview .jc-brand small{font-size:6px;letter-spacing:.65px;color:var(--quiet);display:block;margin-top:5px;}
+#jd-community-preview .jc-logo{width:29px;height:34px;position:relative;flex:none;}
+#jd-community-preview .jc-logo:before,#jd-community-preview .jc-logo:after{content:'';position:absolute;inset:3px 1px;border:1px solid var(--red);border-radius:50%;transform:rotate(34deg);}
+#jd-community-preview .jc-logo:after{inset:9px -1px 9px -1px;transform:rotate(-37deg);}
+#jd-community-preview .jc-city{font-size:11px;white-space:nowrap;}
+#jd-community-preview .jc-city span{padding:0 6px;color:var(--red);}
+#jd-community-preview .jc-body{padding:0 23px 24px;min-height:658px;}
+#jd-community-preview .jc-heading{display:flex;align-items:flex-end;justify-content:space-between;padding:24px 0 18px;gap:10px;}
+#jd-community-preview .jc-heading h1{font:500 46px/1.1 var(--serif);letter-spacing:2px;}
+#jd-community-preview .jc-heading .jc-en{display:block;color:var(--quiet);font-size:10px;margin-top:10px;}
+#jd-community-preview .jc-write{display:flex;align-items:center;gap:7px;min-height:44px;color:var(--red);font-family:var(--serif);font-size:14px;border-bottom:1px solid var(--red);}
+#jd-community-preview .jc-tabs{display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--line);margin-bottom:21px;}
+#jd-community-preview .jc-tabs button{min-height:42px;color:var(--quiet);position:relative;font-size:13px;}
+#jd-community-preview .jc-tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;}
+#jd-community-preview .jc-tabs button[aria-selected="true"]:after{content:'';height:2px;background:var(--red);position:absolute;bottom:-1px;left:0;right:0;}
+#jd-community-preview .jc-tabs .jc-tab-end{margin-left:auto;color:var(--quiet);font-size:11px;letter-spacing:1px;}
+#jd-community-preview .jc-byline{display:flex;align-items:center;gap:9px;min-height:36px;margin-bottom:13px;}
+#jd-community-preview .jc-avatar{width:29px;height:29px;border-radius:50%;display:grid;place-items:center;background:#e0e5cd;font:15px var(--serif);flex:none;}
+#jd-community-preview .jc-avatar.sand{background:#e8decd;}
+#jd-community-preview .jc-author{font-size:12px;line-height:1.6;}
+#jd-community-preview .jc-author small{display:block;color:var(--quiet);font-size:10px;}
+#jd-community-preview .jc-follow{margin-left:auto;min-width:44px;min-height:44px;font-size:11px;color:var(--red);text-align:right;}
+#jd-community-preview .jc-photo{position:relative;width:100%;display:block;}
+#jd-community-preview .jc-photo img{height:249px;width:100%;border-radius:0 42px 0 0;}
+#jd-community-preview .jc-photo:after{content:attr(data-caption);position:absolute;bottom:0;left:0;padding:9px 15px 0 0;background:var(--paper);font:italic 11px Georgia,var(--serif);color:var(--quiet);border-top-right-radius:16px;}
+#jd-community-preview .jc-photo-title{margin-top:17px;display:block;width:100%;}
+#jd-community-preview .jc-photo-title h2{font:500 23px/1.5 var(--serif);letter-spacing:.2px;}
+#jd-community-preview .jc-excerpt{font-size:12px;line-height:1.9;color:#626656;margin-top:7px;}
+#jd-community-preview .jc-location{display:flex;align-items:center;gap:6px;min-height:44px;font-size:11px;color:var(--quiet);max-width:100%;}
+#jd-community-preview .jc-location svg{width:13px;height:13px;color:var(--red);}
+#jd-community-preview .jc-location .jc-chevron{margin-left:3px;color:var(--quiet);}
+#jd-community-preview .jc-actions{display:flex;gap:21px;align-items:center;padding:2px 0 12px;}
+#jd-community-preview .jc-actions button{min-height:36px;min-width:44px;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--quiet);}
+#jd-community-preview .jc-actions button:last-child{margin-left:auto;}
+#jd-community-preview .jc-actions button[aria-pressed="true"]{color:var(--red);}
+#jd-community-preview .jc-actions button[aria-pressed="true"] svg{fill:#c8483217;}
+#jd-community-preview article+article:not(.jc-question){border-top:1px solid var(--line);padding-top:20px;}
+#jd-community-preview .jc-question{border-top:1px solid var(--line);padding:20px 0 5px;}
+#jd-community-preview .jc-question-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+#jd-community-preview .jc-question-head .jc-stamp{font:12px var(--serif);color:var(--red);border:1px solid #c8483270;padding:2px 5px;transform:rotate(-4deg);}
+#jd-community-preview .jc-question h2{font:20px/1.6 var(--serif);}
+#jd-community-preview .jc-answer-preview{margin:7px 0 10px;border-left:2px solid #c7ceb0;padding-left:10px;color:var(--quiet);font-size:11px;line-height:1.8;}
+#jd-community-preview .jc-nav{margin:0 23px 20px;display:flex;align-items:center;justify-content:space-around;border:1px solid #dfdace;border-radius:5px;height:64px;background:#f8f4eb;}
+#jd-community-preview .jc-nav button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:58px;width:33.3%;position:relative;font-size:12px;color:var(--quiet);}
+#jd-community-preview .jc-nav button[aria-current="page"]{color:var(--red);}
+#jd-community-preview .jc-nav button[aria-current="page"]:after{content:'';position:absolute;width:3px;height:3px;background:var(--red);bottom:9px;border-radius:50%;left:50%;}
+#jd-community-preview .jc-native-pin{width:16px;height:18px;object-fit:contain;}
+#jd-community-preview .jc-top{height:68px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);margin-bottom:24px;}
+#jd-community-preview .jc-back{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--quiet);min-height:44px;}
+#jd-community-preview .jc-iconbutton{min-width:44px;min-height:44px;display:grid;place-items:center;}
+#jd-community-preview .jc-detail .jc-photo img{height:275px;}
+#jd-community-preview .jc-detail .jc-photo-title{margin:17px 0 11px;}
+#jd-community-preview .jc-detail .jc-photo-title h1{font:27px/1.5 var(--serif);}
+#jd-community-preview .jc-prose{font-size:13px;line-height:2;color:#525748;white-space:pre-line;}
+#jd-community-preview .jc-visit{margin-top:15px;font-size:11px;color:var(--quiet);}
+#jd-community-preview .jc-place-slip{display:flex;gap:13px;align-items:center;width:100%;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:15px 0;margin:16px 0 3px;}
+#jd-community-preview .jc-place-slip img{width:54px;height:62px;border-radius:0 14px 0 0;}
+#jd-community-preview .jc-place-slip strong{display:block;font:18px var(--serif);margin-bottom:5px;}
+#jd-community-preview .jc-place-slip small{display:block;font-size:11px;color:var(--quiet);}
+#jd-community-preview .jc-place-slip svg{margin-left:auto;color:var(--red);}
+#jd-community-preview .jc-section-head{display:flex;justify-content:space-between;align-items:baseline;margin:22px 0 18px;}
+#jd-community-preview .jc-section-head h2{font:23px var(--serif);}
+#jd-community-preview .jc-section-head span{font:italic 13px Georgia;color:var(--quiet);}
+#jd-community-preview .jc-comment{display:flex;gap:10px;padding:0 0 19px;}
+#jd-community-preview .jc-comment .jc-comment-main{flex:1;min-width:0;}
+#jd-community-preview .jc-comment strong{font-weight:500;font-size:12px;}
+#jd-community-preview .jc-comment p{font-size:12px;line-height:1.9;margin-top:4px;color:#525748;}
+#jd-community-preview .jc-comment small{font-size:10px;color:var(--quiet);}
+#jd-community-preview .jc-comment-reply{padding:9px 10px;margin-top:10px;background:#e9e8dc;font-size:11px;line-height:1.8;}
+#jd-community-preview .jc-reply{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px;}
+#jd-community-preview .jc-reply input{width:0;flex:1;background:none;border:0;border-bottom:1px solid var(--line);font-size:16px;padding:10px 0;border-radius:0;}
+#jd-community-preview .jc-reply button{min-width:44px;min-height:44px;color:var(--red);font-family:var(--serif);}
+#jd-community-preview .jc-place-head{position:relative;margin-bottom:20px;}
+#jd-community-preview .jc-place-head .jc-kicker{display:flex;justify-content:space-between;font-size:11px;color:var(--quiet);margin-bottom:13px;}
+#jd-community-preview .jc-place-head h1{font:50px/1.25 var(--serif);position:relative;z-index:1;}
+#jd-community-preview .jc-place-head h1 span{background:var(--paper);padding-right:16px;border-radius:0 0 25px 0;}
+#jd-community-preview .jc-place-head img{height:200px;width:calc(100% - 24px);margin:-8px 0 0 24px;border-radius:0 54px 0 0;}
+#jd-community-preview .jc-point-title{font:25px/1.4 var(--serif);margin:20px 0 7px;}
+#jd-community-preview .jc-go-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:23px 0;margin:23px 0;gap:10px;}
+#jd-community-preview .jc-go-row strong{display:block;font:23px var(--serif);margin-bottom:4px;}
+#jd-community-preview .jc-go{font:17px var(--serif);color:var(--red);border-bottom:1px solid #c8483280;padding:9px 0;display:flex;gap:8px;align-items:center;white-space:nowrap;}
+#jd-community-preview .jc-note-row{border-bottom:1px solid var(--line);padding:15px 0;display:block;width:100%;}
+#jd-community-preview .jc-note-row p{font:18px/1.6 var(--serif);margin:7px 0;}
+#jd-community-preview .jc-note-row small{font-size:11px;color:var(--quiet);}
+#jd-community-preview .jc-publish-row{display:flex;justify-content:space-between;align-items:center;padding:20px 0;color:var(--red);font:16px var(--serif);width:100%;}
+#jd-community-preview .jc-companion-eyebrow{display:flex;justify-content:space-between;align-items:center;padding:19px 0 23px;font-size:10px;letter-spacing:1px;color:var(--quiet);}
+#jd-community-preview .jc-companion-eyebrow em{font:italic 21px Georgia;color:var(--red);}
+#jd-community-preview .jc-companion-caption{font-size:10px;letter-spacing:2px;color:var(--quiet);margin-bottom:12px;}
+#jd-community-preview .jc-companion-title{font:600 46px/1.3 var(--serif);letter-spacing:-2px;position:relative;}
+#jd-community-preview .jc-companion-title .jc-red{display:inline-block;position:relative;z-index:1;}
+#jd-community-preview .jc-companion-title .jc-red:after{content:'';position:absolute;height:7px;left:0;right:-7px;bottom:3px;background:var(--lime);border-radius:5px;transform:rotate(-2deg);z-index:-1;}
+#jd-community-preview .jc-companion-desc{font-size:11px;color:var(--quiet);line-height:1.9;margin-top:17px;}
+#jd-community-preview .jc-distance{position:relative;height:179px;margin:24px -23px 19px;background:linear-gradient(100deg,#e9edce,transparent 76%);display:grid;place-items:center;overflow:hidden;}
+#jd-community-preview .jc-orbit{position:relative;width:128px;height:128px;border:1px solid #cf432f5a;border-radius:50%;display:grid;place-content:center;text-align:center;transform:rotate(-12deg);}
+#jd-community-preview .jc-orbit:before,#jd-community-preview .jc-orbit:after{content:'';position:absolute;inset:-17px 6px;border:1px solid #cf432f45;border-radius:50%;transform:rotate(-26deg);}
+#jd-community-preview .jc-orbit:after{inset:3px -18px;transform:rotate(43deg);}
+#jd-community-preview .jc-orbit strong{font:italic 38px Georgia;color:var(--red);transform:rotate(12deg);}
+#jd-community-preview .jc-orbit small{font-size:10px;color:var(--quiet);transform:rotate(12deg);}
+#jd-community-preview .jc-location-status svg{display:inline-block;width:12px;height:12px;vertical-align:middle;}
+#jd-community-preview .jc-location-status{position:absolute;right:23px;top:13px;font-size:10px;color:var(--quiet);}
+#jd-community-preview .jc-distance .jc-distance-caption{position:absolute;bottom:12px;left:23px;font-size:8px;letter-spacing:1.5px;color:var(--quiet);}
+#jd-community-preview .jc-target{border-bottom:1px solid var(--line);padding-bottom:18px;}
+#jd-community-preview .jc-target h2{font:25px/1.5 var(--serif);margin-top:7px;}
+#jd-community-preview .jc-target button{display:flex;align-items:center;gap:5px;min-height:44px;font-size:11px;color:var(--red);}
+#jd-community-preview .jc-community-entry{margin-top:17px;border-bottom:1px solid var(--line);padding-bottom:14px;}
+#jd-community-preview .jc-entry-title{width:100%;display:flex;align-items:center;justify-content:space-between;font:19px var(--serif);min-height:44px;gap:6px;}
+#jd-community-preview .jc-entry-title span{color:var(--red);font:italic 16px Georgia;margin-left:auto;}
+#jd-community-preview .jc-entry-quote{font-size:12px;line-height:1.9;color:var(--quiet);border-left:2px solid #c7ceb0;padding-left:11px;margin:6px 0 10px;}
+#jd-community-preview .jc-entry-footer{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--quiet);gap:10px;}
+#jd-community-preview .jc-entry-footer button{min-height:44px;color:var(--red);font-family:var(--serif);font-size:13px;}
+#jd-community-preview .jc-companion-bottom h2{font:26px var(--serif);margin:25px 0 9px;}
+#jd-community-preview .jc-companion-bottom p{color:var(--quiet);font-size:11px;}
+#jd-community-preview .jc-start{border-bottom:1px solid var(--red);color:var(--red);display:flex;align-items:center;gap:10px;font:17px var(--serif);padding:16px 0 10px;margin:10px 0 6px;}
+#jd-community-preview .jc-compose h1{font:34px var(--serif);margin-bottom:10px;}
+#jd-community-preview .jc-compose .jc-tabs{margin:23px 0 16px;}
+#jd-community-preview .jc-compose textarea{width:100%;min-height:170px;resize:vertical;background:none;border:0;padding:10px 0;font:17px/2 var(--serif);border-radius:0;}
+#jd-community-preview .jc-compose textarea::placeholder{color:#958c7d;}
+#jd-community-preview .jc-counter{text-align:right;color:var(--quiet);font:11px Georgia;margin-bottom:16px;}
+#jd-community-preview .jc-photo-tray{display:flex;gap:10px;margin-bottom:24px;}
+#jd-community-preview .jc-photo-thumb{position:relative;width:90px;height:100px;}
+#jd-community-preview .jc-photo-thumb img{width:100%;height:100%;border-radius:0 20px 0 0;}
+#jd-community-preview .jc-photo-thumb button{position:absolute;bottom:0;right:0;min-width:32px;min-height:32px;display:grid;place-items:center;background:var(--paper);color:var(--red);}
+#jd-community-preview .jc-add-photo{width:90px;height:100px;border:1px dashed #bbb6a7;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px;color:var(--quiet);font-size:11px;cursor:pointer;}
+#jd-community-preview .jc-form-row{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:63px;border-top:1px solid var(--line);gap:14px;}
+#jd-community-preview .jc-form-row label{font-size:12px;white-space:nowrap;}
+#jd-community-preview .jc-form-row button{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-height:44px;font-size:12px;text-align:right;}
+#jd-community-preview .jc-form-row input{background:none;border:0;font-size:12px;max-width:155px;padding:8px 0;}
+#jd-community-preview .jc-form-row .jc-place-picked{font-size:11px;color:var(--quiet);display:block;}
+#jd-community-preview .jc-form-hint{font-size:11px;line-height:1.9;color:var(--quiet);padding:6px 0 17px;border-bottom:1px solid var(--line);}
+#jd-community-preview .jc-submit{margin-top:28px;display:flex;align-items:center;justify-content:space-between;width:100%;min-height:51px;border-top:1px solid var(--red);border-bottom:1px solid var(--red);color:var(--red);font:20px var(--serif);}
+#jd-community-preview .jc-draft-message{font-size:11px;color:var(--quiet);margin-top:10px;}
+#jd-community-preview .jc-picker h1{font:32px var(--serif);margin-bottom:10px;}
+#jd-community-preview .jc-picker-group{margin:25px 0 8px;font:20px var(--serif);}
+#jd-community-preview .jc-picker-option{width:100%;display:flex;align-items:center;justify-content:space-between;min-height:62px;border-bottom:1px solid var(--line);font-size:13px;gap:8px;}
+#jd-community-preview .jc-picker-option[aria-pressed="true"]{color:var(--red);}
+#jd-community-preview .jc-toast{position:absolute;left:23px;right:23px;bottom:98px;background:var(--ink);color:var(--paper);padding:12px 16px;border-radius:3px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:5;text-align:center;}
+#jd-community-preview .jc-toast.show{opacity:1;}
+#jd-community-preview .jc-journal-title{font:600 52px/1.25 var(--serif);color:var(--red);margin:22px 0 0;letter-spacing:-2px;}
+#jd-community-preview .jc-journal-title span{display:block;text-align:right;margin-right:40px;}
+#jd-community-preview .jc-journal-photo{height:251px;width:calc(100% + 23px);max-width:none;border-radius:72px 0 40px 0;margin:0 0 25px;}
+#jd-community-preview .jc-journal-place{display:flex;align-items:center;justify-content:space-between;}
+#jd-community-preview .jc-journal-place h2{font:27px var(--serif);}
+#jd-community-preview .jc-journal-entry{margin:17px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--red);padding:12px 0;display:flex;gap:12px;align-items:center;width:100%;}
+#jd-community-preview .jc-journal-entry>span:first-child{border:1px solid var(--red);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;}
+#jd-community-preview .jc-journal-entry strong{font:19px var(--serif);color:var(--red);display:block;}
+#jd-community-preview .jc-journal-entry small{font-size:10px;color:var(--quiet);display:block;}
+#jd-community-preview .jc-journal-entry>svg{margin-left:auto;color:var(--red);}
+#jd-community-preview .jc-journal-map{border-bottom:1px solid var(--line);padding:6px 0 22px;display:block;width:100%;}
+#jd-community-preview .jc-journal-map strong{font:26px var(--serif);display:block;margin:6px 0;}
+#jd-community-preview .jc-transition{animation:jc-page-in .24s ease-out;}
+@keyframes jc-page-in{from{opacity:.25;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+#jd-community-preview .jc-city-map{position:relative;width:100%;margin:30px 0;}
+#jd-community-preview .jc-city-index{border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:6px 0 24px;}
+#jd-community-preview .jc-city-index summary{list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:62px;gap:15px;}
+#jd-community-preview .jc-city-index summary::-webkit-details-marker{display:none;}
+#jd-community-preview .jc-city-index summary>span:first-child{font-size:11px;letter-spacing:1px;color:var(--quiet);}
+#jd-community-preview .jc-city-current{display:flex;align-items:center;gap:13px;font:20px/1.5 var(--serif);}
+#jd-community-preview .jc-city-current b{font-weight:400;border-bottom:1px solid #c8483260;padding-bottom:2px;}
+#jd-community-preview .jc-city-current svg{width:17px;height:17px;color:var(--red);stroke-width:1.2;transition:transform .22s;}
+#jd-community-preview .jc-city-index[open] .jc-city-current svg{transform:rotate(-90deg);}
+#jd-community-preview .jc-city-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:17px 0 20px;border-top:1px solid var(--line);background:#f9f5ed;animation:jc-page-in .22s ease-out;}
+#jd-community-preview .jc-city-option{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:78px;gap:8px;padding:0 16px;position:relative;}
+#jd-community-preview .jc-city-option+button{border-left:1px solid var(--line);}
+#jd-community-preview .jc-city-option strong{font:24px/1.3 var(--serif);font-weight:400;}
+#jd-community-preview .jc-city-option small{font:italic 9px Georgia,serif;letter-spacing:.3px;color:var(--quiet);}
+#jd-community-preview .jc-city-option[aria-pressed="true"]{color:var(--red);}
+#jd-community-preview .jc-city-option[aria-pressed="true"]:after{content:'';width:17px;height:1px;background:var(--red);position:absolute;left:16px;bottom:0;transform:rotate(-6deg);}
+#jd-community-preview .jc-city-option svg{width:12px;height:12px;position:absolute;right:13px;top:6px;color:var(--red);}
+@media(prefers-reduced-motion:reduce){#jd-community-preview .jc-city-options{animation:none}#jd-community-preview .jc-city-current svg{transition:none}}
+#jd-community-preview .jc-excerpt-open{display:block;width:100%;min-height:44px;}
+#jd-community-preview .jc-location-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;margin:14px 0 8px;padding:7px 0;}
+#jd-community-preview .jc-location-name{display:flex;align-items:flex-start;gap:7px;min-width:0;min-height:44px;padding:4px 0;text-align:left;}
+#jd-community-preview .jc-location-name>svg{width:13px;height:15px;margin-top:3px;color:var(--quiet);flex:none;}
+#jd-community-preview .jc-location-name>span{min-width:0;}
+#jd-community-preview .jc-location-name strong{display:block;font-size:12px;font-weight:400;line-height:1.7;}
+#jd-community-preview .jc-location-name small{display:block;font-size:11px;line-height:1.8;color:var(--quiet);margin-top:2px;overflow-wrap:anywhere;}
+#jd-community-preview .jc-location-go{font-size:15px;min-height:44px;gap:7px;align-self:center;}
+#jd-community-preview .jc-location-detail{border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:21px 0 7px;padding:18px 0;}
+#jd-community-preview .jc-location-detail .jc-location-name strong{font:18px/1.6 var(--serif);}
+#jd-community-preview .jc-location-detail .jc-location-go{font-size:17px;}
+#jd-community-preview .jc-compose textarea{margin-top:27px;}
+#jd-community-preview .jc-city-map>svg{display:block;width:100%;height:auto;}
+#jd-community-preview .jc-map-point{position:absolute;display:flex;gap:6px;align-items:center;transform:translate(-5px,-50%);font-size:11px;min-height:44px;white-space:nowrap;}
+#jd-community-preview .jc-map-point span{width:7px;height:7px;background:var(--red);border:2px solid var(--paper);box-sizing:content-box;border-radius:50%;}
+@media(max-width:360px){#jd-community-preview .jc-distance{margin-left:-19px;margin-right:-19px}#jd-community-preview .jc-journal-photo{width:calc(100% + 19px)}#jd-community-preview .jc-header{margin:0 19px}#jd-community-preview .jc-body{padding-left:19px;padding-right:19px}#jd-community-preview .jc-nav{margin-left:19px;margin-right:19px}#jd-community-preview .jc-photo img{height:223px}#jd-community-preview .jc-photo-title h2{font-size:21px}#jd-community-preview .jc-heading h1{font-size:42px}#jd-community-preview .jc-companion-title{font-size:42px}#jd-community-preview .jc-journal-title{font-size:46px}#jd-community-preview .jc-place-head h1{font-size:44px}#jd-community-preview .jc-go-row strong{font-size:21px}}
+@media(prefers-reduced-motion:reduce){#jd-community-preview .jc-transition{animation:none}#jd-community-preview .jc-toast{transition:none}}
+</style>
+<!-- D3_BUNDLE -->
+<script>
+(()=>{
+ const root=document.getElementById('jd-community-preview');
+ const phone=root.querySelector('.jc-phone'), stage=root.querySelector('.jc-stage');
+ const photos=__PHOTO_DATA__;
+ const cityGeo=__CITY_GEO__;
+ for(const feature of cityGeo.features){const polygons=feature.geometry.type==='MultiPolygon'?feature.geometry.coordinates:[feature.geometry.coordinates];for(const polygon of polygons)for(const ring of polygon)ring.reverse();}
+ const nativePin='__NATIVE_PIN__';
+ const points=[{id:'plaza',name:'中央公共海滨广场',place:'大梅沙',image:'coast',district:'盐田区',intro:'沿海滨步道走到广场，在这里停一停，看看海。'},{id:'west',name:'西部重建海岸公园',place:'大梅沙',image:'coast',district:'盐田区',intro:'沿着海岸继续走，看看海边的公共空间。'},{id:'gate',name:'南头古城南门',place:'南头古城',image:'nantou',district:'南山区',intro:'从南门进入古城，沿着街巷慢慢走。'}];
+ const posts=[{id:'sea',author:'阿岚',avatar:'岚',date:'10 月 4 日 · 17:42',point:'plaza',image:'coast',title:'坐在海边，等天色慢下来。',excerpt:'没赶上日落也没关系。坐了一会儿，才发现看海本来就不用做什么。',body:'沿着海滨步道走到广场，找了个能看到海的位置坐下。\n没赶上日落也没关系。风吹过来的时候，才发现看海本来就不用做什么。\n我那天傍晚来，坐了大约四十分钟。离开前记得把身边的垃圾带走。',likes:26,comments:2,kind:'note'},{id:'ask',author:'小舟',avatar:'舟',date:'10 月 5 日 · 09:36',point:'gate',image:null,title:'古城里，有适合一个人坐会儿的地方吗？',excerpt:'想找个能看看街巷、又不用一直走的地方。',body:'打算一个人去南头古城，想走一小段后找个地方坐会儿。大家有没有喜欢的地方？有树荫就更好了。',likes:8,comments:1,kind:'question'},{id:'walk',author:'林间',avatar:'林',date:'10 月 3 日 · 15:26',point:'plaza',image:'coast',title:'不用走很远，也能看很久。',excerpt:'带了本书，结果一页也没翻，光顾着看海了。',body:'本来想沿海岸多走一段，后来在广场旁边坐下，看人来人往。带了本书，结果一页也没翻，光顾着看海了。',likes:14,comments:0,kind:'note'},{id:'wind',author:'陈小雨',avatar:'雨',date:'10 月 2 日 · 18:08',point:'plaza',image:null,title:'那天海风大，薄外套派上了用场。',excerpt:'多带一件衣服，可以在海边多坐一会儿。',body:'白天还觉得热，到傍晚海风起来就有点凉。那天多带的薄外套派上了用场。出门前还是看看当天的天气。',likes:11,comments:0,kind:'note'}];
+ points.push({id:'wukang',city:'上海',name:'武康大楼北侧公共人行道',place:'武康路',image:'wukang',district:'徐汇区',intro:'沿公共人行道走走，看看树影里的街角建筑。'});
+ posts[1]={id:'street',author:'小舟',avatar:'舟',date:'10 月 5 日 · 15:08',point:'wukang',image:'wukang',title:'转过街角，刚好遇见树影。',excerpt:'沿着武康路慢慢走，比起拍照，更喜欢树荫落在人行道上的这一段。',body:'下午沿着武康路走了一小段，树荫把人行道分成了一块一块。\n在公共人行道上停了片刻，看看街角的建筑，再继续往前走。拍照的时候也记得给路过的人留出空间。',likes:18,kind:'note'};
+ const baseComments={sea:[{name:'小满',initial:'满',body:'一个人去，沿海边慢慢走也很舒服。',reply:'阿岚：是的，坐着看海也很好。'},{name:'周周',initial:'周',body:'喜欢这种不用把行程排满的下午。'}],ask:[{name:'木木',initial:'木',body:'可以进南门后沿中山南街慢慢找找，我上次在街边坐了好一会儿。'}]};
+ const defaults={page:'feed',cityFilter:'全部',post:'sea',point:'plaza',likes:{},saves:{},comments:{},draft:'',draftPoint:'plaza',visit:'2026-10-04',draftSaved:false,published:[],running:false,journalSaved:false};
+ const instanceId='preview-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+ let s={...defaults}, history=[], pickerSource='compose',photo=photos.coast,toastTimer;
+ const design={photoHeight:249};
+ const icon=(name)=>`<i data-lucide="${name}" aria-hidden="true"></i>`;
+ const esc=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const point=id=>points.find(x=>x.id===id)||points[0];
+ const post=id=>[...s.published,...posts].find(x=>x.id===id)||posts[0];
+ const allComments=id=>[...(baseComments[id]||[]),...(s.comments[id]||[])];
+ function restore(raw){const saved=raw?.privateContent;if(!saved||saved.version!==2)return;s={...defaults,...saved.state};s.page=['feed','post','place','companion','compose','journal','picker','city'].includes(s.page)?s.page:'feed';s.published=s.published.map(p=>({...p,image:photos[p.image]?p.image:null}));history=[];}
+ restore(window.openai?.widgetState);
+ function save(){const snapshot={...s,published:s.published.slice(0,8),comments:Object.fromEntries(Object.entries(s.comments).map(([k,v])=>[k,v.slice(-10)]))};window.openai?.setWidgetState?.({modelContent:{design:'见闻社区 · 地点与随行联动',screen:s.page,point:point(s.point).name},privateContent:{version:2,source:instanceId,state:snapshot}})?.catch(()=>{});}
+ function toast(message){const el=root.querySelector('.jc-toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);}
+ function go(page){history.push({page:s.page,point:s.point,post:s.post});s.page=page;render(true);save();}
+ function back(){const prev=history.pop();if(prev)Object.assign(s,prev);else s.page='feed';render(true);save();}
+ const header=()=>`<header class="jc-header"><div class="jc-brand"><span class="jc-logo" aria-hidden="true"></span><div><strong>见地</strong><small>THE CITY, UNFOLDED</small></div></div>${s.page==='feed'?'':`<div class="jc-city">${s.page==='journal'?'深圳 · 城市随刊':(point(s.point).city||'深圳')+' · 随行'}</div>`}</header>`;
+ function nav(){const active=(s.page==='journal'||s.page==='city')?'journal':s.page==='companion'?'companion':'feed';return `<nav class="jc-nav" aria-label="主导航">${[['journal','book-open','随刊'],['feed','messages-square','见闻'],['companion','map-pin','随行']].map(([key,i,label])=>`<button data-action="nav" data-value="${key}" ${active===key?'aria-current="page"':''}>${key==='companion'?`<img class="jc-native-pin" src="${nativePin}" alt="">`:icon(i)}${label}</button>`).join('')}</nav>`;}
+ function top(label,extra=''){return `<div class="jc-top"><button class="jc-back" data-action="back">${icon('arrow-left')}${label}</button>${extra}</div>`;}
+ function author(p){return `<div class="jc-byline"><span class="jc-avatar">${esc(p.avatar)}</span><div class="jc-author">${esc(p.author)}<small>${esc(p.date)}</small></div></div>`;}
+ function location(p,detail=false){const pt=point(p.point);return `<div class="jc-location-row ${detail?'jc-location-detail':''}">${detail?`<div class="jc-location-name">${icon('map-pin')}<span><strong>${pt.city||'深圳'} · ${pt.place}</strong><small>${pt.name}</small></span></div>`:`<button class="jc-location-name" data-action="post" data-value="${p.id}" aria-label="查看这则动态详情">${icon('map-pin')}<span><strong>${pt.city||'深圳'} · ${pt.place}</strong><small>${pt.name}</small></span></button>`}<button class="jc-go jc-location-go" data-action="go-point" data-value="${pt.id}" aria-label="去${pt.name}随行">去随行 ${icon('arrow-up-right')}</button></div>`;}
+ function actions(p){return `<div class="jc-actions"><button data-action="like" data-value="${p.id}" aria-label="喜欢这则见闻" aria-pressed="${!!s.likes[p.id]}">${icon('heart')} ${p.likes+(s.likes[p.id]?1:0)}</button><button data-action="post" data-value="${p.id}" aria-label="查看留言">${icon('message-circle')} ${allComments(p.id).length}</button><button data-action="save" data-value="${p.id}" aria-pressed="${!!s.saves[p.id]}">${icon('bookmark')}${s.saves[p.id]?'已收藏':'收藏'}</button></div>`;}
+ function feedCard(p){return `<article>${author(p)}${p.image?`<button class="jc-photo" data-caption="${point(p.point).image==='coast'?'海边 / COAST':'街巷 / STREETS'}" data-action="post" data-value="${p.id}" aria-label="阅读${esc(p.title)}"><img src="${photos[p.image]}" alt="${esc(point(p.point).place)}的旅行记录" style="height:${design.photoHeight}px"></button>`:''}<button class="jc-photo-title" data-action="post" data-value="${p.id}"><h2>${esc(p.title)}</h2></button><button class="jc-excerpt jc-excerpt-open" data-action="post" data-value="${p.id}">${esc(p.excerpt)}</button>${location(p)}${actions(p)}</article>`;}
+ function cityIndex(){return `<details class="jc-city-index"><summary class="cursor-interaction" aria-label="选择城市，当前${s.cityFilter==='全部'?'全部城市':s.cityFilter}"><span>在地记录</span><span class="jc-city-current"><b>${s.cityFilter==='全部'?'全部城市':s.cityFilter}</b>${icon('arrow-down-right')}</span></summary><div class="jc-city-options" role="group" aria-label="城市范围">${[['全部','ALL CITIES'],['深圳','SHENZHEN'],['上海','SHANGHAI']].map(([city,en])=>`<button class="jc-city-option" data-action="city-choice" data-value="${city}" aria-pressed="${s.cityFilter===city}"><strong>${city}</strong><small>${en}</small>${s.cityFilter===city?icon('check'):''}</button>`).join('')}</div></details>`;}
+ function feed(){const visible=[...s.published,posts[0],posts[1]].filter(p=>s.cityFilter==='全部'||(point(p.point).city||'深圳')===s.cityFilter);return `${header()}<main class="jc-body"><div class="jc-heading"><div><h1>见闻<span class="jc-red">.</span></h1><span class="jc-en">NOTES FROM THE WAY</span></div><button class="jc-write" data-action="compose">${icon('pen-line')}${s.draftSaved?'继续写见闻':'留一则见闻'}</button></div>${cityIndex()}<div aria-live="polite">${visible.map(feedCard).join('')||'<p class="jc-excerpt">这里还没有见闻。</p>'}</div></main>${nav()}`;}
+ function detail(){const p=post(s.post);return `<main class="jc-body jc-detail">${top('动态详情',`<button class="jc-iconbutton jc-red" data-action="save" data-value="${p.id}" aria-pressed="${!!s.saves[p.id]}" aria-label="${s.saves[p.id]?'取消收藏':'收藏见闻'}">${icon(s.saves[p.id]?'bookmark-check':'bookmark')}</button>`)}${author(p)}${p.image?`<div class="jc-photo" data-caption="${point(p.point).image==='coast'?'海边 / COAST':'街巷 / STREETS'}"><img src="${photos[p.image]}" alt="${esc(point(p.point).place)}的旅行记录"></div>`:''}<div class="jc-photo-title"><h1>${esc(p.title)}</h1></div><p class="jc-prose">${esc(p.body)}</p><p class="jc-visit">${p.author==='我'?'到访日期 · '+esc(p.visit||p.date):esc(p.date)+(p.id==='sea'?' · 停留约 40 分钟':'')}</p>${location(p,true)}${actions(p)}<section class="jc-comments"><div class="jc-section-head"><h2>评论</h2><span>${String(allComments(p.id).length).padStart(2,'0')}</span></div>${allComments(p.id).map(c=>`<div class="jc-comment"><span class="jc-avatar sand">${esc(c.initial)}</span><div class="jc-comment-main"><strong>${esc(c.name)}</strong><p>${esc(c.body)}</p>${c.reply?`<div class="jc-comment-reply">${esc(c.reply)}</div>`:''}</div></div>`).join('')||'<p class="jc-muted">还没有评论，来聊聊你的发现。</p>'}<div class="jc-reply" role="group" aria-label="写评论"><input name="reply" aria-label="写下评论" placeholder="说说你的发现…" maxlength="200" required autocomplete="off"><button type="button" data-action="send-comment">发送</button></div></section></main>${nav()}`;}
+ function placePage(){const pt=point(s.point);return `<main class="jc-body">${top('地点详情')}<div class="jc-place-head"><div class="jc-kicker"><span>${pt.city||'深圳'} · ${pt.district}</span><span class="jc-red">${pt.image==='coast'?'海边':'街巷'}</span></div><h1><span>${pt.place}</span></h1><img src="${photos[pt.image]}" alt="${pt.place}"></div><h2 class="jc-point-title">${pt.name}</h2><p class="jc-excerpt">${pt.intro}</p><div class="jc-go-row"><div><strong>边走边发现<span class="jc-red">。</span></strong><small class="jc-muted">定位发现 · 到点提醒</small></div><button class="jc-go" data-action="go-point" data-value="${pt.id}">去随行 ${icon('arrow-up-right')}</button></div></main>${nav()}`;}
+ function companion(){const pt=point(s.point),notes=[...s.published,...posts].filter(p=>p.point===pt.id);return `${header()}<main class="jc-body"><div class="jc-companion-eyebrow"><span>随行 · SOUND WALK</span><em>03</em></div><div class="jc-companion-caption">把屏幕退到身后</div><h1 class="jc-companion-title">让位置，<br><span class="jc-red">替你翻页。</span></h1><p class="jc-companion-desc">你走近一处，城市才打开一段。<br>每一次播放，都由你决定。</p><div class="jc-distance" aria-label="距离等待定位"><span class="jc-location-status">${icon('map-pin')} 等待定位</span><div class="jc-orbit"><strong>—</strong><small>约 · 米</small></div><span class="jc-distance-caption">A PLACE TO GET CLOSER</span></div><div class="jc-target"><small class="jc-muted">${pt.place} · ${s.running?'随行已开启':'当前地点'}</small><h2>${pt.name}</h2><button data-action="choose-companion">换一处 ${icon('arrow-up-right')}</button></div><button class="jc-publish-row" data-action="compose-here">留一则见闻 ${icon('pen-line')}</button><div class="jc-companion-bottom"><h2>沿着城市，慢慢走。</h2><p>靠近故事点时提醒你，准备好再听。</p><button class="jc-start" data-action="start"><img class="jc-native-pin" src="${nativePin}" alt="">${s.running?'暂停随行':'开启随行'} ${icon('arrow-up-right')}</button></div></main>${nav()}`;}
+ function compose(){const pt=point(s.draftPoint);return `<main class="jc-body jc-compose">${top('返回',`<button class="jc-back jc-red" data-action="draft">存草稿</button>`)}<h1>留一则见闻<span class="jc-red">。</span></h1><p class="jc-muted">把值得记住的，留在走过的地方。</p><textarea aria-label="见闻内容" maxlength="600" placeholder="这里有什么，让你想多停留一会儿？">${esc(s.draft)}</textarea><div class="jc-counter"><span>${s.draft.length}</span> / 600</div><div class="jc-photo-tray">${photo?`<div class="jc-photo-thumb"><img src="${photo}" alt="待发布照片"><button data-action="remove-photo" aria-label="移除照片">${icon('x')}</button></div>`:''}<label class="jc-add-photo">${icon('plus')}添加照片<input type="file" accept="image/*" hidden aria-label="选择照片"></label></div><div class="jc-form-row"><label>关联地点</label><button data-action="choose-place"><span>${pt.place}<span class="jc-place-picked">${pt.name}</span></span>${icon('chevron-right')}</button></div><p class="jc-form-hint">选择这则见闻发生的地方，也可以回来后再写。</p><div class="jc-form-row"><label for="jc-visit-date">到访日期</label><input id="jc-visit-date" type="date" value="${esc(s.visit)}" max="2026-10-09"></div><div class="jc-form-row"><label>谁可以看</label><span class="jc-muted">公开 · 发布到见闻</span></div><button class="jc-submit" data-action="publish" ${!s.draft.trim()?'disabled':''}>发布见闻 ${icon('arrow-up-right')}</button><p class="jc-draft-message">${s.draftSaved?'草稿已保存，仅自己可见。':'草稿仅自己可见，发布后旅人们才会看到。'}</p></main>${nav()}`;}
+ function picker(){return `<main class="jc-body jc-picker">${top('返回')}<h1>选择地点<span class="jc-red">。</span></h1><p class="jc-muted">${pickerSource==='companion'?'选择想去随行的地点。':'这则见闻，发生在哪里？'}</p>${['大梅沙','南头古城','武康路'].map(name=>`<h2 class="jc-picker-group">${name}</h2>${points.filter(p=>p.place===name).map(p=>`<button class="jc-picker-option" data-action="pick" data-value="${p.id}" aria-pressed="${p.id===(pickerSource==='companion'?s.point:s.draftPoint)}">${p.name}${icon(p.id===(pickerSource==='companion'?s.point:s.draftPoint)?'check':'arrow-up-right')}</button>`).join('')}`).join('')}</main>${nav()}`;}
+ function journal(){return `${header()}<main class="jc-body"><div class="jc-companion-eyebrow"><span>城市随刊 <em>01</em> / 02</span><span>SHENZHEN</span></div><h1 class="jc-journal-title">不赶路，<span>去听海。</span></h1><img class="jc-journal-photo" src="${photos.coast}" alt="大梅沙海湾"><small class="jc-muted">深圳 / 海边</small><div class="jc-journal-place"><button data-action="place" data-value="plaza"><h2>大梅沙 ↗</h2></button><button class="jc-iconbutton jc-red" aria-label="收藏大梅沙" aria-pressed="${s.journalSaved}" data-action="journal-save">${icon(s.journalSaved?'heart-handshake':'heart')}</button></div><p class="jc-muted">75 分钟 · 1.8 km · 文字漫游</p><button class="jc-journal-entry" data-action="journal-companion"><span><img class="jc-native-pin" src="${nativePin}" alt=""></span><span><strong>随行</strong><small>到点先提醒，再决定听不听</small></span>${icon('arrow-up-right')}</button><button class="jc-journal-map" data-action="city"><span class="jc-en jc-muted">THE CITY, MAPPED</span><strong>城市地图</strong><small class="jc-red">查看景点与介绍 ↗</small></button></main>${nav()}`;}
+
+ function city(){const projection=d3.geoMercator().fitExtent([[12,12],[322,262]],cityGeo),path=d3.geoPath(projection);const stops=[{id:'gate',xy:[113.9227,22.5381],name:'南头古城'},{id:'plaza',xy:[114.3038915,22.5987158],name:'大梅沙'}];return `<main class="jc-body">${top('城市地图')}<div class="jc-heading"><div><h1>深圳<span class="jc-red">.</span></h1><span class="jc-en">THE CITY, MAPPED</span></div></div><p class="jc-muted">选择地点，看看介绍。</p><div class="jc-city-map"><svg viewBox="0 0 334 274" role="img" aria-label="深圳行政区地图，标注南头古城与大梅沙">${cityGeo.features.map(f=>`<path d="${path(f)}" fill="#e0e5c5" stroke="#f5f0e7" stroke-width="1.2"/>`).join('')}</svg>${stops.map(p=>{const [x,y]=projection(p.xy);return `<button class="jc-map-point" style="left:${x/334*100}%;top:${y/274*100}%" data-action="place" data-value="${p.id}"><span></span>${p.name}</button>`}).join('')}</div><div class="jc-section-head"><h2>从这里出发</h2><span>02 places</span></div>${stops.map(p=>`<button class="jc-place-slip" data-action="place" data-value="${p.id}"><img src="${photos[point(p.id).image]}" alt=""><span><strong>${p.name}</strong><small>${point(p.id).district} · 查看地点介绍</small></span>${icon('arrow-up-right')}</button>`).join('')}</main>${nav()}`;}
+ function render(animate=false){if(animate){clearTimeout(toastTimer);root.querySelector('.jc-toast').classList.remove('show');}const pages={feed,post:detail,place:placePage,companion,compose,picker,journal,city};stage.innerHTML=pages[s.page]();stage.classList.remove('jc-transition');if(animate){void stage.offsetWidth;stage.classList.add('jc-transition');}root.querySelectorAll('button').forEach(b=>b.classList.add('cursor-interaction'));if(globalThis.lucide)globalThis.lucide.createIcons({attrs:{width:16,height:16}});}
+ root.addEventListener('click',e=>{const b=e.target.closest('button[data-action]');if(!b)return;const a=b.dataset.action,v=b.dataset.value;
+ if(a==='city-choice'){s.cityFilter=v;render(true);save();root.querySelector('.jc-city-index summary')?.focus({preventScroll:true});return;}
+ if(a==='nav'){history=[];s.page=v;render(true);save();return;}
+ if(a==='send-comment'){sendComment();return;}
+ if(a==='back'){back();return;}
+ if(a==='go-point'){s.point=v;go('companion');return;}
+ if(a==='post'){if(s.page==='post'&&s.post===v){root.querySelector('.jc-comments')?.scrollIntoView({block:'nearest'});return;}s.post=v;go('post');return;}
+ if(a==='place'){s.point=v;go('place');return;}
+ if(a==='companion'){go('companion');return;}
+ if(a==='journal-companion'){s.point='plaza';go('companion');return;}
+ if(a==='city'){go('city');return;}
+ if(a==='like'||a==='save'){const key=a==='like'?'likes':'saves';s[key]={...s[key],[v]:!s[key][v]};render();save();return;}
+ if(a==='journal-save'){s.journalSaved=!s.journalSaved;render();save();return;}
+ if(a==='compose'||a==='compose-here'){if(a==='compose-here')s.draftPoint=s.point;go('compose');return;}
+ if(a==='choose-place'||a==='choose-companion'){pickerSource=a==='choose-place'?'compose':'companion';go('picker');return;}
+ if(a==='pick'){if(pickerSource==='companion')s.point=v;else s.draftPoint=v;const selected=v;back();if(pickerSource==='companion'){s.point=selected;render();save();}return;}
+ if(a==='remove-photo'){photo=null;render();return;}
+ if(a==='draft'){s.draftSaved=true;save();back();toast('已存入草稿，下次可以继续写');return;}
+ if(a==='publish'){if(!s.draft.trim())return;let imageKey=null;if(photo){imageKey=Object.keys(photos).find(k=>photos[k]===photo)||'upload-'+Date.now();photos[imageKey]=photo;}const p={id:'local-'+Date.now(),author:'我',avatar:'我',date:new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()),visit:s.visit,point:s.draftPoint,image:imageKey,title:s.draft.trim().split('\n')[0].slice(0,48),excerpt:s.draft.trim().slice(0,95),body:s.draft.trim(),likes:0,comments:0,kind:'note'};s.published.unshift(p);s.published=s.published.slice(0,8);s.draft='';s.draftSaved=false;s.page='feed';s.cityFilter='全部';history=[];render(true);save();toast('已添加到见闻预览');return;}
+ if(a==='start'){s.running=!s.running;render();save();toast(s.running?'随行状态预览已开启，实际使用时等待定位':'随行已暂停');return;}
+ });
+ root.addEventListener('input',e=>{if(e.target.matches('textarea')){s.draft=e.target.value;s.draftSaved=false;root.querySelector('.jc-counter span').textContent=s.draft.length;root.querySelector('[data-action="publish"]').disabled=!s.draft.trim();}});
+ root.addEventListener('change',e=>{if(e.target.matches('textarea'))save();if(e.target.id==='jc-visit-date'){s.visit=e.target.value;save();}if(e.target.type==='file'&&e.target.files?.[0]){const f=e.target.files[0];if(!f.type.startsWith('image/'))return toast('请选择图片');const reader=new FileReader();reader.onload=()=>{photo=reader.result;render();};reader.readAsDataURL(f);}});
+ function sendComment(){const input=root.querySelector('.jc-reply input'),body=input?.value.trim();if(!body)return;s.comments[s.post]=[...(s.comments[s.post]||[]),{name:'我',initial:'我',body}].slice(-10);render();save();toast('留言已添加到预览');}
+ root.addEventListener('keydown',e=>{if(e.key==='Escape'){const picker=root.querySelector('.jc-city-index[open]');if(picker){picker.open=false;picker.querySelector('summary').focus({preventScroll:true});return;}}if(e.key==='Enter'&&!e.isComposing&&e.target.matches('.jc-reply input')){e.preventDefault();sendComment();}});
+ window.addEventListener('openai:set_globals',event=>{const raw=event.detail?.globals?.widgetState;if(raw&&raw.privateContent?.source!==instanceId){restore(raw);render();}});
+ render();
+ if(globalThis.Tweak){const tweak=new Tweak({container:phone,onChange:()=>render()});tweak.addSlider(design,'photoHeight',{label:'见闻照片留幅',min:200,max:290,step:10,unit:'px'});}
+})();
+</script>

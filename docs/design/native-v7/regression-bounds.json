@@ -1,0 +1,301 @@
+[
+  {
+    "image": "companion-distance-actions-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      20,
+      493,
+      342,
+      800
+    ]
+  },
+  {
+    "image": "companion-distance-actions-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      23,
+      529,
+      369,
+      844
+    ]
+  },
+  {
+    "image": "companion-distance-auto-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      20,
+      668,
+      340,
+      785
+    ]
+  },
+  {
+    "image": "companion-distance-auto-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      23,
+      704,
+      367,
+      844
+    ]
+  },
+  {
+    "image": "companion-distance-manual-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      20,
+      673,
+      340,
+      790
+    ]
+  },
+  {
+    "image": "companion-distance-manual-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      23,
+      709,
+      367,
+      829
+    ]
+  },
+  {
+    "image": "companion-idle-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      156,
+      745,
+      205,
+      761
+    ]
+  },
+  {
+    "image": "companion-idle-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      789,
+      220,
+      805
+    ]
+  },
+  {
+    "image": "discovery-atlas-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      156,
+      745,
+      205,
+      774
+    ]
+  },
+  {
+    "image": "discovery-atlas-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      789,
+      220,
+      818
+    ]
+  },
+  {
+    "image": "discovery-collage-next-24.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      784,
+      220,
+      800
+    ]
+  },
+  {
+    "image": "discovery-collage-next-48.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      784,
+      220,
+      800
+    ]
+  },
+  {
+    "image": "discovery-collage-next-76.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      784,
+      220,
+      800
+    ]
+  },
+  {
+    "image": "discovery-collage-previous-48.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      784,
+      220,
+      800
+    ]
+  },
+  {
+    "image": "discovery-journal-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      156,
+      740,
+      205,
+      756
+    ]
+  },
+  {
+    "image": "discovery-journal-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      784,
+      220,
+      800
+    ]
+  },
+  {
+    "image": "discovery-shelf-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      156,
+      745,
+      205,
+      761
+    ]
+  },
+  {
+    "image": "discovery-shelf-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      789,
+      220,
+      805
+    ]
+  },
+  {
+    "image": "route-companion-360.png",
+    "size": [
+      360,
+      800
+    ],
+    "changed_bounds": [
+      156,
+      740,
+      205,
+      756
+    ]
+  },
+  {
+    "image": "route-companion-390.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_bounds": [
+      171,
+      784,
+      220,
+      800
+    ]
+  },
+  {
+    "image": "v6-detail-390.png",
+    "size": [
+      390,
+      989
+    ],
+    "changed_bounds": [
+      171,
+      929,
+      220,
+      945
+    ]
+  },
+  {
+    "image": "v6-journal-390.png",
+    "size": [
+      390,
+      892
+    ],
+    "changed_bounds": [
+      171,
+      832,
+      220,
+      848
+    ]
+  },
+  {
+    "image": "v6-map-390.png",
+    "size": [
+      390,
+      843
+    ],
+    "changed_bounds": [
+      171,
+      783,
+      220,
+      799
+    ]
+  }
+]

@@ -101,6 +101,8 @@ class _DiscoveryCompanion extends ConsumerWidget {
                     state: activeTour,
                     horizontal: horizontal,
                   ),
+                if (selectedRoute != null && _supportsCompanion(selectedRoute))
+                  _CommunityShareEntry(route: selectedRoute),
                 _CompanionStateSection(
                   state: activeTour,
                   selected: selectedRoute,
@@ -1143,4 +1145,28 @@ class _CompanionRouteTile extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _CommunityShareEntry extends ConsumerWidget {
+  const _CommunityShareEntry({required this.route});
+  final RouteExperience route;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final target =
+        ref.watch(companionDistanceControllerProvider(route.slug)).target;
+    if (target == null) return const SizedBox.shrink();
+    return NoteButton(
+        label: '留一则见闻',
+        onTap: () => context.push(Uri(
+            path: '/community/write',
+            queryParameters: {'fragment': target.fragment.id}).toString()),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Row(children: [
+            Text('留一则见闻', style: noteSerif(16, color: noteRed)),
+            const Spacer(),
+            const DiscoveryIcon(DiscoveryMark.pen, size: 17, color: noteRed),
+          ]),
+        ));
+  }
 }

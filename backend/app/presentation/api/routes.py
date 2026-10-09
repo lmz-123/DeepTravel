@@ -432,9 +432,7 @@ def list_journeys():
 @api.delete("/journeys/progress")
 @require_user
 def clear_journey_progress():
-    return jsonify(
-        {"data": _services()["journeys"].clear_exploration_progress(g.current_user.id)}
-    )
+    return jsonify({"data": _services()["journeys"].clear_exploration_progress(g.current_user.id)})
 
 
 @api.post("/journeys/<journey_id>/arrivals")
@@ -730,6 +728,57 @@ def create_community_post(journey_id: str, fragment_id: str):
         evidence_ids=[value for value in evidence_ids if value],
     )
     return jsonify({"data": result}), 201
+
+
+@api.get("/community-posts")
+@require_user
+def discover_community_posts():
+    return jsonify(
+        {
+            "data": _services()["community"].discover(
+                g.current_user.id,
+                city_slug=request.args.get("city"),
+                cursor=request.args.get("cursor"),
+                limit=_page_limit(),
+            )
+        }
+    )
+
+
+@api.get("/community-places")
+@require_user
+def community_places():
+    return jsonify({"data": _services()["community"].places(g.current_user.id)})
+
+
+@api.post("/community-places/<fragment_id>/posts")
+@require_user
+def share_place_post(fragment_id):
+    result = _services()["community"].create_post(
+        g.current_user.id,
+        None,
+        fragment_id,
+        category="on_site",
+        title=request.form.get("title"),
+        body=request.form.get("body"),
+        idempotency_key=request.form.get("idempotency_key", ""),
+        visited_on=request.form.get("visited_on"),
+        files=request.files.getlist("photos") + request.files.getlist("photos[]"),
+        evidence_ids=[],
+    )
+    return jsonify({"data": result}), 201
+
+
+@api.route("/community-posts/<post_id>/saved", methods=["PUT", "DELETE"])
+@require_user
+def save_community_post(post_id):
+    return jsonify(
+        {
+            "data": _services()["community"].set_saved(
+                g.current_user.id, post_id, request.method == "PUT"
+            )
+        }
+    )
 
 
 @api.get("/community-posts/<post_id>")

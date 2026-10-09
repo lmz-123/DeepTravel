@@ -127,6 +127,12 @@ abstract interface class ExperienceRepository {
   Future<FragmentRecap> fragmentRecap(String journeyId);
 
   Future<CommunityPolicy> communityPolicy();
+  Future<List<CommunityPlace>> communityPlaces();
+  Future<CommunityPage<CommunityPost>> discoverCommunity(
+      {String? citySlug, String? cursor, int limit = 12});
+  Future<CommunityPost> shareCommunityPost(
+      String fragmentId, CommunityPostDraft draft);
+  Future<void> setCommunitySaved(String postId, bool saved);
 
   Future<CommunityPage<CommunityPostSummary>> communityFeed(
     String journeyId,

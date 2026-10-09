@@ -8,6 +8,71 @@ import 'package:jiandi/features/experience/domain/community_models.dart';
 
 void main() {
   test(
+      'discovery contract uses all/city feeds and a concrete place without a journey',
+      () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.example.test/api/v1'));
+    final requests = <RequestOptions>[];
+    const place = {
+      'fragment_id': 'fragment-1',
+      'name': '海滨广场',
+      'route_slug': 'dameisha',
+      'route_title': '大梅沙',
+      'city_slug': 'shenzhen',
+      'city_name': '深圳'
+    };
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+      requests.add(options);
+      final data = switch (options.path) {
+        '/community-places' => [place],
+        '/community-posts' => {
+            'items': [
+              {..._post, 'place': place}
+            ],
+            'next_cursor': 'next'
+          },
+        '/community-places/fragment-1/posts' => {
+            ..._post,
+            'place': place,
+            'visited_on': '2026-10-04'
+          },
+        '/community-posts/post-1/saved' => {
+            'viewer_has_saved': options.method == 'PUT'
+          },
+        _ => throw StateError(options.path),
+      };
+      handler.resolve(Response(
+          requestOptions: options, statusCode: 200, data: {'data': data}));
+    }));
+    final repo = ApiExperienceRepository(dio, _Auth(dio));
+    expect((await repo.communityPlaces()).single.name, '海滨广场');
+    expect((await repo.discoverCommunity()).items.single.place?.fragmentId,
+        'fragment-1');
+    expect(requests.last.queryParameters.containsKey('city'), isFalse);
+    await repo.discoverCommunity(citySlug: 'shenzhen', cursor: 'next');
+    expect(requests.last.queryParameters,
+        {'city': 'shenzhen', 'cursor': 'next', 'limit': 12});
+    final post = await repo.shareCommunityPost(
+        'fragment-1',
+        const CommunityPostDraft(
+            category: CommunityCategory.onSite,
+            idempotencyKey: 'share-once',
+            body: '这里的风很好',
+            visitedOn: '2026-10-04'));
+    expect(post.visitedOn, '2026-10-04');
+    final fields = Map.fromEntries((requests.last.data as FormData).fields);
+    expect(fields['visited_on'], '2026-10-04');
+    expect(fields['idempotency_key'], 'share-once');
+    await repo.setCommunitySaved('post-1', true);
+    expect(requests.last.method, 'PUT');
+    await repo.setCommunitySaved('post-1', false);
+    expect(requests.last.method, 'DELETE');
+    expect(
+        requests.every(
+            (r) => r.headers['Authorization'] == 'Bearer community-token'),
+        isTrue);
+  });
+
+  test(
       'API community contract parses pages, authenticates media and builds multipart',
       () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://api.example.test/api/v1'));

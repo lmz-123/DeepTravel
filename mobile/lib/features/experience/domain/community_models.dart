@@ -98,6 +98,32 @@ class CommunityMedia {
       );
 }
 
+class CommunityPlace {
+  const CommunityPlace(
+      {required this.fragmentId,
+      required this.name,
+      required this.routeSlug,
+      required this.routeTitle,
+      required this.citySlug,
+      required this.cityName,
+      this.theme = ''});
+  final String fragmentId,
+      name,
+      routeSlug,
+      routeTitle,
+      citySlug,
+      cityName,
+      theme;
+  factory CommunityPlace.fromJson(Map<String, dynamic> json) => CommunityPlace(
+      fragmentId: _text(json['fragment_id']) ?? '',
+      name: _text(json['name']) ?? '',
+      routeSlug: _text(json['route_slug']) ?? '',
+      routeTitle: _text(json['route_title']) ?? '',
+      citySlug: _text(json['city_slug']) ?? '',
+      cityName: _text(json['city_name']) ?? '',
+      theme: _text(json['theme']) ?? '');
+}
+
 class CommunityPost {
   const CommunityPost({
     required this.id,
@@ -113,6 +139,9 @@ class CommunityPost {
     this.title,
     this.body = '',
     this.bodyTruncated = false,
+    this.place,
+    this.visitedOn,
+    this.viewerHasSaved = false,
   });
 
   final String id;
@@ -121,6 +150,9 @@ class CommunityPost {
   final String? title;
   final String body;
   final bool bodyTruncated;
+  final CommunityPlace? place;
+  final String? visitedOn;
+  final bool viewerHasSaved;
   final CommunityAuthor author;
   final List<CommunityMedia> media;
   final int likeCount;
@@ -133,6 +165,7 @@ class CommunityPost {
     int? likeCount,
     int? commentCount,
     bool? viewerHasLiked,
+    bool? viewerHasSaved,
   }) =>
       CommunityPost(
         id: id,
@@ -141,6 +174,9 @@ class CommunityPost {
         title: title,
         body: body,
         bodyTruncated: bodyTruncated,
+        place: place,
+        visitedOn: visitedOn,
+        viewerHasSaved: viewerHasSaved ?? this.viewerHasSaved,
         author: author,
         media: media,
         likeCount: likeCount ?? this.likeCount,
@@ -157,6 +193,11 @@ class CommunityPost {
         title: _text(json['title']),
         body: _text(json['body']) ?? '',
         bodyTruncated: json['body_truncated'] == true,
+        place: json['place'] is Map
+            ? CommunityPlace.fromJson(_map(json['place']))
+            : null,
+        visitedOn: _text(json['visited_on']),
+        viewerHasSaved: json['viewer_has_saved'] == true,
         author: CommunityAuthor.fromJson(_map(json['author'])),
         media: _maps(json['media'])
             .map(CommunityMedia.fromJson)
@@ -269,6 +310,7 @@ class CommunityPostDraft {
     this.body,
     this.photoPaths = const [],
     this.evidenceIds = const [],
+    this.visitedOn,
   });
   final CommunityCategory category;
   final String idempotencyKey;
@@ -276,6 +318,7 @@ class CommunityPostDraft {
   final String? body;
   final List<String> photoPaths;
   final List<String> evidenceIds;
+  final String? visitedOn;
 }
 
 class CommunityMediaBytes {

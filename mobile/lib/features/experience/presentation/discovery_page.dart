@@ -16,6 +16,8 @@ import 'companion_distance_controller.dart';
 import 'companion_point_picker.dart';
 import 'discovery_controller.dart';
 import 'city_atlas.dart';
+import 'community/notes_page.dart';
+import 'community/notes_widgets.dart';
 import 'experience_providers.dart';
 import 'offline_package_controller.dart';
 import 'widgets/discovery_art.dart';
@@ -34,10 +36,12 @@ class DiscoveryPage extends ConsumerStatefulWidget {
     this.initialTab,
     this.initialCompanionRouteSlug,
     this.initialCompanionRequestId,
+    this.initialCompanionFragmentId,
   });
   final String? initialTab;
   final String? initialCompanionRouteSlug;
   final String? initialCompanionRequestId;
+  final String? initialCompanionFragmentId;
   @override
   ConsumerState<DiscoveryPage> createState() => _DiscoveryPageState();
 }
@@ -51,6 +55,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   String? _companionRouteId;
   String? _distanceRouteSlug;
   bool _startingCompanion = false;
+  String? _selectedCommunityRequest;
 
   @override
   void initState() {
@@ -91,6 +96,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
 
   TravelerSection _parseTab(String? tab) => switch (tab) {
         'atlas' => TravelerSection.atlas,
+        'community' => TravelerSection.community,
         'shelf' => TravelerSection.shelf,
         'companion' => TravelerSection.companion,
         _ => TravelerSection.journal,
@@ -101,12 +107,19 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     super.didChangeDependencies();
     if (_coldStartPrepared) return;
     _coldStartPrepared = true;
-    if (_section == TravelerSection.companion) return;
+    if (_section == TravelerSection.companion ||
+        _section == TravelerSection.community) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepareColdStart());
   }
 
   Future<void> _prepareColdStart() async {
-    if (!mounted || _section == TravelerSection.companion) return;
+    if (!mounted ||
+        _section == TravelerSection.companion ||
+        _section == TravelerSection.community) {
+      return;
+    }
     final controller = ref.read(discoveryControllerProvider.notifier);
     DiscoveryStartupAction action;
     try {
@@ -295,6 +308,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_section == TravelerSection.community) return const NotesPage();
     final discovery = ref.watch(discoveryControllerProvider);
     final state = discovery.asData?.value;
     final userId = ref.watch(currentUserIdProvider);
@@ -316,6 +330,27 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     final requestedRoute = requestedSlug == null
         ? null
         : ref.watch(offlineAwareRouteProvider(requestedSlug));
+    final fragment = widget.initialCompanionFragmentId;
+    final request =
+        '$requestedSlug:$fragment:${widget.initialCompanionRequestId}';
+    if (_section == TravelerSection.companion &&
+        requestedSlug != null &&
+        fragment != null &&
+        _selectedCommunityRequest != request) {
+      final points =
+          ref.watch(companionDistanceControllerProvider(requestedSlug));
+      if (points.points.any((p) => p.fragment.id == fragment)) {
+        _selectedCommunityRequest = request;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ref
+                .read(
+                    companionDistanceControllerProvider(requestedSlug).notifier)
+                .selectPoint(fragment);
+          }
+        });
+      }
+    }
     final companion = TickerMode(
       enabled: _section == TravelerSection.companion &&
           !MediaQuery.disableAnimationsOf(context),
@@ -537,7 +572,9 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
               active: _section,
               onSelected: (section) {
                 FocusManager.instance.primaryFocus?.unfocus();
-                setState(() => _section = section);
+                context.go(section == TravelerSection.journal
+                    ? '/'
+                    : '/?tab=${section.name}');
               },
             ),
           ),

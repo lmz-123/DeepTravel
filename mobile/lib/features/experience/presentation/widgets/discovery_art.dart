@@ -67,6 +67,10 @@ TextStyle discoverySans(
 /// The same outlined marks used by the approved paper prototype. Keeping these
 /// paths local avoids platform-dependent Material icon silhouettes.
 enum DiscoveryMark {
+  comment,
+  community,
+  pen,
+  plus,
   book,
   bookmark,
   heart,
@@ -129,6 +133,43 @@ class _MarkPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     final path = Path();
     switch (mark) {
+      case DiscoveryMark.comment:
+        path.moveTo(3, 21);
+        path.lineTo(4.5, 16.5);
+        path.cubicTo(0, 8, 6, 2, 12, 3);
+        path.cubicTo(24, 2, 24, 20, 12, 21);
+        path.cubicTo(9, 21, 7, 20, 6, 19.5);
+        path.close();
+      case DiscoveryMark.community:
+        path.moveTo(8, 3);
+        path.lineTo(17, 3);
+        path.quadraticBezierTo(19, 3, 19, 5);
+        path.lineTo(19, 13);
+        path.quadraticBezierTo(19, 15, 17, 15);
+        path.lineTo(7, 15);
+        path.lineTo(3, 19);
+        path.lineTo(3, 5);
+        path.quadraticBezierTo(3, 3, 5, 3);
+        path.close();
+        path.moveTo(21, 8);
+        path.lineTo(21, 21);
+        path.lineTo(17, 18);
+        path.lineTo(10, 18);
+      case DiscoveryMark.pen:
+        path.moveTo(4, 15);
+        path.lineTo(16, 3);
+        path.quadraticBezierTo(18, 1, 21, 4);
+        path.quadraticBezierTo(22, 5, 20, 7);
+        path.lineTo(8, 19);
+        path.lineTo(3, 20);
+        path.close();
+        path.moveTo(13, 22);
+        path.lineTo(22, 22);
+      case DiscoveryMark.plus:
+        path.moveTo(12, 5);
+        path.lineTo(12, 19);
+        path.moveTo(5, 12);
+        path.lineTo(19, 12);
       case DiscoveryMark.book:
         path.moveTo(12, 7);
         path.cubicTo(8, 4, 4, 4, 2, 5);

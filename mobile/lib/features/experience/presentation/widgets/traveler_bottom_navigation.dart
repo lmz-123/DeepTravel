@@ -11,6 +11,7 @@ import 'discovery_art.dart';
 
 // Legacy destinations stay available to existing journey and footprint screens.
 enum TravelerSection {
+  community,
   discovery,
   journey,
   footprints,
@@ -38,11 +39,7 @@ class TravelerBottomNavigation extends ConsumerWidget {
     final horizontal = MediaQuery.sizeOf(context).width <= 360 ? 20.0 : 23.0;
     final entries = [
       (TravelerSection.journal, DiscoveryMark.book, '随刊'),
-      (
-        TravelerSection.atlas,
-        editorial ? DiscoveryMark.compass : DiscoveryMark.search,
-        '路线'
-      ),
+      (TravelerSection.community, DiscoveryMark.community, '见闻'),
       (TravelerSection.companion, DiscoveryMark.pin, '随行'),
     ];
     return Padding(

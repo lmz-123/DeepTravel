@@ -57,6 +57,21 @@ void main() {
     }
   });
 
+  testWidgets(
+      'community handoff selects the shared point without starting a tour',
+      (tester) async {
+    final harness = _CompanionHarness(routes: [_distanceRoute]);
+    await _pump(tester,
+        harness: harness,
+        requestedSlug: _distanceRoute.slug,
+        requestedFragment: 'dongguan-hall');
+    expect(_distancePlace(tester), '东莞会馆');
+    expect(harness.tour.startCalls, 0);
+    expect(harness.journey.startCalls, 0);
+    expect(find.text('留一则见闻'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final size in [const Size(390, 844), const Size(360, 800)]) {
     testWidgets('companion idle fits ${size.width.toInt()}px mobile surface',
         (tester) async {
@@ -501,6 +516,7 @@ Future<GoRouter> _pump(
   Size size = const Size(390, 844),
   _CompanionHarness? harness,
   String? requestedSlug,
+  String? requestedFragment,
   double textScale = 1,
 }) async {
   final fixture = harness ?? _CompanionHarness();
@@ -511,12 +527,13 @@ Future<GoRouter> _pump(
 
   final router = GoRouter(
     initialLocation: companionLocation(requestedSlug,
-        requestSelection: requestedSlug != null),
+        fragmentId: requestedFragment, requestSelection: requestedSlug != null),
     routes: [
       GoRoute(
         path: '/',
         builder: (_, state) => DiscoveryPage(
           initialTab: state.uri.queryParameters['tab'],
+          initialCompanionFragmentId: state.uri.queryParameters['fragment'],
           initialCompanionRouteSlug: state.uri.queryParameters['route'],
           initialCompanionRequestId: state.uri.queryParameters['selection'],
         ),

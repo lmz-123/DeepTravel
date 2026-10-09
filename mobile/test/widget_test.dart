@@ -173,7 +173,7 @@ void main() {
     await _pumpApp(tester, repository: repository);
     expect(find.text('旧港码头'), findsNothing);
     expect(find.text('山海栈道'), findsNothing);
-    await tester.tap(find.text('路线'));
+    appRouter.go('/?tab=atlas');
     await tester.pumpAndSettle();
     expect(find.text('收录 2 条路线'), findsOneWidget);
     final second =

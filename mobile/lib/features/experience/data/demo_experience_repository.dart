@@ -532,6 +532,30 @@ class DemoExperienceRepository implements ExperienceRepository {
       _fragmentOnly();
 
   @override
+  Future<List<CommunityPlace>> communityPlaces() async => const [];
+
+  @override
+  Future<CommunityPage<CommunityPost>> discoverCommunity(
+          {String? citySlug, String? cursor, int limit = 12}) async =>
+      CommunityPage(
+          items: _communityPosts
+              .where((p) => citySlug == null || p.place?.citySlug == citySlug)
+              .take(limit)
+              .toList());
+
+  @override
+  Future<CommunityPost> shareCommunityPost(
+          String fragmentId, CommunityPostDraft draft) =>
+      createCommunityPost('', fragmentId, draft);
+
+  @override
+  Future<void> setCommunitySaved(String postId, bool saved) async {
+    final index = _communityPosts.indexWhere((p) => p.id == postId);
+    _communityPosts[index] =
+        _communityPosts[index].copyWith(viewerHasSaved: saved);
+  }
+
+  @override
   Future<CommunityPolicy> communityPolicy() async => const CommunityPolicy(
         enabled: true,
         categories: CommunityCategory.values,
@@ -615,6 +639,10 @@ class DemoExperienceRepository implements ExperienceRepository {
       id: draft.idempotencyKey,
       fragmentId: fragmentId,
       category: draft.category,
+      visitedOn: draft.visitedOn,
+      place: (await communityPlaces())
+          .where((p) => p.fragmentId == fragmentId)
+          .firstOrNull,
       title: draft.title,
       body: draft.body ?? '',
       author: const CommunityAuthor(displayName: '演示旅行者', avatar: 'default'),

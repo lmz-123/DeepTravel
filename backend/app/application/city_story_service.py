@@ -203,7 +203,8 @@ class CityStoryService:
         with self.session_factory() as session:
             rows = session.scalars(
                 select(TravelerFavoriteModel)
-                .where(TravelerFavoriteModel.user_id == user_id)
+                .where(TravelerFavoriteModel.user_id == user_id,
+                       TravelerFavoriteModel.target_kind != "community_post")
                 .order_by(TravelerFavoriteModel.created_at.desc())
             ).all()
             return [self._favorite_payload(session, item) for item in rows]
