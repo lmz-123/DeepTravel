@@ -103,7 +103,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
     _settle(delta, length);
   }
 
-  void _settle(int destination, int length) {
+  void _settle(int destination, int length, {double? releaseVelocity}) {
     _dragging = false;
     _destination = destination;
     final epoch = ++_motionEpoch;
@@ -121,14 +121,27 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
       finish();
       return;
     }
-    // Match the approved collage timeline, including its minimum settle time.
     final remaining = (_turn.value - destination).abs();
+    // An arrow starts at rest; a released drag is already moving. Restarting
+    // the arrow's ease-in here made every swipe visibly pause at lift-off.
+    var duration =
+        Duration(milliseconds: math.max(220, (820 * remaining).round()));
+    Curve curve = const _JournalTurnCurve();
+    if (releaseVelocity != null) {
+      final towardTarget = releaseVelocity * (destination - _turn.value).sign;
+      final speed = math.max(0.0, towardTarget);
+      final seconds = (2 * remaining / math.max(1.5, speed)).clamp(.18, .46);
+      duration = Duration(microseconds: (seconds * 1000000).round());
+      // Match finger velocity where possible, while bounding the slope so a
+      // fling cannot overshoot the next issue or reverse during settlement.
+      curve =
+          _JournalReleaseCurve((speed * seconds / remaining).clamp(1.0, 3.0));
+    }
     _turn
         .animateTo(
           destination.toDouble(),
-          duration:
-              Duration(milliseconds: math.max(220, (820 * remaining).round())),
-          curve: const _JournalTurnCurve(),
+          duration: duration,
+          curve: curve,
         )
         .then((_) => finish());
   }
@@ -149,10 +162,11 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
     }
   }
 
-  void _endDrag(int length) {
+  void _endDrag(int length, double velocity, double width) {
     if (!_dragging) return;
     final progress = _reduceMotion ? _quietDrag : _turn.value;
-    _settle(progress.abs() > .18 ? progress.sign.toInt() : 0, length);
+    _settle(progress.abs() > .18 ? progress.sign.toInt() : 0, length,
+        releaseVelocity: -velocity / (width * .78));
   }
 
   @override
@@ -272,7 +286,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                           // as drag-end. Always restore the issue in that case.
                           onPointerCancel: (_) {
                             if (_dragging) {
-                              _settle(0, issues.length);
+                              _settle(0, issues.length, releaseVelocity: 0);
                             }
                           },
                           child: GestureDetector(
@@ -286,11 +300,15 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                                 : (details) => _dragBy(details.delta.dx, width),
                             onHorizontalDragEnd: issues.length < 2
                                 ? null
-                                : (_) => _endDrag(issues.length),
+                                : (details) => _endDrag(issues.length,
+                                    details.primaryVelocity ?? 0, width),
                             onHorizontalDragCancel: issues.length < 2
                                 ? null
                                 : () {
-                                    if (_dragging) _settle(0, issues.length);
+                                    if (_dragging) {
+                                      _settle(0, issues.length,
+                                          releaseVelocity: 0);
+                                    }
                                   },
                             child: AnimatedBuilder(
                               animation: _turn,
@@ -724,4 +742,15 @@ class _JournalTurnCurve extends Curve {
   @override
   double transformInternal(double t) =>
       t < .5 ? 4 * t * t * t : 1 - math.pow(-2 * t + 2, 3) / 2;
+}
+
+/// Cubic Hermite segment: carries release speed into a zero-speed arrival.
+/// Slopes in [1, 3] keep progress monotonic and avoid a second ease-in pause.
+class _JournalReleaseCurve extends Curve {
+  const _JournalReleaseCurve(this.slope);
+  final double slope;
+
+  @override
+  double transformInternal(double t) =>
+      ((slope - 2) * t + (3 - 2 * slope)) * t * t + slope * t;
 }

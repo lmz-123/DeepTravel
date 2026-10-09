@@ -141,7 +141,12 @@ class _JournalCollageCover extends StatelessWidget {
                   height: 244,
                   child: Opacity(
                     opacity: opacity,
-                    child: _JournalCollagePhoto(source: layer.route.heroImage),
+                    // Cache the toned photo independently of the animated
+                    // opacity and paper mat, which repaint throughout a turn.
+                    child: RepaintBoundary(
+                      child:
+                          _JournalCollagePhoto(source: layer.route.heroImage),
+                    ),
                   ),
                 ),
                 Positioned(
@@ -276,18 +281,12 @@ class _JournalCollageCover extends StatelessWidget {
           ? 1 - _collageEase(_collageInterval(first ? .22 : .36, 1, layer.p))
           : _collageEase(_collageInterval(first ? 0 : .08, .64, layer.p));
       final text = first ? layer.copy.first : layer.copy.second;
-      final measured = TextPainter(
-        text: TextSpan(text: text, style: style),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-        textScaler: TextScaler.noScaling,
-      )..layout();
-      final lineWidth = first ? .95 * _width : measured.width + 12.09;
-      measured.dispose();
       return Positioned(
         left: .059 * _width + (first ? 0 : 40),
         top: 2 + line * lineHeight,
-        width: lineWidth,
+        // Let the second line keep its natural width. Measuring both titles
+        // with new TextPainters each frame duplicated Flutter's text layout.
+        width: first ? .95 * _width : null,
         height: lineHeight + (first ? 0 : 1.95),
         child: _position(
           transformKey: ValueKey('journal-title-${layer.route.id}-$line'),

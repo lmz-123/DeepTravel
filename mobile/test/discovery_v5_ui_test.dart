@@ -226,6 +226,86 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final direction in [1, -1]) {
+    for (final step in [6.0, 12.0, 24.0]) {
+      testWidgets(
+          'journal release preserves momentum at ${step / .016}px/s in direction $direction',
+          (tester) async {
+        await _pump(tester, controller: _JournalDiscovery(_shenzhenRoutes));
+        double progress() =>
+            tester
+                .widgetList<Transform>(_journalPages)
+                .first
+                .transform
+                .entry(0, 3)
+                .abs() /
+            16;
+        final gesture =
+            await tester.startGesture(tester.getCenter(_journalSwipe));
+        for (var i = 1; i <= 120 / step; i++) {
+          await gesture.moveBy(Offset(-direction * step, 0),
+              timeStamp: Duration(milliseconds: i * 16));
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        final releasedAt = progress();
+        expect(releasedAt, closeTo(120 / (390 * .78), .001));
+        await gesture.up(
+            timeStamp: Duration(milliseconds: (120 / step * 16).round()));
+        await tester.pump();
+        expect(progress(), closeTo(releasedAt, .001));
+        await tester.pump(const Duration(milliseconds: 16));
+        // The first post-release frame must continue the measured gesture,
+        // not restart from rest in the middle of the collage.
+        final firstStep = progress() - releasedAt;
+        expect(firstStep, closeTo(step / (390 * .78), .01));
+        var previous = progress();
+        for (var frame = 0; frame < 8; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final current = progress();
+          expect(current, greaterThan(previous));
+          expect(current, lessThan(1));
+          previous = current;
+        }
+        await tester.pump(const Duration(milliseconds: 340));
+        expect(find.text(direction == 1 ? '02' : '04'), findsOneWidget);
+        expect(_journalPages, findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets(
+      'a fast release near the end lands without overshooting or skipping',
+      (tester) async {
+    await _pump(tester, controller: _JournalDiscovery(_shenzhenRoutes));
+    final gesture = await tester.startGesture(tester.getCenter(_journalSwipe));
+    for (var i = 1; i <= 8; i++) {
+      await gesture.moveBy(const Offset(-36, 0),
+          timeStamp: Duration(milliseconds: i * 16));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up(timeStamp: const Duration(milliseconds: 128));
+    await tester.pump();
+    var previous = 288 / (390 * .78);
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      final progress = tester
+              .widgetList<Transform>(_journalPages)
+              .first
+              .transform
+              .entry(0, 3)
+              .abs() /
+          16;
+      expect(progress, greaterThan(previous));
+      expect(progress, lessThanOrEqualTo(1));
+      previous = progress;
+    }
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(find.text('02'), findsOneWidget);
+    expect(_journalPages, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a slow short swipe springs back without changing the issue',
       (tester) async {
     await _pump(tester, controller: _JournalDiscovery(_shenzhenRoutes));
