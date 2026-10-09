@@ -9,6 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
+import 'package:jiandi/features/experience/presentation/city_atlas.dart';
+import 'package:jiandi/features/experience/presentation/widgets/traveler_bottom_navigation.dart';
+import 'fixtures/city_atlas/approved_routes.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/domain/city_story.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
@@ -49,6 +52,73 @@ void main() {
           await File('test/fixtures/discovery/$name.jpg').readAsBytes();
     }
   });
+  for (final page in ['journal', 'map']) {
+    testWidgets('v6 approved $page composition', (tester) async {
+      final routes = (await tester.runAsync(approvedRoutes))!;
+      tester.view.physicalSize = Size(390, page == 'journal' ? 892 : 843);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = GoRouter(routes: [
+        GoRoute(
+            path: '/',
+            builder: (_, __) => page == 'journal'
+                ? const DiscoveryPage()
+                : Scaffold(
+                    backgroundColor: AppColors.paper,
+                    body: Stack(children: [
+                      CityAtlas(
+                          citySlug: 'shenzhen',
+                          cityName: '深圳',
+                          routes: routes,
+                          saved: const {},
+                          busyFavorites: const {},
+                          onFavorite: (_) {},
+                          onOpen: (_) {},
+                          onBack: () {}),
+                      Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: TravelerBottomNavigation(
+                              editorial: true,
+                              active: TravelerSection.journal,
+                              onSelected: (_) {})),
+                    ])))
+      ]);
+      addTearDown(router.dispose);
+      await HttpOverrides.runZoned(() async {
+        await tester.pumpWidget(ProviderScope(
+            overrides: [
+              currentUserIdProvider.overrideWithValue(null),
+              experienceRepositoryProvider
+                  .overrideWithValue(_GoldenRepository()),
+              discoveryControllerProvider.overrideWith(
+                  () => _ApprovedDiscovery(routes.take(2).toList())),
+              activeTourControllerProvider.overrideWith(_GoldenTour.new),
+            ],
+            child: RepaintBoundary(
+                key: const ValueKey('golden-screen'),
+                child: MaterialApp.router(
+                    debugShowCheckedModeBanner: false,
+                    routerConfig: router,
+                    theme: AppTheme.light))));
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          final context = tester.element(find.byType(Scaffold).first);
+          for (final route
+              in routes.where((route) => route.heroImage.isNotEmpty)) {
+            await precacheImage(NetworkImage(route.heroImage), context);
+          }
+        });
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await expectLater(find.byKey(const ValueKey('golden-screen')),
+            matchesGoldenFile('goldens/v6-$page-390.png'));
+      }, createHttpClient: (_) => _FixtureClient(pictures));
+    });
+  }
+
   for (final width in [390.0, 360.0]) {
     for (final tab in ['journal', 'atlas', 'shelf']) {
       testWidgets('$tab approved typography ${width.toInt()}', (tester) async {
@@ -315,4 +385,16 @@ class _FixtureResponse extends Stream<List<int>> implements HttpClientResponse {
       );
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ApprovedDiscovery extends _GoldenDiscovery {
+  _ApprovedDiscovery(this.routes);
+  final List<RouteExperience> routes;
+  @override
+  Future<DiscoveryState> build() async => DiscoveryState(
+      cities: const [_city],
+      city: _city,
+      catalog: CityDiscoveryCatalog(routes: routes),
+      cards: routes.map((r) => ScenicAreaCard(route: r)).toList(),
+      revision: 0);
 }

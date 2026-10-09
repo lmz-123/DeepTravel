@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
+import 'fixtures/city_atlas/approved_routes.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/home_story.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
@@ -48,6 +49,41 @@ void main() {
         .load();
   });
 
+  testWidgets('v6 approved scenic detail composition', (tester) async {
+    final route =
+        (await tester.runAsync(() => approvedRoutes(companion: true)))!.first;
+    final bytes = (await tester.runAsync(
+        () => File('test/fixtures/discovery/coast.jpg').readAsBytes()))!;
+    tester.view.physicalSize = const Size(390, 989);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await HttpOverrides.runZoned(() async {
+      await tester.pumpWidget(ProviderScope(
+          overrides: [
+            currentUserIdProvider.overrideWithValue(null),
+            offlineAwareRouteProvider.overrideWith((ref, slug) async => route),
+            homeStoryPlaybackControllerProvider
+                .overrideWith(_QuietPlayback.new),
+            journeyControllerProvider.overrideWith(_NoFieldStart.new),
+            manualSessionProvider.overrideWith2(_MemorySession.new),
+          ],
+          child: RepaintBoundary(
+              key: const ValueKey('manual-evidence'),
+              child: MaterialApp(
+                  debugShowCheckedModeBanner: false,
+                  theme: AppTheme.light,
+                  home: RouteDetailPage(slug: route.slug)))));
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(RouteDetailPage));
+      await tester.runAsync(
+          () => precacheImage(NetworkImage(route.heroImage), context));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await expectLater(find.byKey(const ValueKey('manual-evidence')),
+          matchesGoldenFile('goldens/v6-detail-390.png'));
+    }, createHttpClient: (_) => _PhotoClient(bytes));
+  });
   for (final size in [const Size(390, 844), const Size(360, 800)]) {
     testWidgets(
         'route opens directory directly, remains quiet, and reading never starts field tour at $size',
@@ -101,7 +137,9 @@ void main() {
           matchesGoldenFile(
               'goldens/route-companion-${size.width.toInt()}.png'),
         );
-        await tester.tap(find.text('翻开这段旅程'));
+        await tester
+            .ensureVisible(find.byKey(const ValueKey('route-directory-entry')));
+        await tester.tap(find.byKey(const ValueKey('route-directory-entry')));
         await tester.pumpAndSettle();
         expect(find.byType(RouteChapterDirectory), findsOneWidget);
         expect(find.byType(ChapterPrelude), findsNothing);

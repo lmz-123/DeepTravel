@@ -26,9 +26,11 @@ class TravelerBottomNavigation extends ConsumerWidget {
     super.key,
     this.journeyId,
     this.onSelected,
+    this.editorial = false,
   });
   final TravelerSection active;
   final String? journeyId;
+  final bool editorial;
   final ValueChanged<TravelerSection>? onSelected;
 
   @override
@@ -36,7 +38,11 @@ class TravelerBottomNavigation extends ConsumerWidget {
     final horizontal = MediaQuery.sizeOf(context).width <= 360 ? 20.0 : 23.0;
     final entries = [
       (TravelerSection.journal, DiscoveryMark.book, '随刊'),
-      (TravelerSection.atlas, DiscoveryMark.search, '路线'),
+      (
+        TravelerSection.atlas,
+        editorial ? DiscoveryMark.compass : DiscoveryMark.search,
+        '路线'
+      ),
       (TravelerSection.companion, DiscoveryMark.pin, '随行'),
     ];
     return Padding(
@@ -46,7 +52,7 @@ class TravelerBottomNavigation extends ConsumerWidget {
         horizontal,
         MediaQuery.paddingOf(context)
             .bottom
-            .clamp(15.0, double.infinity)
+            .clamp(editorial ? 20.0 : 15.0, double.infinity)
             .toDouble(),
       ),
       child: Stack(
@@ -129,21 +135,22 @@ class TravelerBottomNavigation extends ConsumerWidget {
               ),
             ),
           ),
-          Positioned(
-            top: -1,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: const Color(0xffdbe782),
-                  borderRadius: BorderRadius.circular(99),
+          if (!editorial)
+            Positioned(
+              top: -1,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: 36,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: const Color(0xffdbe782),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

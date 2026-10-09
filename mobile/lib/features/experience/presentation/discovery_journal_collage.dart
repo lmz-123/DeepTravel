@@ -1,6 +1,6 @@
 part of 'discovery_page.dart';
 
-/// The approved photographic montage uses a 390 × 463 artboard. Keeping its
+/// The approved photographic montage uses a 390 × 370 artboard. Keeping its
 /// coordinates together makes the crop, print registration and type movement
 /// scale as one composition on every phone width.
 class _JournalCollageCover extends StatelessWidget {
@@ -21,7 +21,7 @@ class _JournalCollageCover extends StatelessWidget {
   final VoidCallback onOpen;
 
   static const _width = 390.0;
-  static const _height = 463.0;
+  static const _height = 370.0;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +81,7 @@ class _JournalCollageCover extends StatelessWidget {
 
   Widget _glyph(_JournalCollageLayer layer) => Positioned(
         left: -.04 * _width,
-        top: .57 * _height,
+        top: 205,
         child: _position(
           opacity: layer.enter
               ? _collageInterval(.2, .92, layer.p)
@@ -94,7 +94,7 @@ class _JournalCollageCover extends StatelessWidget {
             layer.copy.print,
             textScaler: TextScaler.noScaling,
             style: discoverySerif(
-              193.05,
+              174,
               weight: FontWeight.w900,
               height: 1,
               color: layer.copy.printColor,
@@ -117,10 +117,10 @@ class _JournalCollageCover extends StatelessWidget {
         ? _collageInterval(0, .13, layer.p)
         : 1 - _collageInterval(.56, .97, layer.p);
     final matrix = Matrix4.identity()
-      ..translateByDouble(220 + x, 285 + y, 0, 1)
+      ..translateByDouble(223 + x, 233 + y, 0, 1)
       ..rotateZ(angle)
       ..scaleByDouble(scale, scale, 1, 1)
-      ..translateByDouble(-220, -285, 0, 1);
+      ..translateByDouble(-223, -233, 0, 1);
     Widget print = Transform(
       key: ValueKey('journal-photo-${layer.route.id}'),
       transform: matrix,
@@ -135,20 +135,20 @@ class _JournalCollageCover extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 Positioned(
-                  left: 45,
-                  top: 125,
-                  width: 370,
-                  height: 320,
+                  left: 56,
+                  top: 111,
+                  width: 334,
+                  height: 244,
                   child: Opacity(
                     opacity: opacity,
                     child: _JournalCollagePhoto(source: layer.route.heroImage),
                   ),
                 ),
                 Positioned(
-                  left: 40,
-                  top: 325,
-                  width: 365,
-                  height: 125,
+                  left: 56,
+                  top: 255,
+                  width: 334,
+                  height: 100,
                   child: Opacity(
                     opacity: opacity,
                     child: const DecoratedBox(
@@ -182,8 +182,8 @@ class _JournalCollageCover extends StatelessWidget {
   }
 
   Widget _note(_JournalCollageLayer layer) => Positioned(
-        left: .057 * _width,
-        top: .42 * _height,
+        left: 23,
+        top: 168,
         height: .49 * _height,
         child: _position(
           opacity: layer.enter
@@ -195,8 +195,8 @@ class _JournalCollageCover extends StatelessWidget {
       );
 
   Widget _caption(_JournalCollageLayer layer) => Positioned(
-        left: .21 * _width,
-        top: .86 * _height,
+        left: 78,
+        top: 316,
         width: .58 * _width,
         child: _position(
           opacity: layer.enter
@@ -224,8 +224,8 @@ class _JournalCollageCover extends StatelessWidget {
       );
 
   Widget _seal(_JournalCollageLayer layer) => Positioned(
-        right: .043 * _width,
-        bottom: .01 * _height,
+        right: 21,
+        bottom: 0,
         child: _position(
           opacity: layer.enter
               ? _collageInterval(.52, .98, layer.p)
@@ -236,8 +236,8 @@ class _JournalCollageCover extends StatelessWidget {
           scale: .93 + .07 * (1 - layer.remaining),
           origin: Alignment.bottomCenter,
           child: Container(
-            width: 62.985,
-            height: 62.985,
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: layer.copy.sealColor,
@@ -246,7 +246,7 @@ class _JournalCollageCover extends StatelessWidget {
             child: const Center(
               child: DiscoveryIcon(
                 DiscoveryMark.arrowUpRight,
-                size: 30.42,
+                size: 27,
                 stroke: 1.4,
                 color: Color(0xff3c4329),
               ),
@@ -256,12 +256,12 @@ class _JournalCollageCover extends StatelessWidget {
       );
 
   List<Widget> _title(_JournalCollageLayer layer) {
-    const fontSize = 62.01;
-    const lineHeight = fontSize * 1.15;
+    const fontSize = 60.06;
+    const lineHeight = fontSize * 1.17;
     final style = discoverySerif(
       fontSize,
       weight: FontWeight.w700,
-      height: 1.15,
+      height: 1.17,
       spacing: -4.017,
       color: layer.copy.color == AppColors.terracotta
           ? const Color(0xffcf4630)
@@ -285,8 +285,8 @@ class _JournalCollageCover extends StatelessWidget {
       final lineWidth = first ? .95 * _width : measured.width + 12.09;
       measured.dispose();
       return Positioned(
-        left: .059 * _width + (first ? 0 : 53.04),
-        top: .014 * _height + line * lineHeight,
+        left: .059 * _width + (first ? 0 : 40),
+        top: 2 + line * lineHeight,
         width: lineWidth,
         height: lineHeight + (first ? 0 : 1.95),
         child: _position(
@@ -367,26 +367,14 @@ double _collageInterval(double start, double end, double p) =>
 double _collageEase(double p) => p * p * (3 - 2 * p);
 
 Path _journalCollagePhotoPath(bool town) {
-  final path = Path();
-  if (town) {
-    path
-      ..moveTo(60, 151)
-      ..lineTo(271, 151)
-      ..quadraticBezierTo(355, 151, 390, 205)
-      ..lineTo(390, 425)
-      ..quadraticBezierTo(377, 438, 350, 438)
-      ..lineTo(60, 438);
-  } else {
-    path
-      ..moveTo(150, 131)
-      ..lineTo(390, 131)
-      ..lineTo(390, 410)
-      ..quadraticBezierTo(390, 438, 358, 438)
-      ..lineTo(60, 438)
-      ..lineTo(60, 222)
-      ..quadraticBezierTo(76, 160, 150, 131);
-  }
-  return path..close();
+  return Path()
+    ..addRRect(RRect.fromRectAndCorners(
+      const Rect.fromLTWH(56, 111, 334, 244),
+      topLeft: Radius.circular(town ? 2 : 105),
+      topRight: Radius.circular(town ? 85 : 0),
+      bottomRight: Radius.circular(town ? 3 : 39),
+      bottomLeft: Radius.circular(town ? 35 : 0),
+    ));
 }
 
 class _JournalCollagePhotoClipper extends CustomClipper<Path> {
@@ -459,6 +447,10 @@ class _JournalCollagePhoto extends StatelessWidget {
       ? _fallback()
       : Image.network(
           source,
+          frameBuilder: (_, child, frame, __) => frame == null
+              ? child
+              : ColorFiltered(
+                  colorFilter: discoveryPhotoTone(.8), child: child),
           width: 370,
           height: 320,
           fit: BoxFit.cover,
@@ -491,8 +483,8 @@ class _JournalVerticalNote extends StatelessWidget {
   Widget build(BuildContext context) {
     const fontSize = 9.984;
     const advance = fontSize * 1.22;
-    const columnHeight = 463 * .49;
-    const capacity = 18;
+    const columnHeight = 370 * .49;
+    const capacity = 14;
     final characters = text.runes.map(String.fromCharCode).toList();
     final columns = <Widget>[];
     for (var start = 0; start < characters.length; start += capacity) {

@@ -45,7 +45,10 @@ void main() {
       (tester) async {
     await _pumpApp(tester);
     await _openFeatured(tester);
-    await tester.tap(find.text('翻开这段旅程'));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('route-directory-entry')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('route-directory-entry')));
     await tester.pumpAndSettle();
     expect(find.text('本刊目录'), findsOneWidget);
     expect(find.text('我已到达，开始观察'), findsNothing);
@@ -85,7 +88,10 @@ void main() {
     expect(container.read(journeyControllerProvider).session, isNull);
     expect(container.read(activeTourControllerProvider).session, isNull);
 
-    await tester.tap(find.text('翻开这段旅程'));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('route-directory-entry')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('route-directory-entry')));
     await tester.pumpAndSettle();
     expect(find.text('本刊目录'), findsOneWidget);
     expect(find.text('我已到达，开始观察'), findsNothing);
@@ -119,7 +125,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(appRouter.routeInformationProvider.value.uri.path,
         '/route/wukang-urban-slices');
-    expect(find.text('翻开这段旅程'), findsOneWidget);
+    expect(find.byKey(const ValueKey('route-directory-entry')), findsOneWidget);
     expect(find.text('我已到达，开始观察'), findsNothing);
     expect(container.read(journeyControllerProvider).session, same(session));
     expect(container.read(activeTourControllerProvider).session, isNull);
@@ -128,7 +134,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('城市随刊'), findsOneWidget);
+    expect(find.text('城市随刊'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 
@@ -192,7 +198,7 @@ void main() {
     await _pumpApp(tester);
     expect(find.text('继续未完成的旧路线'), findsNothing);
     expect(find.textContaining('已定位到'), findsNothing);
-    expect(find.text('城市随刊'), findsOneWidget);
+    expect(find.text('城市随刊'), findsNWidgets(2));
   });
 }
 

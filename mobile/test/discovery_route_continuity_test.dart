@@ -23,7 +23,7 @@ void main() {
       expect(find.text('测试路线'), findsOneWidget);
       expect(find.text('第一条线索'), findsNothing);
       expect(find.textContaining('距你'), findsNothing);
-      expect(find.text('城市随刊'), findsOneWidget);
+      expect(find.text('城市随刊'), findsNWidgets(2));
       expect(find.text('随刊'), findsOneWidget);
     },
   );
@@ -222,7 +222,7 @@ Future<void> _pumpDiscovery(
 
 class _RecordingOfflinePackageService extends RouteOfflinePackageService {
   _RecordingOfflinePackageService()
-    : super(Dio(), _CardStore(), PreparedRouteService(Dio(), _CardStore()));
+      : super(Dio(), _CardStore(), PreparedRouteService(Dio(), _CardStore()));
 
   String? installedSlug;
 
@@ -230,7 +230,8 @@ class _RecordingOfflinePackageService extends RouteOfflinePackageService {
   Future<OfflinePackageStatus> status(
     String slug, {
     String? currentVersion,
-  }) async => const OfflinePackageStatus.idle();
+  }) async =>
+      const OfflinePackageStatus.idle();
 
   @override
   Future<InstalledRoutePackage> install(
@@ -267,7 +268,8 @@ class _CardStore implements TourStore {
     String url,
     String version,
     int sizeBytes,
-  ) async => null;
+  ) async =>
+      null;
   @override
   Future<List<PreparedAssetRecord>> preparedAssets() async => const [];
   @override
@@ -300,12 +302,12 @@ class _RecordingRevisitController extends ActiveTourController {
 class _FixedDiscoveryController extends DiscoveryController {
   @override
   Future<DiscoveryState> build() async => const DiscoveryState(
-    cities: [_city],
-    city: _city,
-    catalog: CityDiscoveryCatalog(routes: [_route]),
-    cards: [ScenicAreaCard(route: _route)],
-    revision: 0,
-  );
+        cities: [_city],
+        city: _city,
+        catalog: CityDiscoveryCatalog(routes: [_route]),
+        cards: [ScenicAreaCard(route: _route)],
+        revision: 0,
+      );
 
   @override
   Future<DiscoveryStartupAction> prepareColdStart() async =>
@@ -414,10 +416,10 @@ JourneyContext _context({required String status, required String kind}) =>
     );
 
 JourneyLibraryItem _item(JourneyContext context) => JourneyLibraryItem(
-  journey: context.journey,
-  route: context.route,
-  journeyKind: context.journeyKind,
-  collectedCount: context.collectedCount,
-  totalCount: context.totalCount,
-  evidenceCount: 0,
-);
+      journey: context.journey,
+      route: context.route,
+      journeyKind: context.journeyKind,
+      collectedCount: context.collectedCount,
+      totalCount: context.totalCount,
+      evidenceCount: 0,
+    );

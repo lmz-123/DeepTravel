@@ -4,6 +4,35 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 
+/// Matches the restrained photographic ink in the approved journal/detail.
+ColorFilter discoveryPhotoTone(double saturation) {
+  final r = .2126 * (1 - saturation);
+  final g = .7152 * (1 - saturation);
+  final b = .0722 * (1 - saturation);
+  return ColorFilter.matrix([
+    r + saturation,
+    g,
+    b,
+    0,
+    0,
+    r,
+    g + saturation,
+    b,
+    0,
+    0,
+    r,
+    g,
+    b + saturation,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]);
+}
+
 TextStyle discoverySerif(
   double size, {
   Color color = AppColors.ink,
@@ -40,6 +69,9 @@ TextStyle discoverySans(
 enum DiscoveryMark {
   book,
   bookmark,
+  heart,
+  compass,
+  expand,
   search,
   arrowUpRight,
   arrowLeft,
@@ -106,6 +138,38 @@ class _MarkPainter extends CustomPainter {
         path.lineTo(22, 5);
         path.cubicTo(19, 4, 15, 4, 12, 7);
         path.lineTo(12, 21);
+      case DiscoveryMark.expand:
+        path.moveTo(8, 4);
+        path.lineTo(4, 4);
+        path.lineTo(4, 8);
+        path.moveTo(16, 4);
+        path.lineTo(20, 4);
+        path.lineTo(20, 8);
+        path.moveTo(4, 16);
+        path.lineTo(4, 20);
+        path.lineTo(8, 20);
+        path.moveTo(16, 20);
+        path.lineTo(20, 20);
+        path.lineTo(20, 16);
+      case DiscoveryMark.compass:
+        canvas.drawCircle(const Offset(12, 12), 8.5, pen);
+        path.moveTo(15.5, 8.5);
+        path.lineTo(13.5, 13.5);
+        path.lineTo(8.5, 15.5);
+        path.lineTo(10.5, 10.5);
+        path.close();
+      case DiscoveryMark.heart:
+        path.moveTo(20.84, 4.61);
+        path.cubicTo(18.69, 2.46, 15.21, 2.46, 13.06, 4.61);
+        path.lineTo(12, 5.67);
+        path.lineTo(10.94, 4.61);
+        path.cubicTo(8.79, 2.46, 5.31, 2.46, 3.16, 4.61);
+        path.cubicTo(1.01, 6.76, 1.01, 10.24, 3.16, 12.39);
+        path.lineTo(12, 21.23);
+        path.lineTo(20.84, 12.39);
+        path.cubicTo(22.99, 10.24, 22.99, 6.76, 20.84, 4.61);
+        path.close();
+        if (filled) canvas.drawPath(path, Paint()..color = color);
       case DiscoveryMark.bookmark:
         path.moveTo(19, 21);
         path.lineTo(12, 17);
@@ -332,7 +396,9 @@ class _DiscoveryTouchState extends State<DiscoveryTouch> {
 }
 
 class DiscoveryBrand extends StatelessWidget {
-  const DiscoveryBrand({super.key, required this.onTap});
+  const DiscoveryBrand(
+      {super.key, required this.onTap, this.editorial = false});
+  final bool editorial;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
@@ -343,10 +409,11 @@ class DiscoveryBrand extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 33,
                 height: 36,
-                child: CustomPaint(painter: _BrandPainter()),
+                child:
+                    CustomPaint(painter: _BrandPainter(editorial: editorial)),
               ),
               const SizedBox(width: 7),
               Column(
@@ -356,8 +423,8 @@ class DiscoveryBrand extends StatelessWidget {
                   Text(
                     '见地',
                     style: discoverySerif(
-                      24,
-                      weight: FontWeight.w600,
+                      editorial ? 26 : 24,
+                      weight: editorial ? FontWeight.w700 : FontWeight.w600,
                       height: 1,
                       spacing: .48,
                     ),
@@ -381,9 +448,23 @@ class DiscoveryBrand extends StatelessWidget {
 }
 
 class _BrandPainter extends CustomPainter {
-  const _BrandPainter();
+  const _BrandPainter({this.editorial = false});
+  final bool editorial;
   @override
   void paint(Canvas canvas, Size size) {
+    if (editorial) {
+      final pen = Paint()
+        ..color = AppColors.terracotta
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1;
+      canvas.translate(size.width / 2, size.height / 2);
+      canvas.rotate(-28 * math.pi / 180);
+      canvas.drawOval(const Rect.fromLTWH(-14, -12, 27, 20), pen);
+      canvas.translate(-2, 7);
+      canvas.rotate(-29 * math.pi / 180);
+      canvas.drawOval(const Rect.fromLTWH(-14, -12, 27, 20), pen);
+      return;
+    }
     canvas.scale(size.width / 40, size.height / 40);
     final path = Path()
       ..moveTo(7, 29)
@@ -402,7 +483,7 @@ class _BrandPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_BrandPainter old) => false;
+  bool shouldRepaint(_BrandPainter old) => editorial != old.editorial;
 }
 
 class DiscoveryCircle extends StatelessWidget {

@@ -17,7 +17,7 @@ class _DiscoveryJournal extends StatefulWidget {
   final Set<String> saved, busyFavorites;
   final ValueChanged<RouteExperience> onFavorite, onOpen;
   final VoidCallback onCity, onAtlas;
-  final VoidCallback onCompanion;
+  final ValueChanged<RouteExperience> onCompanion;
   final Future<void> Function() onRefresh;
   @override
   State<_DiscoveryJournal> createState() => _DiscoveryJournalState();
@@ -178,6 +178,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
         slivers: [
           SliverToBoxAdapter(
             child: _DiscoveryHeader(
+              editorial: true,
               city: widget.state.city?.name ?? '选择城市',
               onCity: widget.onCity,
             ),
@@ -193,7 +194,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          height: 48,
+                          height: 47,
                           margin: EdgeInsets.symmetric(horizontal: pad),
                           decoration: const BoxDecoration(
                             border: Border(
@@ -342,47 +343,8 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                           ),
                         ),
                         DiscoveryTouch(
-                          label: '打开城市索引',
-                          onTap: widget.onAtlas,
-                          child: Container(
-                            margin: EdgeInsets.symmetric(horizontal: pad),
-                            height: 50,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '有目的地，也有自己的节奏。',
-                                  style: discoverySans(
-                                    narrow ? 8 : 9,
-                                    color: const Color(0xffa08b75),
-                                  ),
-                                ),
-                                Row(
-                                  children: [
-                                    Text(
-                                      '打开城市索引',
-                                      style: discoverySans(
-                                        10,
-                                        weight: FontWeight.w500,
-                                        color: const Color(0xff6d6656),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    const DiscoveryIcon(
-                                      DiscoveryMark.arrowUpRight,
-                                      size: 15,
-                                      color: Color(0xff6d6656),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        DiscoveryTouch(
                           label: '打开随行，开启到点提醒',
-                          onTap: widget.onCompanion,
+                          onTap: () => widget.onCompanion(route),
                           child: Container(
                             width: double.infinity,
                             margin: EdgeInsets.symmetric(horizontal: pad),
@@ -448,6 +410,16 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                             ),
                           ),
                         ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: pad),
+                          child: CityMapEntry(
+                              citySlug: widget.state.city?.slug ?? '',
+                              coordinates: issues
+                                  .map(cityAtlasCoordinate)
+                                  .whereType<Offset>()
+                                  .toList(),
+                              onTap: widget.onAtlas),
+                        ),
                       ],
                     ),
             ),
@@ -466,11 +438,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
   Widget _issueDetails(RouteExperience route, RouteExperience? next,
           double scale, double progress, int direction) =>
       Container(
-        padding: const EdgeInsets.fromLTRB(0, 14, 0, 13),
-        decoration: const BoxDecoration(
-            border: Border(
-          bottom: BorderSide(color: Color(0x222d3026)),
-        )),
+        padding: const EdgeInsets.fromLTRB(0, 17, 0, 17),
         child: Row(children: [
           Expanded(
               child: Stack(children: [
@@ -483,18 +451,18 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
             child: Opacity(
               opacity: 1 - math.sin(math.pi * progress) * .78,
               child: _DiscoveryIconButton(
-                mark: DiscoveryMark.bookmark,
+                mark: DiscoveryMark.heart,
                 label:
                     '${widget.saved.contains(route.id) ? '取消收藏' : '收藏'}${route.title}',
                 onTap: widget.busyFavorites.contains(route.id)
                     ? null
                     : () => widget.onFavorite(route),
-                size: 23,
+                size: 20,
                 selected: widget.saved.contains(route.id),
                 filled: widget.saved.contains(route.id),
                 color: widget.saved.contains(route.id)
                     ? AppColors.terracotta
-                    : const Color(0xff817761),
+                    : const Color(0xffc84832),
               ),
             ),
           ),
@@ -531,10 +499,10 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                     Row(children: [
                       Flexible(
                           child: Text(route.title,
-                              style: discoverySerif(26 * scale,
+                              style: discoverySerif(25 * scale,
                                   weight: FontWeight.w600,
                                   height: 1.65,
-                                  spacing: -1 * scale),
+                                  spacing: 0),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis)),
                       SizedBox(width: 15.6 * scale),

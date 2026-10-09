@@ -15,6 +15,7 @@ import 'companion_walk_settings.dart';
 import 'companion_distance_controller.dart';
 import 'companion_point_picker.dart';
 import 'discovery_controller.dart';
+import 'city_atlas.dart';
 import 'experience_providers.dart';
 import 'offline_package_controller.dart';
 import 'widgets/discovery_art.dart';
@@ -42,6 +43,7 @@ class DiscoveryPage extends ConsumerStatefulWidget {
 }
 
 class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
+  var _cityMapOpen = false;
   var _coldStartPrepared = false;
   var _section = TravelerSection.journal;
   final _busyFavorites = <String>{};
@@ -369,64 +371,100 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                       onRetry: () =>
                           ref.invalidate(discoveryControllerProvider),
                     ),
-                    data: (state) => IndexedStack(
-                      index: switch (_section) {
-                        TravelerSection.atlas => 1,
-                        TravelerSection.shelf => 2,
-                        TravelerSection.companion => 3,
-                        _ => 0,
+                    data: (state) => PopScope(
+                      canPop:
+                          !_cityMapOpen || _section != TravelerSection.journal,
+                      onPopInvokedWithResult: (didPop, _) {
+                        if (!didPop && _cityMapOpen) {
+                          setState(() => _cityMapOpen = false);
+                        }
                       },
-                      children: [
-                        _DiscoveryJournal(
-                          key: ValueKey('journal-${state.city?.slug}'),
-                          state: state,
-                          saved: saved,
-                          busyFavorites: _busyFavorites,
-                          onFavorite: _toggleFavorite,
-                          onOpen: _openRoute,
-                          onCity: () => _chooseCity(state),
-                          onAtlas: () =>
-                              setState(() => _section = TravelerSection.atlas),
-                          onCompanion: () => setState(
-                              () => _section = TravelerSection.companion),
-                          onRefresh: _refresh,
-                        ),
-                        _DiscoveryAtlas(
-                          key: ValueKey('atlas-${state.city?.slug}'),
-                          state: state,
-                          saved: saved,
-                          busyFavorites: _busyFavorites,
-                          onFavorite: _toggleFavorite,
-                          onOpen: _openRoute,
-                          onCity: () => _chooseCity(state),
-                          onRefresh: _refresh,
-                        ),
-                        _DiscoveryShelf(
-                          favoritesLoading: favoriteState?.isLoading == true,
-                          favoritesError: favoriteState?.hasError == true,
-                          onRetryFavorites: () {
-                            if (userId != null) {
-                              ref.invalidate(travelerFavoritesProvider(userId));
-                            }
-                          },
-                          favorites: favorites
-                              .where((f) => f.kind == 'route')
-                              .toList(),
-                          state: state,
-                          visible: _section == TravelerSection.shelf,
-                          busyFavorites: _busyFavorites,
-                          onRemove: _toggleFavoriteId,
-                          onOpen: _openRoute,
-                          onCity: () => _chooseCity(state),
-                          onBrowse: () => setState(
-                              () => _section = TravelerSection.journal),
-                        ),
-                        companion,
-                      ],
+                      child: IndexedStack(
+                        index: switch (_section) {
+                          TravelerSection.atlas => 1,
+                          TravelerSection.shelf => 2,
+                          TravelerSection.companion => 3,
+                          _ => 0,
+                        },
+                        children: [
+                          IndexedStack(index: _cityMapOpen ? 1 : 0, children: [
+                            _DiscoveryJournal(
+                              key: ValueKey('journal-${state.city?.slug}'),
+                              state: state,
+                              saved: saved,
+                              busyFavorites: _busyFavorites,
+                              onFavorite: _toggleFavorite,
+                              onOpen: _openRoute,
+                              onCity: () => _chooseCity(state),
+                              onAtlas: () =>
+                                  setState(() => _cityMapOpen = true),
+                              onCompanion: (route) => setState(() {
+                                _companionRouteId =
+                                    (route.audioTour?.fragments.isNotEmpty ??
+                                            false)
+                                        ? route.id
+                                        : null;
+                                _section = TravelerSection.companion;
+                              }),
+                              onRefresh: _refresh,
+                            ),
+                            CityAtlas(
+                              visible: _cityMapOpen &&
+                                  _section == TravelerSection.journal,
+                              key: ValueKey('city-map-${state.city?.slug}'),
+                              citySlug: state.city?.slug ?? '',
+                              cityName: state.city?.name ?? '',
+                              routes: state.cards
+                                  .map((card) => card.route)
+                                  .toList(),
+                              saved: saved,
+                              busyFavorites: _busyFavorites,
+                              onFavorite: _toggleFavorite,
+                              onOpen: _openRoute,
+                              onBack: () =>
+                                  setState(() => _cityMapOpen = false),
+                            ),
+                          ]),
+                          _DiscoveryAtlas(
+                            key: ValueKey('atlas-${state.city?.slug}'),
+                            state: state,
+                            saved: saved,
+                            busyFavorites: _busyFavorites,
+                            onFavorite: _toggleFavorite,
+                            onOpen: _openRoute,
+                            onCity: () => _chooseCity(state),
+                            onRefresh: _refresh,
+                          ),
+                          _DiscoveryShelf(
+                            favoritesLoading: favoriteState?.isLoading == true,
+                            favoritesError: favoriteState?.hasError == true,
+                            onRetryFavorites: () {
+                              if (userId != null) {
+                                ref.invalidate(
+                                    travelerFavoritesProvider(userId));
+                              }
+                            },
+                            favorites: favorites
+                                .where((f) => f.kind == 'route')
+                                .toList(),
+                            state: state,
+                            visible: _section == TravelerSection.shelf,
+                            busyFavorites: _busyFavorites,
+                            onRemove: _toggleFavoriteId,
+                            onOpen: _openRoute,
+                            onCity: () => _chooseCity(state),
+                            onBrowse: () => setState(
+                                () => _section = TravelerSection.journal),
+                          ),
+                          companion,
+                        ],
+                      ),
                     ),
                   ),
           ),
-          if (resumeTitle != null && _section != TravelerSection.companion)
+          if (resumeTitle != null &&
+              _section != TravelerSection.companion &&
+              !_cityMapOpen)
             Positioned(
               left: 23,
               right: 23,
@@ -495,6 +533,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
             right: 0,
             bottom: 0,
             child: TravelerBottomNavigation(
+              editorial: _section == TravelerSection.journal,
               active: _section,
               onSelected: (section) {
                 FocusManager.instance.primaryFocus?.unfocus();
@@ -519,12 +558,13 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
 }
 
 class _DiscoveryHeader extends StatelessWidget {
-  const _DiscoveryHeader({this.city, this.onCity});
+  const _DiscoveryHeader({this.city, this.onCity, this.editorial = false});
   final String? city;
   final VoidCallback? onCity;
+  final bool editorial;
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 71,
+        height: editorial ? 78 : 71,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: MediaQuery.sizeOf(context).width <= 360 ? 20 : 23,
@@ -532,7 +572,8 @@ class _DiscoveryHeader extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              DiscoveryBrand(onTap: () => context.push('/profile')),
+              DiscoveryBrand(
+                  editorial: editorial, onTap: () => context.push('/profile')),
               if (city != null)
                 Tooltip(
                   message: '选择城市',
@@ -545,10 +586,19 @@ class _DiscoveryHeader extends StatelessWidget {
                         children: [
                           Text(
                             city!,
-                            style: discoverySans(13, color: AppColors.ink),
+                            style: discoverySans(editorial ? 11 : 13,
+                                color: AppColors.ink),
                           ),
                           const SizedBox(width: 10),
-                          const DiscoveryIcon(DiscoveryMark.down, size: 14),
+                          if (editorial) ...[
+                            Text('·',
+                                style: discoverySans(11,
+                                    color: AppColors.terracotta)),
+                            const SizedBox(width: 10),
+                            Text('城市随刊',
+                                style: discoverySans(11, color: AppColors.ink)),
+                          ] else
+                            const DiscoveryIcon(DiscoveryMark.down, size: 14),
                         ],
                       ),
                     ),

@@ -168,9 +168,10 @@ void main() {
 
     expect(find.byType(Slider), findsNothing);
     expect(find.byType(LinearProgressIndicator), findsNothing);
-    await tester.ensureVisible(find.text('翻开这段旅程'));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('route-directory-entry')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('翻开这段旅程'));
+    await tester.tap(find.byKey(const ValueKey('route-directory-entry')));
     await tester.pumpAndSettle();
     expect(find.byType(RouteChapterDirectory), findsOneWidget);
     expect(find.text('旧砖故事'), findsOneWidget);

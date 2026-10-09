@@ -26,6 +26,24 @@ void main() {
     });
   }
 
+  testWidgets('city map belongs to journal and returns to the same issue',
+      (tester) async {
+    await _pump(tester, controller: _JournalDiscovery(_shenzhenRoutes));
+    await tester.tap(find.byTooltip('下一期随刊'));
+    await tester.pumpAndSettle();
+    final entry = find.bySemanticsLabel(RegExp('城市地图，查看景点与介绍'));
+    await Scrollable.ensureVisible(tester.element(entry), alignment: .35);
+    await tester.pumpAndSettle();
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+    expect(find.text('循着好奇，'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel(RegExp('返回随刊')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('route-card-shenzhen-mixc-world')),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'city index searches real metadata and restores selection after detail',
     (tester) async {

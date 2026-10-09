@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../experience_providers.dart';
+import 'discovery_art.dart';
 
 class FavoriteButton extends ConsumerStatefulWidget {
   const FavoriteButton({
     required this.kind,
     required this.targetId,
     this.color,
+    this.mark,
     this.filledWhenSelected = false,
     super.key,
   });
@@ -15,6 +17,7 @@ class FavoriteButton extends ConsumerStatefulWidget {
   final String kind;
   final String targetId;
   final Color? color;
+  final DiscoveryMark? mark;
   final bool filledWhenSelected;
 
   @override
@@ -44,13 +47,20 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton> {
       style: selected && widget.filledWhenSelected
           ? IconButton.styleFrom(backgroundColor: const Color(0xFF252824))
           : null,
-      icon: Icon(
-        selected
-            ? widget.filledWhenSelected
-                ? Icons.check_rounded
-                : Icons.bookmark_rounded
-            : Icons.bookmark_border_rounded,
-      ),
+      icon: widget.mark != null
+          ? DiscoveryIcon(widget.mark!,
+              size: 20,
+              filled: selected,
+              color: selected
+                  ? const Color(0xffc84832)
+                  : widget.color ?? const Color(0xff30372d))
+          : Icon(
+              selected
+                  ? widget.filledWhenSelected
+                      ? Icons.check_rounded
+                      : Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+            ),
     );
   }
 
