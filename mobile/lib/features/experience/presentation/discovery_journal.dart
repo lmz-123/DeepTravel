@@ -11,9 +11,11 @@ class _DiscoveryJournal extends StatefulWidget {
     required this.onAtlas,
     required this.onCompanion,
     required this.onRefresh,
+    this.mapUpdates,
     super.key,
   });
   final DiscoveryState state;
+  final CityMapUpdates? mapUpdates;
   final Set<String> saved, busyFavorites;
   final ValueChanged<RouteExperience> onFavorite, onOpen;
   final VoidCallback onCity, onAtlas;
@@ -428,7 +430,10 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: pad),
                           child: CityMapEntry(
+                              mapUpdates: widget.mapUpdates,
+                              revision: widget.state.catalog,
                               citySlug: widget.state.city?.slug ?? '',
+                              cityName: widget.state.city?.name ?? '',
                               coordinates: issues
                                   .map(cityAtlasCoordinate)
                                   .whereType<Offset>()

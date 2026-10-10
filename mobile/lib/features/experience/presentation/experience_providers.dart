@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/logging/runtime_log_reporter.dart';
 import '../data/api_experience_repository.dart';
+import '../data/city_map_repository.dart';
+import 'city_atlas_geometry.dart';
 import '../data/demo_experience_repository.dart';
 import '../data/footprint_photo_picker.dart';
 import '../data/footprint_share_service.dart';
@@ -1169,3 +1171,20 @@ class JourneyController extends Notifier<JourneyUiState> {
 
 final journeyControllerProvider =
     NotifierProvider<JourneyController, JourneyUiState>(JourneyController.new);
+
+final cityMapRepositoryProvider = Provider<CityMapRepository?>((ref) {
+  if (ref.watch(experienceRepositoryProvider) is! ApiExperienceRepository) {
+    return null;
+  }
+  final dio = ref.watch(dioProvider);
+  return CityMapRepository(
+    scope: dio.options.baseUrl,
+    manifest: (city) async {
+      final response =
+          await dio.get('/cities/${Uri.encodeComponent(city)}/map');
+      return Map<String, dynamic>.from(response.data['data'] as Map);
+    },
+    bundled: loadCityAtlasDistricts,
+    cache: FileCityMapCache(),
+  );
+});

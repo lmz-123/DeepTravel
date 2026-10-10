@@ -35,6 +35,7 @@ def route_to_dict(route: Route, *, include_stops: bool = True) -> dict:
         "distance_km": route.distance_km,
         "difficulty": route.difficulty,
         "theme": route.theme,
+        "map_category": route.map_category,
         "hero_image": asset_url(route.hero_image),
         "is_featured": route.is_featured,
         "content_status": route.content_status.value,

@@ -6,6 +6,7 @@ import 'package:jiandi/features/experience/presentation/city_atlas.dart';
 
 RouteExperience place(String id,
         {String theme = '海边',
+        String? category,
         double? lat = 22.5987158,
         double? lon = 114.3038915,
         String status = 'published'}) =>
@@ -19,6 +20,7 @@ RouteExperience place(String id,
       distanceKm: 1.8,
       difficulty: '轻松',
       theme: theme,
+      mapCategory: category,
       heroImage: '',
       contentStatus: status,
       stops: const [],
@@ -27,6 +29,9 @@ RouteExperience place(String id,
     );
 void main() {
   test('atlas categories describe places, never delivery mechanics', () {
+    expect(
+        cityAtlasCategory(place('海边街区', theme: '海边', category: 'architecture')),
+        '建筑');
     expect(cityAtlasCategory(place('南头古城', theme: '定位音频 · 碎片叙事')), '街巷');
     expect(cityAtlasCategory(place('上海城市生活', theme: '定位音频')), '其他');
     expect(cityAtlasCategory(place('人民公园', theme: '实地记录')), '公园');

@@ -19,6 +19,7 @@ import 'companion_distance_controller.dart';
 import 'companion_point_picker.dart';
 import 'discovery_controller.dart';
 import 'city_atlas.dart';
+import '../domain/city_map.dart';
 import 'community/notes_page.dart';
 import 'community/notes_widgets.dart';
 import 'experience_providers.dart';
@@ -443,6 +444,8 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                         children: [
                           IndexedStack(index: _cityMapOpen ? 1 : 0, children: [
                             _DiscoveryJournal(
+                              mapUpdates:
+                                  ref.watch(cityMapRepositoryProvider)?.watch,
                               key: ValueKey('journal-${state.city?.slug}'),
                               state: state,
                               saved: saved,
@@ -463,6 +466,9 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                               onRefresh: _refresh,
                             ),
                             CityAtlas(
+                              mapUpdates:
+                                  ref.watch(cityMapRepositoryProvider)?.watch,
+                              revision: state.catalog,
                               visible: _cityMapOpen &&
                                   _section == TravelerSection.journal,
                               key: ValueKey('city-map-${state.city?.slug}'),

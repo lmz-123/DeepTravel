@@ -144,6 +144,7 @@ class RouteExperience {
     this.citySlug = '',
     this.pretrip,
     this.predeparture,
+    this.mapCategory,
     this.centerLatitude,
     this.centerLongitude,
   });
@@ -171,6 +172,7 @@ class RouteExperience {
   final String citySlug;
   final PretripExperience? pretrip;
   final PredepartureIntroduction? predeparture;
+  final String? mapCategory;
   final double? centerLatitude;
   final double? centerLongitude;
 
@@ -196,6 +198,7 @@ class RouteExperience {
         district: json['district'] as String? ?? '',
         cityName: (json['city'] as Map?)?['name'] as String? ?? '',
         citySlug: (json['city'] as Map?)?['slug'] as String? ?? '',
+        mapCategory: json['map_category'] as String?,
         centerLatitude: json['center'] is Map<String, dynamic> &&
                 (json['center'] as Map<String, dynamic>)['latitude'] is num
             ? ((json['center'] as Map<String, dynamic>)['latitude'] as num)

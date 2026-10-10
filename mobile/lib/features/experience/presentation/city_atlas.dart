@@ -13,6 +13,15 @@ const _muted = Color(0xff807664);
 const _line = Color(0xffd7d2c5);
 
 String cityAtlasCategory(RouteExperience route) {
+  const labels = {
+    'coast': '海边',
+    'nature': '山野',
+    'streets': '街巷',
+    'architecture': '建筑',
+    'park': '公园',
+    'other': '其他'
+  };
+  if (labels.containsKey(route.mapCategory)) return labels[route.mapCategory]!;
   String? classify(String text) {
     if (RegExp('海边|海岸|海滨|滨海|海岛|海滩|沙滩|大梅沙').hasMatch(text)) return '海边';
     if (RegExp('山|自然|森林|郊野').hasMatch(text)) return '山野';
@@ -55,9 +64,15 @@ class CityMapEntry extends StatelessWidget {
       {required this.citySlug,
       required this.onTap,
       this.coordinates = const [],
+      this.cityName = '',
+      this.mapUpdates,
+      this.revision,
       super.key});
   final String citySlug;
+  final String cityName;
   final List<Offset> coordinates;
+  final CityMapUpdates? mapUpdates;
+  final Object? revision;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
@@ -73,12 +88,16 @@ class CityMapEntry extends StatelessWidget {
                   top: 7,
                   width: 154,
                   height: 100,
-                  child: FutureBuilder<List<CityAtlasDistrict>>(
-                    future: loadCityAtlasDistricts(citySlug),
-                    builder: (context, snapshot) => CustomPaint(
+                  child: CityMapGeometryView(
+                    city: citySlug,
+                    updates: mapUpdates,
+                    revision: revision,
+                    builder: (districts) => CustomPaint(
                         painter: _AtlasPainter(
-                            cityLabel: citySlug.toUpperCase(),
-                            districts: snapshot.data ?? const [],
+                            cityLabel: citySlug.startsWith('city-')
+                                ? cityName
+                                : citySlug.toUpperCase(),
+                            districts: districts,
                             coordinates: coordinates,
                             zoom: 1,
                             pan: Offset.zero,
@@ -138,6 +157,8 @@ class CityAtlas extends StatefulWidget {
       required this.onOpen,
       required this.onBack,
       this.visible = true,
+      this.mapUpdates,
+      this.revision,
       super.key});
   final String citySlug, cityName;
   final List<RouteExperience> routes;
@@ -145,6 +166,8 @@ class CityAtlas extends StatefulWidget {
   final ValueChanged<RouteExperience> onFavorite, onOpen;
   final VoidCallback onBack;
   final bool visible;
+  final CityMapUpdates? mapUpdates;
+  final Object? revision;
   @override
   State<CityAtlas> createState() => _CityAtlasState();
 }
@@ -164,18 +187,11 @@ class _CityAtlasState extends State<CityAtlas>
   String? _selected;
   double _zoom = 1, _startZoom = 1;
   Offset _pan = Offset.zero, _startPan = Offset.zero, _startFocal = Offset.zero;
-  late Future<List<CityAtlasDistrict>> _geometry;
   List<RouteExperience> get _routes =>
       widget.routes.where((route) => route.isPublished).toList();
   List<RouteExperience> get _visible => _routes
       .where((route) => _filter == '全部' || cityAtlasCategory(route) == _filter)
       .toList();
-  @override
-  void initState() {
-    super.initState();
-    _geometry = loadCityAtlasDistricts(widget.citySlug);
-  }
-
   @override
   void didUpdateWidget(CityAtlas oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -185,7 +201,6 @@ class _CityAtlasState extends State<CityAtlas>
       _arrival.forward(from: 0);
     }
     if (oldWidget.citySlug != widget.citySlug) {
-      _geometry = loadCityAtlasDistricts(widget.citySlug);
       _filter = '全部';
       _selected = null;
       _zoom = 1;
@@ -333,10 +348,12 @@ class _CityAtlasState extends State<CityAtlas>
                                     ))),
                               )),
                       ]))),
-              FutureBuilder<List<CityAtlasDistrict>>(
-                  future: _geometry,
-                  builder: (context, snapshot) =>
-                      _map(snapshot.data ?? const [], visible, selected?.id)),
+              CityMapGeometryView(
+                  city: widget.citySlug,
+                  updates: widget.mapUpdates,
+                  revision: (widget.revision, widget.visible),
+                  builder: (districts) =>
+                      _map(districts, visible, selected?.id)),
               if (selected != null)
                 _sheet(selected)
               else
@@ -438,7 +455,9 @@ class _CityAtlasState extends State<CityAtlas>
                       }),
                       child: CustomPaint(
                           painter: _AtlasPainter(
-                              cityLabel: widget.citySlug.toUpperCase(),
+                              cityLabel: widget.citySlug.startsWith('city-')
+                                  ? widget.cityName
+                                  : widget.citySlug.toUpperCase(),
                               districts: districts,
                               coordinates: coordinates,
                               zoom: _zoom,

@@ -555,6 +555,7 @@ Future<GoRouter> _pump(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        cityMapRepositoryProvider.overrideWithValue(null),
         currentUserIdProvider.overrideWithValue(null),
         companionDistanceNowProvider.overrideWithValue(() => _distanceNow),
         discoveryControllerProvider.overrideWith(() => fixture.discovery),

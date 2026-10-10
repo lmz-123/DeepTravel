@@ -7,6 +7,7 @@ from datetime import datetime
 from flask import Blueprint, abort, current_app, g, jsonify, request, send_file
 from sqlalchemy import text
 
+from app.application.city_maps import city_map_manifest
 from app.domain.errors import ValidationError
 from app.domain.models import ContentStatus, JourneyStatus
 from app.presentation.api.auth import require_user
@@ -224,6 +225,19 @@ def upgrade_legacy_user():
 def list_cities():
     cities = _services()["catalog"].list_cities()
     return jsonify({"data": [city_to_dict(city) for city in cities]})
+
+
+@api.get("/cities/<city_slug>/map")
+def get_city_map(city_slug: str):
+    with current_app.extensions["database"].session_factory() as session:
+        data = city_map_manifest(
+            session, current_app.extensions["object_storage"]["public"], city_slug
+        )
+    if data is None:
+        abort(404)
+    response = jsonify({"data": data})
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @api.get("/cities/<city_slug>/routes")
