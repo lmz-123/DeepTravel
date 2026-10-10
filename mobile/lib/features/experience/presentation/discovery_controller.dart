@@ -80,7 +80,7 @@ final discoveryControllerProvider =
 );
 
 class DiscoveryController extends AsyncNotifier<DiscoveryState> {
-  static const maximumSampleAge = Duration(seconds: 30);
+  static const maximumSampleAge = Duration(minutes: 5);
   static const cityRecognitionRadiusMeters = 100000.0;
 
   ExperienceRepository get _repository =>

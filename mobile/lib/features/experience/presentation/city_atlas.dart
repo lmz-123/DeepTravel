@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../domain/models.dart';
+import 'city_atlas_geometry.dart';
 import 'widgets/discovery_art.dart';
 
 const _paper = Color(0xfff5f0e7);
@@ -14,12 +13,17 @@ const _muted = Color(0xff807664);
 const _line = Color(0xffd7d2c5);
 
 String cityAtlasCategory(RouteExperience route) {
-  final theme = route.theme;
-  if (RegExp('海|滨|沙滩').hasMatch(theme)) return '海边';
-  if (RegExp('山|自然|森林|郊野').hasMatch(theme)) return '山野';
-  if (RegExp('街|巷|古城|老城|历史').hasMatch(theme)) return '街巷';
-  if (RegExp('建筑|设计|艺术|商业').hasMatch(theme)) return '建筑';
-  return theme.isEmpty ? '城市' : theme;
+  String? classify(String text) {
+    if (RegExp('海边|海岸|海滨|滨海|海岛|海滩|沙滩|大梅沙').hasMatch(text)) return '海边';
+    if (RegExp('山|自然|森林|郊野').hasMatch(text)) return '山野';
+    if (RegExp('街|巷|古城|老城|历史|南头|西关|永庆坊').hasMatch(text)) return '街巷';
+    if (RegExp('建筑|设计|艺术|商业|万象').hasMatch(text)) return '建筑';
+    if (RegExp('公园|园林|花园|绿地').hasMatch(text)) return '公园';
+    return null;
+  }
+
+  // Legacy themes may describe playback mechanics rather than the place.
+  return classify(route.theme) ?? classify(route.title) ?? '其他';
 }
 
 /// Coordinates are public catalog coordinates only. Browsing never requests GPS.
@@ -69,10 +73,11 @@ class CityMapEntry extends StatelessWidget {
                   top: 7,
                   width: 154,
                   height: 100,
-                  child: FutureBuilder<List<_District>>(
-                    future: _districts(citySlug),
+                  child: FutureBuilder<List<CityAtlasDistrict>>(
+                    future: loadCityAtlasDistricts(citySlug),
                     builder: (context, snapshot) => CustomPaint(
                         painter: _AtlasPainter(
+                            cityLabel: citySlug.toUpperCase(),
                             districts: snapshot.data ?? const [],
                             coordinates: coordinates,
                             zoom: 1,
@@ -159,7 +164,7 @@ class _CityAtlasState extends State<CityAtlas>
   String? _selected;
   double _zoom = 1, _startZoom = 1;
   Offset _pan = Offset.zero, _startPan = Offset.zero, _startFocal = Offset.zero;
-  late Future<List<_District>> _geometry;
+  late Future<List<CityAtlasDistrict>> _geometry;
   List<RouteExperience> get _routes =>
       widget.routes.where((route) => route.isPublished).toList();
   List<RouteExperience> get _visible => _routes
@@ -168,7 +173,7 @@ class _CityAtlasState extends State<CityAtlas>
   @override
   void initState() {
     super.initState();
-    _geometry = _districts(widget.citySlug);
+    _geometry = loadCityAtlasDistricts(widget.citySlug);
   }
 
   @override
@@ -180,7 +185,7 @@ class _CityAtlasState extends State<CityAtlas>
       _arrival.forward(from: 0);
     }
     if (oldWidget.citySlug != widget.citySlug) {
-      _geometry = _districts(widget.citySlug);
+      _geometry = loadCityAtlasDistricts(widget.citySlug);
       _filter = '全部';
       _selected = null;
       _zoom = 1;
@@ -209,7 +214,8 @@ class _CityAtlasState extends State<CityAtlas>
             visible.firstOrNull;
     final categories = [
       '全部',
-      ...{'街巷', '海边', '山野', '建筑', ..._routes.map(cityAtlasCategory)}
+      ...{'街巷', '海边', '山野', '建筑', '公园', '其他'}
+          .where(_routes.map(cityAtlasCategory).toSet().contains)
     ];
     final side = MediaQuery.sizeOf(context).width <= 360 ? 19.0 : 23.0;
     return FadeTransition(
@@ -225,7 +231,7 @@ class _CityAtlasState extends State<CityAtlas>
                       height: 51,
                       child: Row(children: [
                         DiscoveryTouch(
-                            label: '返回随刊',
+                            label: '返回发现',
                             onTap: widget.onBack,
                             child: SizedBox(
                                 height: 44,
@@ -233,7 +239,7 @@ class _CityAtlasState extends State<CityAtlas>
                                   const DiscoveryIcon(DiscoveryMark.arrowLeft,
                                       size: 17, color: _muted),
                                   const SizedBox(width: 7),
-                                  Text('随刊',
+                                  Text('发现',
                                       style: discoverySans(11, color: _muted)),
                                 ]))),
                         const Spacer(),
@@ -327,7 +333,7 @@ class _CityAtlasState extends State<CityAtlas>
                                     ))),
                               )),
                       ]))),
-              FutureBuilder<List<_District>>(
+              FutureBuilder<List<CityAtlasDistrict>>(
                   future: _geometry,
                   builder: (context, snapshot) =>
                       _map(snapshot.data ?? const [], visible, selected?.id)),
@@ -358,10 +364,7 @@ class _CityAtlasState extends State<CityAtlas>
                         ])),
               Padding(
                   padding: EdgeInsets.fromLTRB(side, 8, side, 0),
-                  child: Text(
-                      widget.citySlug == 'shenzhen'
-                          ? '底图：DataV 地理数据 · 地点：见地内容库 · 非导航地图'
-                          : '地点：见地内容库 · 地点分布示意，非导航地图',
+                  child: Text('底图：DataV 地理数据 · 地点：见地内容库 · 非导航地图',
                       style: discoverySans(9, color: _muted))),
             ])));
   }
@@ -369,7 +372,7 @@ class _CityAtlasState extends State<CityAtlas>
   bool _labelBelow(RouteExperience route) =>
       ['海边', '建筑'].contains(cityAtlasCategory(route));
 
-  Widget _map(List<_District> districts, List<RouteExperience> visible,
+  Widget _map(List<CityAtlasDistrict> districts, List<RouteExperience> visible,
       String? selected) {
     final coordinates =
         _routes.map(cityAtlasCoordinate).whereType<Offset>().toList();
@@ -435,6 +438,7 @@ class _CityAtlasState extends State<CityAtlas>
                       }),
                       child: CustomPaint(
                           painter: _AtlasPainter(
+                              cityLabel: widget.citySlug.toUpperCase(),
                               districts: districts,
                               coordinates: coordinates,
                               zoom: _zoom,
@@ -665,47 +669,12 @@ class _CityAtlasState extends State<CityAtlas>
               style: discoverySerif(38, color: const Color(0xff687355)))));
 }
 
-class _District {
-  const _District(this.name, this.center, this.polygons);
-  final String name;
-  final Offset center;
-  final List<List<List<Offset>>> polygons;
-}
-
-List<_District>? _shenzhen;
-Future<List<_District>> _districts(String city) async {
-  if (city != 'shenzhen') return const [];
-  if (_shenzhen != null) return _shenzhen!;
-  return rootBundle.loadString('assets/maps/shenzhen.geojson').then((source) {
-    final data = jsonDecode(source) as Map<String, dynamic>;
-    return _shenzhen = (data['features'] as List).map((feature) {
-      final props = feature['properties'];
-      final center = props['center'] as List;
-      final geometry = feature['geometry'];
-      final polygons = geometry['type'] == 'Polygon'
-          ? [geometry['coordinates']]
-          : geometry['coordinates'] as List;
-      return _District(
-          props['name'] as String,
-          Offset((center[0] as num).toDouble(), (center[1] as num).toDouble()),
-          polygons
-              .map<List<List<Offset>>>((polygon) => (polygon as List)
-                  .map<List<Offset>>((ring) => (ring as List)
-                      .map<Offset>((point) => Offset(
-                          (point[0] as num).toDouble(),
-                          (point[1] as num).toDouble()))
-                      .toList())
-                  .toList())
-              .toList());
-    }).toList();
-  });
-}
-
 Offset _mercator(Offset point) => Offset(point.dx * math.pi / 180,
     -math.log(math.tan(math.pi / 4 + point.dy * math.pi / 360)));
 
 class _Projection {
-  _Projection(List<_District> districts, List<Offset> coordinates, Size size,
+  _Projection(
+      List<CityAtlasDistrict> districts, List<Offset> coordinates, Size size,
       {bool miniature = false}) {
     final points = [
       ...districts.expand((d) => d.polygons.expand((p) => p.expand((r) => r))),
@@ -741,12 +710,14 @@ class _Projection {
 
 class _AtlasPainter extends CustomPainter {
   const _AtlasPainter(
-      {required this.districts,
+      {required this.cityLabel,
+      required this.districts,
       required this.coordinates,
       required this.zoom,
       required this.pan,
       this.miniature = false});
-  final List<_District> districts;
+  final String cityLabel;
+  final List<CityAtlasDistrict> districts;
   final List<Offset> coordinates;
   final double zoom;
   final Offset pan;
@@ -786,7 +757,10 @@ class _AtlasPainter extends CustomPainter {
             ..color = miniature ? _paper : const Color(0xffc9cbb8)
             ..style = PaintingStyle.stroke
             ..strokeWidth = miniature ? .6 : .8);
-      if (!miniature && ['宝安区', '龙岗区', '坪山区', '龙华区'].contains(district.name)) {
+    }
+    final labels = <Rect>[];
+    if (!miniature) {
+      for (final district in districts) {
         final label = TextPainter(
             text: TextSpan(
                 text: district.name,
@@ -795,10 +769,15 @@ class _AtlasPainter extends CustomPainter {
                     .copyWith(fontFamily: 'Noto Sans SC')),
             textDirection: TextDirection.ltr)
           ..layout();
-        label.paint(
-            canvas,
-            project(district.center) -
-                Offset(label.width / 2, label.height / 2));
+        final origin = project(district.center) -
+            Offset(label.width / 2, label.height / 2);
+        final bounds = origin & label.size;
+        if ((Offset.zero & size).contains(bounds.topLeft) &&
+            (Offset.zero & size).contains(bounds.bottomRight) &&
+            !labels.any((other) => other.overlaps(bounds.inflate(4)))) {
+          label.paint(canvas, origin);
+          labels.add(bounds);
+        }
         label.dispose();
       }
     }
@@ -809,9 +788,9 @@ class _AtlasPainter extends CustomPainter {
     }
     if (!miniature && districts.isNotEmpty) {
       final label = TextPainter(
-          text: const TextSpan(
-              text: 'SHENZHEN',
-              style: TextStyle(
+          text: TextSpan(
+              text: cityLabel,
+              style: const TextStyle(
                   fontFamily: 'Georgia',
                   fontStyle: FontStyle.italic,
                   fontSize: 12,
@@ -826,6 +805,7 @@ class _AtlasPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_AtlasPainter old) =>
+      old.cityLabel != cityLabel ||
       old.districts != districts ||
       old.coordinates != coordinates ||
       old.zoom != zoom ||

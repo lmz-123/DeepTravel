@@ -41,7 +41,7 @@ void main() {
     await tester.tap(entry);
     await tester.pumpAndSettle();
     expect(find.text('循着好奇，'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel(RegExp('返回随刊')));
+    await tester.tap(find.bySemanticsLabel(RegExp('返回发现')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('route-card-shenzhen-mixc-world')),
         findsOneWidget);

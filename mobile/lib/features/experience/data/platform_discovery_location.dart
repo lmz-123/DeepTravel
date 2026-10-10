@@ -50,7 +50,7 @@ class PlatformCurrentLocationSource implements CurrentLocationSource {
 
   static const _positionTimeout = Duration(seconds: 10);
   static const _localityTimeout = Duration(seconds: 8);
-  static const _maximumCachedAge = Duration(seconds: 30);
+  static const _maximumCachedAge = Duration(minutes: 5);
 
   final LocationDiagnosticCallback? onDiagnostic;
   final LocationServiceEnabledGetter _locationServiceEnabled;
@@ -180,27 +180,25 @@ class PlatformCurrentLocationSource implements CurrentLocationSource {
 
   Future<({Position position, String strategy, bool cached})>
       _acquirePosition() async {
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      final position = await _currentPosition(
-        const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          timeLimit: _positionTimeout,
-        ),
-      );
-      return (position: position, strategy: 'platform_default', cached: false);
-    }
+    final android = defaultTargetPlatform == TargetPlatform.android;
+    final strategy = android ? 'android_location_manager' : 'platform_default';
 
     try {
       final position = await _currentPosition(
-        AndroidSettings(
-          accuracy: LocationAccuracy.high,
-          forceLocationManager: true,
-          timeLimit: _positionTimeout,
-        ),
+        android
+            ? AndroidSettings(
+                accuracy: LocationAccuracy.medium,
+                forceLocationManager: true,
+                timeLimit: _positionTimeout,
+              )
+            : const LocationSettings(
+                accuracy: LocationAccuracy.medium,
+                timeLimit: _positionTimeout,
+              ),
       );
       return (
         position: position,
-        strategy: 'android_location_manager',
+        strategy: strategy,
         cached: false,
       );
     } on LocationServiceDisabledException {
@@ -208,26 +206,33 @@ class PlatformCurrentLocationSource implements CurrentLocationSource {
     } on PermissionDeniedException {
       rethrow;
     } catch (error) {
-      _diagnostic('warning', 'discovery_location_manager_failed', {
-        'provider_strategy': 'android_location_manager',
+      _diagnostic('warning', 'discovery_location_provider_failed', {
+        'provider_strategy': strategy,
         'failure_type': _failureType(error),
       });
     }
 
-    final cached = await _lastKnownPosition(true);
+    final cached = await _lastKnownPosition(android);
     if (cached != null && _isFreshCache(cached)) {
       return (
         position: cached,
-        strategy: 'android_location_manager_cache',
+        strategy: '${strategy}_cache',
         cached: true,
       );
     }
-    throw TimeoutException('No fresh Android location was available');
+    throw TimeoutException('No recent location was available');
   }
 
   bool _isFreshCache(Position position) {
     final age = DateTime.now().toUtc().difference(position.timestamp.toUtc());
-    return age >= Duration.zero && age <= _maximumCachedAge;
+    return position.latitude.isFinite &&
+        position.longitude.isFinite &&
+        position.latitude.abs() <= 90 &&
+        position.longitude.abs() <= 180 &&
+        position.accuracy.isFinite &&
+        position.accuracy >= 0 &&
+        age >= Duration.zero &&
+        age <= _maximumCachedAge;
   }
 
   void _diagnostic(

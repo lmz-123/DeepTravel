@@ -330,11 +330,30 @@ void main() {
     expect(location.requests, [false, false]);
   });
 
+  test('recent indoor cached position remains usable for city discovery',
+      () async {
+    final location = _LocationSource(samples: [
+      _sample(
+          locality: '深圳',
+          recordedAt: DateTime.now().subtract(const Duration(minutes: 3))),
+    ]);
+    final container = _container(location);
+    addTearDown(container.dispose);
+    await container.read(discoveryControllerProvider.future);
+    await container
+        .read(discoveryControllerProvider.notifier)
+        .prepareColdStart();
+    final state = await container.read(discoveryControllerProvider.future);
+    expect(state.locationFailure, isNull);
+    expect(state.city?.slug, 'shenzhen');
+    expect(state.cards.any((item) => item.distanceMeters != null), isTrue);
+  });
+
   test('stale samples restore server order and no fake distance', () async {
     final location = _LocationSource(samples: [
       _sample(
         locality: '深圳',
-        recordedAt: DateTime.now().subtract(const Duration(minutes: 3)),
+        recordedAt: DateTime.now().subtract(const Duration(minutes: 6)),
       ),
     ]);
     final container = _container(location);

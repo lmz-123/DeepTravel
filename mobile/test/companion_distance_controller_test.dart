@@ -144,7 +144,7 @@ void main() {
     final fixture = _Fixture();
     fixture.tour.emit(fixture
         .live()
-        .copyWith(latestLocationSample: fixture.sample(accuracy: 70)));
+        .copyWith(latestLocationSample: fixture.sample(accuracy: 1500)));
     expect(fixture.value.hasLocation, isTrue);
     expect(fixture.value.isApproximate, isTrue);
     expect(fixture.value.target?.distanceMeters, isNotNull);
@@ -161,14 +161,13 @@ void main() {
     expect(fixture.value.target?.distanceMeters, isNotNull);
   });
 
-  test('invalid and inaccurate samples leave distances unknown', () {
+  test('invalid and stale samples leave distances unknown', () {
     final fixture = _Fixture();
     for (final sample in [
       fixture.sample(latitude: double.nan),
       fixture.sample(latitude: 91),
       fixture.sample(accuracy: -1),
       fixture.sample(accuracy: double.infinity),
-      fixture.sample(accuracy: 201),
       fixture.sample(time: fixture.now.subtract(const Duration(seconds: 61))),
       fixture.sample(time: fixture.now.add(const Duration(seconds: 6))),
     ]) {

@@ -522,7 +522,7 @@ def seed_fragment_tour(session: Session, route_id: str) -> bool:
         )
         route.duration_minutes = 75
         route.distance_km = 1.6
-        route.theme = "定位音频 · 碎片叙事"
+        route.theme = "古城更新与公共生活"
         route.content_status = "published"
     session.flush()
     return changed

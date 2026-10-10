@@ -26,6 +26,14 @@ RouteExperience place(String id,
       centerLongitude: lon,
     );
 void main() {
+  test('atlas categories describe places, never delivery mechanics', () {
+    expect(cityAtlasCategory(place('南头古城', theme: '定位音频 · 碎片叙事')), '街巷');
+    expect(cityAtlasCategory(place('上海城市生活', theme: '定位音频')), '其他');
+    expect(cityAtlasCategory(place('人民公园', theme: '实地记录')), '公园');
+    expect(cityAtlasCategory(place('永庆坊', theme: '西关与岭南文化')), '街巷');
+    expect(cityAtlasCategory(place('海岛', theme: '海岛与文化建筑')), '海边');
+  });
+
   test('only finite, geographic catalog coordinates are projected', () {
     expect(cityAtlasCoordinate(place('valid')),
         const Offset(114.3038915, 22.5987158));

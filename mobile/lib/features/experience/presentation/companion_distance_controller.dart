@@ -55,7 +55,6 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
   // A distance estimate is not an arrival decision. Keep stricter accuracy
   // and freshness requirements in StableTriggerEngine unchanged.
   static const maximumDisplayAge = Duration(minutes: 1);
-  static const maximumDisplayAccuracyM = 200.0;
 
   final String routeSlug;
   String? _manualId;
@@ -127,7 +126,6 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
       final region = point.fragment.triggerRegion;
       final usable = sample != null &&
           _validCoordinate(region.latitude, region.longitude) &&
-          sample.accuracyM <= maximumDisplayAccuracyM &&
           point.distanceMeters?.isFinite == true;
       return NearbyStoryPoint(
         fragment: point.fragment,
@@ -163,11 +161,9 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
       isApproximate: sample != null && sample.accuracyM > 50,
       locationIssue: rawSample == null
           ? null
-          : rawSample.accuracyM > maximumDisplayAccuracyM
-              ? '定位精度不足'
-              : sample == null
-                  ? '定位更新中'
-                  : null,
+          : sample == null
+              ? '定位更新中'
+              : null,
     );
   }
 
@@ -234,7 +230,6 @@ class CompanionDistanceController extends Notifier<CompanionDistanceState> {
     if (sample == null ||
         !_validCoordinate(sample.latitude, sample.longitude) ||
         !sample.accuracyM.isFinite ||
-        sample.accuracyM > maximumDisplayAccuracyM ||
         sample.accuracyM < 0) {
       return false;
     }

@@ -40,7 +40,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/maps/shenzhen.geojson
+    - assets/maps/
     - assets/fonts/NotoSerifSC-OFL.txt
     - assets/fonts/NotoSansSC-OFL.txt
     - assets/fonts/Inter-OFL.txt
