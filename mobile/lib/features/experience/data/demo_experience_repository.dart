@@ -536,10 +536,16 @@ class DemoExperienceRepository implements ExperienceRepository {
 
   @override
   Future<CommunityPage<CommunityPost>> discoverCommunity(
-          {String? citySlug, String? cursor, int limit = 12}) async =>
+          {String? citySlug,
+          String? cursor,
+          int limit = 12,
+          CommunityQuery query = const CommunityQuery()}) async =>
       CommunityPage(
           items: _communityPosts
-              .where((p) => citySlug == null || p.place?.citySlug == citySlug)
+              .where((p) =>
+                  (citySlug == null || p.place?.citySlug == citySlug) &&
+                  (query.category == null || p.category == query.category) &&
+                  (!query.savedOnly || p.viewerHasSaved))
               .take(limit)
               .toList());
 
@@ -562,7 +568,7 @@ class DemoExperienceRepository implements ExperienceRepository {
         titleMaxLength: 60,
         bodyMaxLength: 1200,
         commentMaxLength: 300,
-        maxMedia: 4,
+        maxMedia: 9,
         allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
         reportReasons: ['spam', 'abuse', 'privacy', 'misinformation', 'other'],
         privateSourceRemainsPrivate: true,

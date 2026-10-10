@@ -80,7 +80,7 @@ void main() {
       expect(find.text('把屏幕退到身后'), findsOneWidget);
       expect(find.text('让位置，'), findsOneWidget);
       expect(find.byKey(const ValueKey('companion-signal')), findsOneWidget);
-      expect(find.text('等你开启'), findsOneWidget);
+      expect(find.text('开启'), findsOneWidget);
       expect(
         tester.getSize(find.byKey(const ValueKey('companion-screen'))),
         size,
@@ -111,7 +111,7 @@ void main() {
       });
       expect(_distancePlace(tester), '东莞会馆');
       expect(_distanceNumber(tester), '260');
-      expect(find.text('手动选定 · 距离目标'), findsOneWidget);
+      expect(find.text('手动选定'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pump(const Duration(seconds: 5));
       await tester.pump(const Duration(milliseconds: 400));
@@ -134,14 +134,12 @@ void main() {
         (tester) async {
       await _pump(tester,
           harness: _distanceHarness(), size: Size(width, 844), textScale: 1.3);
-      final actions = find.byKey(const ValueKey('companion-walk-actions'));
-      await _reveal(tester, actions);
-      final primary =
-          tester.getRect(find.byKey(const ValueKey('companion-primary')));
-      final end = tester.getRect(find.byKey(const ValueKey('companion-end')));
-      expect(primary.center.dy, closeTo(end.center.dy, .1));
-      expect(primary.right, lessThan(end.left));
-      expect(end.right, lessThanOrEqualTo(width - 20));
+      final orbit = find.byKey(const ValueKey('companion-signal'));
+      final end = find.byKey(const ValueKey('companion-end'));
+      expect(tester.getRect(end).right, lessThanOrEqualTo(width - 19));
+      await tester.tapAt(tester.getCenter(orbit));
+      await tester.pump();
+      expect(find.text('停止随行'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -187,8 +185,8 @@ void main() {
     expect(_distancePlace(tester), '东莞会馆');
     expect(_distanceNumber(tester), '260');
 
-    await _reveal(tester, find.text('结束本次随行'));
-    await tester.tap(find.text('结束本次随行'));
+    await _reveal(tester, find.text('停止随行'));
+    await tester.tap(find.text('停止随行'));
     await tester.pump();
     final container =
         ProviderScope.containerOf(tester.element(find.byType(DiscoveryPage)));
@@ -243,7 +241,7 @@ void main() {
         find.byKey(const ValueKey('companion-distance-target')), findsNothing);
     await tester.pump(const Duration(seconds: 3));
     await tester.pump();
-    expect(find.text('本次随行 · 另一条路线'), findsOneWidget);
+    expect(find.text('另一条路线 · 本次随行'), findsOneWidget);
 
     router.go(companionLocation(_distanceRoute.slug, requestSelection: true));
     await tester.pump();
@@ -280,8 +278,10 @@ void main() {
       (tester) async {
     final harness = _CompanionHarness();
     await _pump(tester, harness: harness);
-    await _reveal(tester, find.byKey(const ValueKey('companion-primary')));
-    await tester.tap(find.byKey(const ValueKey('companion-primary')));
+    await _reveal(
+        tester, find.byKey(const ValueKey('companion-walk-settings-entry')));
+    await tester
+        .tap(find.byKey(const ValueKey('companion-walk-settings-entry')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -308,12 +308,12 @@ void main() {
     final harness = _CompanionHarness(routes: routes);
     await _pump(tester, harness: harness, requestedSlug: 'route-4');
 
-    expect(find.text('本次随行 · 测试路线 4'), findsOneWidget);
+    expect(find.text('测试路线 4 · 本次随行'), findsOneWidget);
     expect(harness.journey.startCalls, 0);
     expect(harness.tour.startCalls, 0);
-    await _reveal(tester, find.byKey(const ValueKey('companion-primary')));
-    await tester.tap(find.byKey(const ValueKey('companion-primary')));
-    await _confirmStart(tester);
+    await _reveal(tester, find.byKey(const ValueKey('companion-start')));
+    await tester.tap(find.byKey(const ValueKey('companion-start')));
+    await tester.pump(const Duration(milliseconds: 400));
     expect(harness.tour.snapshot.route?.id, 'route-4');
     expect(harness.journey.startCalls, 1);
     expect(harness.tour.startCalls, 1);
@@ -326,13 +326,13 @@ void main() {
     final harness = _CompanionHarness(requestedRoute: requested);
     await _pump(tester, harness: harness, requestedSlug: requested.slug);
 
-    expect(find.text('本次随行 · 另一座城的旅程'), findsOneWidget);
+    expect(find.text('另一座城的旅程 · 本次随行'), findsOneWidget);
     expect(harness.journey.startCalls, 0);
     expect(harness.tour.startCalls, 0);
     expect(harness.discovery.coldStartCalls, 0);
-    await _reveal(tester, find.byKey(const ValueKey('companion-primary')));
-    await tester.tap(find.byKey(const ValueKey('companion-primary')));
-    await _confirmStart(tester);
+    await _reveal(tester, find.byKey(const ValueKey('companion-start')));
+    await tester.tap(find.byKey(const ValueKey('companion-start')));
+    await tester.pump(const Duration(milliseconds: 400));
     expect(harness.tour.snapshot.route?.id, requested.id);
     expect(tester.takeException(), isNull);
   });
@@ -345,13 +345,13 @@ void main() {
     final firstRequest =
         router.routeInformationProvider.value.uri.queryParameters['selection'];
     final originalPage = tester.state(find.byType(DiscoveryPage));
-    expect(find.text('本次随行 · 测试路线 0'), findsOneWidget);
+    expect(find.text('测试路线 0 · 本次随行'), findsOneWidget);
 
     final second = find.byKey(const ValueKey('companion-route-route-1'));
     await _reveal(tester, second);
     await tester.tap(second);
     await tester.pump();
-    expect(find.text('本次随行 · 测试路线 1'), findsOneWidget);
+    expect(find.text('测试路线 1 · 本次随行'), findsOneWidget);
 
     router.push('/route/${_routes.first.slug}');
     await tester.pump();
@@ -368,8 +368,8 @@ void main() {
     expect(
         router.routeInformationProvider.value.uri.queryParameters['selection'],
         isNot(firstRequest));
-    expect(find.text('本次随行 · 测试路线 0'), findsOneWidget);
-    expect(find.text('本次随行 · 测试路线 1'), findsNothing);
+    expect(find.text('测试路线 0 · 本次随行'), findsOneWidget);
+    expect(find.text('测试路线 1 · 本次随行'), findsNothing);
     expect(harness.journey.startCalls, 0);
     expect(harness.tour.startCalls, 0);
     expect(tester.takeException(), isNull);
@@ -423,23 +423,22 @@ void main() {
     final harness = _CompanionHarness(startDelay: const Duration(seconds: 2));
     await _pump(tester, harness: harness);
 
-    final primary = find.byKey(const ValueKey('companion-primary'));
+    final primary = find.byKey(const ValueKey('companion-start'));
     await _reveal(tester, primary);
     await tester.tap(primary);
     await tester.pump();
-    expect(harness.journey.startCalls, 0);
-    expect(harness.tour.startCalls, 0);
-    await _confirmStart(tester);
-    expect(find.text('准备中…'), findsOneWidget);
-
-    await _reveal(tester, primary);
-    await tester.tap(primary);
+    expect(harness.journey.startCalls, 1);
+    expect(harness.tour.startCalls, 1);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const ValueKey('companion-start')), findsNothing);
+    await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('companion-signal'))));
     expect(harness.journey.startCalls, 1);
     expect(harness.tour.startCalls, 1);
 
     await tester.pump(const Duration(seconds: 3));
     expect(harness.tour.startCalls, 1);
-    expect(find.text('暂停随行'), findsOneWidget);
+    expect(find.text('停止随行'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -449,21 +448,17 @@ void main() {
     final harness = _CompanionHarness();
     await _pump(tester, harness: harness);
 
-    final primary = find.byKey(const ValueKey('companion-primary'));
+    final primary = find.byKey(const ValueKey('companion-start'));
     await _reveal(tester, primary);
     await tester.tap(primary);
     await tester.pump();
-    await _confirmStart(tester);
-    expect(find.text('暂停随行'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('停止随行'), findsOneWidget);
 
-    await _reveal(tester, find.text('暂停随行'));
-    await tester.tap(find.text('暂停随行'));
+    await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('companion-signal'))));
     await tester.pump();
-    expect(find.text('继续寻找'), findsOneWidget);
-    await _reveal(tester, find.text('继续寻找'));
-    await tester.tap(find.text('继续寻找'));
-    await tester.pump();
-    expect(find.text('暂停随行'), findsOneWidget);
+    expect(harness.tour.stopCalls, 0);
 
     await _reveal(tester, find.text('模拟靠近一处线索'));
     await tester.tap(find.text('模拟靠近一处线索'));
@@ -487,7 +482,7 @@ void main() {
     await _reveal(tester, find.text('继续寻找'));
     await tester.tap(find.text('继续寻找'));
     await tester.pump();
-    expect(find.text('暂停随行'), findsOneWidget);
+    expect(find.text('停止随行'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -495,18 +490,18 @@ void main() {
       (tester) async {
     final harness = _CompanionHarness();
     await _pump(tester, harness: harness);
-    final primary = find.byKey(const ValueKey('companion-primary'));
+    final primary = find.byKey(const ValueKey('companion-start'));
     await _reveal(tester, primary);
     await tester.tap(primary);
     await tester.pump();
-    await _confirmStart(tester);
-    expect(find.text('暂停随行'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('停止随行'), findsOneWidget);
 
-    await _reveal(tester, find.text('结束本次随行'));
-    await tester.tap(find.text('结束本次随行'));
+    await _reveal(tester, find.text('停止随行'));
+    await tester.tap(find.text('停止随行'));
     await tester.pump();
-    expect(find.text('开启随行'), findsOneWidget);
-    expect(find.text('等你开启'), findsOneWidget);
+    expect(find.byKey(const ValueKey('companion-start')), findsOneWidget);
+    expect(find.text('开启'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
@@ -597,19 +592,6 @@ Future<GoRouter> _pump(
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
   return router;
-}
-
-Future<void> _confirmStart(WidgetTester tester) async {
-  // The first frame mounts the bottom sheet and starts its entrance animation.
-  // Advancing time before that frame leaves it below the phone viewport.
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 400));
-  final done = find.byKey(const ValueKey('companion-settings-done'));
-  await tester.ensureVisible(done);
-  await tester.pump(const Duration(milliseconds: 50));
-  expect(done.hitTestable(), findsOneWidget);
-  await tester.tap(done);
-  await tester.pump(const Duration(milliseconds: 300));
 }
 
 Future<void> _reveal(WidgetTester tester, Finder finder) async {

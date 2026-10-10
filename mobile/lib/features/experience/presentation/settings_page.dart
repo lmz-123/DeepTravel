@@ -73,14 +73,13 @@ class SettingsPage extends ConsumerWidget {
                       const ListTile(
                         leading: Icon(Icons.record_voice_over_outlined),
                         title: Text('讲述声音'),
-                        subtitle: Text('每条景点讲述可在播放器中切换可用声音'),
+                        subtitle: Text('在播放器中切换'),
                         trailing: Text('随内容提供'),
                       ),
                       const Divider(height: 1),
                       const ListTile(
                         leading: Icon(Icons.headphones_rounded),
                         title: Text('建议佩戴耳机'),
-                        subtitle: Text('靠近景点时更容易听清环境与讲述的层次'),
                       ),
                     ],
                   ),
@@ -92,7 +91,7 @@ class SettingsPage extends ConsumerWidget {
                       const ListTile(
                         leading: Icon(Icons.radar_rounded),
                         title: Text('靠近景点自动准备讲述'),
-                        subtitle: Text('仅在行走导览开启时使用位置；系统限制会如实提示'),
+                        subtitle: Text('仅在随行开启时使用位置'),
                       ),
                     ],
                   ),
@@ -114,7 +113,7 @@ class SettingsPage extends ConsumerWidget {
                       const ListTile(
                         leading: Icon(Icons.location_off_outlined),
                         title: Text('照片位置保持私密'),
-                        subtitle: Text('上传时移除 EXIF；私人照片不会自动发布到社区'),
+                        subtitle: Text('上传时移除照片位置信息，不自动公开'),
                       ),
                     ],
                   ),
@@ -520,7 +519,7 @@ class _PolicyContent extends StatelessWidget {
         leading: const Icon(Icons.privacy_tip_outlined),
         title: const Text('旅途照片为私密内容'),
         subtitle: Text(
-          '仅本人可查看 · 上传时移除 EXIF · 保留 ${policy.retentionDays} 天 · '
+          '仅本人可查看 · 上传时移除拍摄信息 · 保留 ${policy.retentionDays} 天 · '
           '单张上限 ${(policy.maxBytes / 1024 / 1024).toStringAsFixed(0)} MB',
         ),
       );

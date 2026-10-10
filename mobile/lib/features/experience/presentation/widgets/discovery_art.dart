@@ -438,8 +438,9 @@ class _DiscoveryTouchState extends State<DiscoveryTouch> {
 
 class DiscoveryBrand extends StatelessWidget {
   const DiscoveryBrand(
-      {super.key, required this.onTap, this.editorial = false});
+      {super.key, required this.onTap, this.editorial = false, this.title});
   final bool editorial;
+  final String? title;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
@@ -462,7 +463,7 @@ class DiscoveryBrand extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '见地',
+                    title ?? '见地',
                     style: discoverySerif(
                       editorial ? 26 : 24,
                       weight: editorial ? FontWeight.w700 : FontWeight.w600,
@@ -470,16 +471,17 @@ class DiscoveryBrand extends StatelessWidget {
                       spacing: .48,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'THE CITY, UNFOLDED',
-                    style: discoverySans(
-                      6,
-                      spacing: .48,
-                      height: 1,
-                      color: const Color(0xff817764),
+                  if (title == null) const SizedBox(height: 6),
+                  if (title == null)
+                    Text(
+                      'THE CITY, UNFOLDED',
+                      style: discoverySans(
+                        6,
+                        spacing: .48,
+                        height: 1,
+                        color: const Color(0xff817764),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ],

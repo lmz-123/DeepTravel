@@ -38,7 +38,7 @@ class TravelerBottomNavigation extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final horizontal = MediaQuery.sizeOf(context).width <= 360 ? 20.0 : 23.0;
     final entries = [
-      (TravelerSection.journal, DiscoveryMark.book, '随刊'),
+      (TravelerSection.journal, DiscoveryMark.book, '发现'),
       (TravelerSection.community, DiscoveryMark.community, '见闻'),
       (TravelerSection.companion, DiscoveryMark.pin, '随行'),
     ];

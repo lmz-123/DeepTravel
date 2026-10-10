@@ -8,6 +8,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
+import '../domain/community_models.dart';
+import '../../../core/router/travel_destinations.dart';
+import 'community/notes_controller.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'audio_ownership_controller.dart';
@@ -173,12 +176,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     }
     setState(() => _startingCompanion = true);
     try {
-      final confirmed = await showCompanionWalkSettings(
-        context,
-        route: route,
-        startAfterPreparation: true,
-      );
-      if (!mounted || !confirmed) return;
       if (_companionRunning(ref.read(activeTourControllerProvider))) return;
       final journeyId = await _startCompanionSession(route);
       if (!mounted) return;
@@ -262,7 +259,28 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
       }
       ref.invalidate(travelerFavoritesProvider(userId));
       await ref.read(travelerFavoritesProvider(userId).future);
-      if (mounted) _notice(selected ? '已从书架移出' : '已放进书架，留给下一次出发');
+      if (mounted && userId == ref.read(currentUserIdProvider)) {
+        _notice(selected ? '已取消收藏' : '已收藏',
+            action: selected
+                ? SnackBarAction(
+                    label: '撤销',
+                    onPressed: () async {
+                      if (!mounted ||
+                          userId != ref.read(currentUserIdProvider)) {
+                        return;
+                      }
+                      try {
+                        await repository.addFavorite('route', id);
+                        if (mounted &&
+                            userId == ref.read(currentUserIdProvider)) {
+                          ref.invalidate(travelerFavoritesProvider(userId));
+                        }
+                      } catch (_) {
+                        if (mounted) _notice('收藏未能恢复，请重试');
+                      }
+                    })
+                : null);
+      }
     } catch (_) {
       if (mounted) _notice('书架暂时无法更新，请稍后重试');
     } finally {
@@ -270,11 +288,12 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     }
   }
 
-  void _notice(String message) {
+  void _notice(String message, {SnackBarAction? action}) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
+          action: action,
           content: Text(
             message,
             style: discoverySans(12, color: AppColors.paper),
@@ -601,7 +620,7 @@ class _DiscoveryHeader extends StatelessWidget {
   final bool editorial;
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: editorial ? 78 : 71,
+        height: 72,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: MediaQuery.sizeOf(context).width <= 360 ? 20 : 23,
@@ -610,7 +629,7 @@ class _DiscoveryHeader extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               DiscoveryBrand(
-                  editorial: editorial, onTap: () => context.push('/profile')),
+                  title: '发现', onTap: () => context.push('/profile')),
               if (city != null)
                 Tooltip(
                   message: '选择城市',
@@ -627,15 +646,7 @@ class _DiscoveryHeader extends StatelessWidget {
                                 color: AppColors.ink),
                           ),
                           const SizedBox(width: 10),
-                          if (editorial) ...[
-                            Text('·',
-                                style: discoverySans(11,
-                                    color: AppColors.terracotta)),
-                            const SizedBox(width: 10),
-                            Text('城市随刊',
-                                style: discoverySans(11, color: AppColors.ink)),
-                          ] else
-                            const DiscoveryIcon(DiscoveryMark.down, size: 14),
+                          const DiscoveryIcon(DiscoveryMark.down, size: 14),
                         ],
                       ),
                     ),

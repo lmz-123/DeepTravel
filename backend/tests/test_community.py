@@ -75,7 +75,7 @@ def test_policy_requires_auth_and_exposes_only_safe_runtime_contract(client):
     policy = response.get_json()["data"]
     assert policy["enabled"] is True
     assert len(policy["categories"]) == 4
-    assert policy["max_media"] == 4
+    assert policy["max_media"] == 9
     serialized = str(policy).lower()
     assert not any(
         secret in serialized

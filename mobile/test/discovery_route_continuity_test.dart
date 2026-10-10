@@ -23,8 +23,8 @@ void main() {
       expect(find.text('测试路线'), findsOneWidget);
       expect(find.text('第一条线索'), findsNothing);
       expect(find.textContaining('距你'), findsNothing);
-      expect(find.text('城市随刊'), findsNWidgets(2));
-      expect(find.text('随刊'), findsOneWidget);
+      expect(find.text('城市随刊'), findsOneWidget);
+      expect(find.text('发现'), findsNWidgets(2));
     },
   );
 
@@ -157,7 +157,7 @@ void main() {
 }
 
 Future<void> _tapRouteCard(WidgetTester tester) async {
-  final card = find.byKey(const ValueKey('route-card-route-a'));
+  final card = find.byKey(const ValueKey('journal-photo-route-a'));
   await tester.ensureVisible(card);
   await tester.pumpAndSettle();
   await tester.tap(card);

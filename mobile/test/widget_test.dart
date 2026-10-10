@@ -134,7 +134,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('城市随刊'), findsNWidgets(2));
+    expect(find.text('城市随刊'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -198,7 +198,7 @@ void main() {
     await _pumpApp(tester);
     expect(find.text('继续未完成的旧路线'), findsNothing);
     expect(find.textContaining('已定位到'), findsNothing);
-    expect(find.text('城市随刊'), findsNWidgets(2));
+    expect(find.text('城市随刊'), findsOneWidget);
   });
 }
 
@@ -219,7 +219,7 @@ Future<void> _pumpApp(WidgetTester tester,
 }
 
 Future<void> _openFeatured(WidgetTester tester) async {
-  final card = find.byKey(const ValueKey('route-card-wukang-urban-slices'));
+  final card = find.byKey(ValueKey('journal-photo-${demoRoute.id}'));
   await tester.ensureVisible(card);
   await tester.pumpAndSettle();
   await tester.tap(card);

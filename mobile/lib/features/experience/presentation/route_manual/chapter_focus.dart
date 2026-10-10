@@ -200,12 +200,12 @@ class _ManualChapterFocusState extends ConsumerState<ManualChapterFocus> {
                       nextLabel: '下一段',
                       playTooltip: playing ? '暂停音频' : '播放音频',
                       status: playing
-                          ? '正在播放，慢慢听。'
+                          ? '播放中'
                           : (owns && playback.phase == HomeStoryPhase.ended)
-                              ? '这一段听完了，下一段随时开始。'
+                              ? '已听完'
                               : position > Duration.zero
-                                  ? '已暂停，回来时从这里继续。'
-                                  : '准备好了，就按下播放。',
+                                  ? '已暂停'
+                                  : '待播放',
                     ),
                     if (owns && playback.message != null)
                       Padding(

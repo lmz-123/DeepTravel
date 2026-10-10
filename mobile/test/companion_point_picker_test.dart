@@ -173,7 +173,7 @@ void main() {
     final row2 = find.byKey(const ValueKey('companion-point-p2'));
     expect(tester.getTopLeft(row1).dy, lessThan(tester.getTopLeft(row2).dy));
     expect(find.text('距离待定'), findsNWidgets(3));
-    expect(find.text('按路线顺序排列 · 等待定位'), findsOneWidget);
+    expect(find.text('等待定位'), findsOneWidget);
   });
 
   testWidgets('keyboard and large text keep search and results reachable',

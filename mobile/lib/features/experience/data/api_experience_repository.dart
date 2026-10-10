@@ -573,11 +573,15 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   @override
   Future<CommunityPage<CommunityPost>> discoverCommunity(
-      {String? citySlug, String? cursor, int limit = 12}) async {
+      {String? citySlug,
+      String? cursor,
+      int limit = 12,
+      CommunityQuery query = const CommunityQuery()}) async {
     await _ensureAuth();
     final response = await _request(() =>
         _dio.get('/community-posts', options: _authorized, queryParameters: {
           'limit': limit,
+          ...query.parameters,
           if (citySlug != null) 'city': citySlug,
           if (cursor != null) 'cursor': cursor
         }));
@@ -821,6 +825,7 @@ class ApiExperienceRepository implements ExperienceRepository {
     return CommunityPage<T>(
       items: items,
       nextCursor: data['next_cursor'] as String?,
+      total: (data['total'] as num?)?.toInt(),
     );
   }
 

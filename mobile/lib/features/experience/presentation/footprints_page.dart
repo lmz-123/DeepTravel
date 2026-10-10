@@ -206,7 +206,7 @@ class _Summary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('这些不是路线成绩，\n是你真正带走的城市印象。',
+          Text('走过的地方，\n留下的印象。',
               style: Theme.of(context)
                   .textTheme
                   .titleLarge

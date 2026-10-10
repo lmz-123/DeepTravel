@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
 enum CommunityCategory {
-  viewpoint('viewpoint', '经典机位'),
-  experience('experience', '行走经验'),
+  viewpoint('viewpoint', '拍照机位'),
+  experience('experience', '经验分享'),
   factSupplement('fact_supplement', '事实补充 · 旅行者内容'),
-  onSite('on_site', '现场发现');
+  onSite('on_site', '日常记录');
 
   const CommunityCategory(this.id, this.label);
   final String id;
@@ -50,7 +50,7 @@ class CommunityPolicy {
         titleMaxLength: _integer(json['title_max_length'], 60),
         bodyMaxLength: _integer(json['body_max_length'], 1200),
         commentMaxLength: _integer(json['comment_max_length'], 300),
-        maxMedia: _integer(json['max_media'], 4),
+        maxMedia: _integer(json['max_media'], 9),
         allowedMimeTypes: _strings(json['allowed_mime_types']),
         reportReasons: _strings(json['report_reasons']),
         privateSourceRemainsPrivate:
@@ -106,7 +106,10 @@ class CommunityPlace {
       required this.routeTitle,
       required this.citySlug,
       required this.cityName,
-      this.theme = ''});
+      this.theme = '',
+      this.latitude,
+      this.longitude});
+  final double? latitude, longitude;
   final String fragmentId,
       name,
       routeSlug,
@@ -121,7 +124,9 @@ class CommunityPlace {
       routeTitle: _text(json['route_title']) ?? '',
       citySlug: _text(json['city_slug']) ?? '',
       cityName: _text(json['city_name']) ?? '',
-      theme: _text(json['theme']) ?? '');
+      theme: _text(json['theme']) ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble());
 }
 
 class CommunityPost {
@@ -284,9 +289,10 @@ class CommunityComment {
 }
 
 class CommunityPage<T> {
-  const CommunityPage({required this.items, this.nextCursor});
+  const CommunityPage({required this.items, this.nextCursor, this.total});
   final List<T> items;
   final String? nextCursor;
+  final int? total;
   bool get hasMore => nextCursor != null && nextCursor!.isNotEmpty;
 }
 
@@ -348,4 +354,26 @@ String? _text(Object? value) {
   if (value is! String) return null;
   final result = value.trim();
   return result.isEmpty ? null : result;
+}
+
+class CommunityQuery {
+  const CommunityQuery(
+      {this.category,
+      this.latitude,
+      this.longitude,
+      this.radiusKm,
+      this.order = 'latest',
+      this.savedOnly = false});
+  final CommunityCategory? category;
+  final double? latitude, longitude, radiusKm;
+  final String order;
+  final bool savedOnly;
+  Map<String, dynamic> get parameters => {
+        if (category != null) 'category': category!.id,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (radiusKm != null) 'radius_km': radiusKm,
+        if (order != 'latest') 'order': order,
+        if (savedOnly) 'saved': 'true',
+      };
 }

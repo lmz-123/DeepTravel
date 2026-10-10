@@ -257,7 +257,7 @@ class _CompanionPointPickerState extends State<CompanionPointPicker> {
                                   weight: FontWeight.w500,
                                   spacing: -.5)),
                           const SizedBox(height: 4),
-                          Text('优先关注最近的未探索地点', style: _type(10, color: _muted)),
+                          Text('最近的未探索地点', style: _type(10, color: _muted)),
                         ],
                       ),
                     ),
@@ -379,15 +379,11 @@ class _CompanionPointPickerState extends State<CompanionPointPicker> {
           children: [
             Flexible(
               child: Text(
-                '${_orderedByDistance ? '按距离排列' : '按路线顺序排列'} · '
-                '${widget.hasLocation ? '直线约距' : '等待定位'}',
+                widget.hasLocation
+                    ? (_orderedByDistance ? '按距离排列' : '按路线顺序排列')
+                    : '等待定位',
                 style: _type(9, color: _muted),
               ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text('选择地点后继续随行',
-                  textAlign: TextAlign.right, style: _type(9, color: _muted)),
             ),
           ],
         ),

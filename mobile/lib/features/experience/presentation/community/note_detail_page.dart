@@ -8,8 +8,9 @@ import 'notes_controller.dart';
 import 'notes_widgets.dart';
 
 class NoteDetailPage extends ConsumerStatefulWidget {
-  const NoteDetailPage({super.key, required this.postId});
+  const NoteDetailPage({super.key, required this.postId, this.photoIndex = 0});
   final String postId;
+  final int photoIndex;
   @override
   ConsumerState<NoteDetailPage> createState() => _NoteDetailPageState();
 }
@@ -36,6 +37,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       if (mounted) {
         ref.invalidate(communityDetailControllerProvider(key));
         ref.invalidate(notesFeedProvider);
+        ref.invalidate(savedNotesProvider);
       }
     } catch (_) {
       if (mounted) noteNotice(context, '收藏未能更新，请重试');
@@ -98,7 +100,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                                         color: noteRed,
                                         filled: p.viewerHasSaved))))),
                     NoteAuthor(p),
-                    NotePhoto(p, height: 275),
+                    NoteGallery(p, initialIndex: widget.photoIndex),
                     if (p.title?.isNotEmpty == true)
                       Padding(
                           padding: const EdgeInsets.only(top: 17, bottom: 11),
@@ -106,13 +108,6 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                     Text(p.body,
                         style: noteSans(13,
                             color: const Color(0xff525748), height: 2)),
-                    Padding(
-                        padding: const EdgeInsets.only(top: 15),
-                        child: Text(
-                            p.visitedOn != null
-                                ? '到访日期 · ${p.visitedOn}'
-                                : noteTime(p.createdAt),
-                            style: noteSans(11, color: noteQuiet))),
                     NotePlaceRow(p, detail: true),
                     NoteActions(p,
                         onLike: state.isMutating
@@ -198,6 +193,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                                         _commentId = const Uuid().v4();
                                         setState(() => _replyTo = null);
                                         ref.invalidate(notesFeedProvider);
+                                        ref.invalidate(savedNotesProvider);
                                       }
                                     },
                               child: SizedBox(

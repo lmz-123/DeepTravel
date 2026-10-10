@@ -82,7 +82,7 @@ class _DiscoveryCompanion extends ConsumerWidget {
                 const _CompanionTitle(),
                 const SizedBox(height: 15),
                 Text(
-                  '你走近一处，城市才打开一段。\n每一次播放，都由你决定。',
+                  '你走近一处，城市才打开一段。',
                   style: _companionSans(11,
                       height: 1.9, color: const Color(0xFF81745F)),
                 ),
@@ -94,6 +94,11 @@ class _DiscoveryCompanion extends ConsumerWidget {
                     activeTour: activeTour,
                     signalActive: signalActive,
                     horizontal: horizontal,
+                    starting: starting,
+                    onStart: () => onStart(selectedRoute),
+                    onStop: () => ref
+                        .read(activeTourControllerProvider.notifier)
+                        .stopTour(),
                   )
                 else
                   _CompanionSignalWidget(
@@ -155,6 +160,7 @@ class _DiscoveryCompanion extends ConsumerWidget {
                         style: _companionSans(11,
                             height: 1.8, color: AppColors.textMuted)),
                   ),
+                const SizedBox(height: 120),
                 if (selectedRoute != null && _supportsCompanion(selectedRoute))
                   CompanionWalkSettingsEntry(
                     route: selectedRoute,
@@ -177,22 +183,7 @@ class _DiscoveryCompanion extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 11),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                          text: '先选一条，\n',
-                          style:
-                              discoverySerif(28, height: 1.45, spacing: -1.7)),
-                      TextSpan(
-                          text: '再让城市靠近。',
-                          style: discoverySerif(28,
-                              height: 1.45,
-                              spacing: -1.7,
-                              color: AppColors.terracotta)),
-                    ],
-                  ),
-                ),
+                Text('选择路线', style: discoverySerif(24)),
                 const SizedBox(height: 18),
                 if (orderedRoutes.isEmpty)
                   Text('当前城市还没有可随行的路线。', style: discoverySerif(22))
@@ -286,8 +277,6 @@ class _DiscoveryCompanion extends ConsumerWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 27),
-                const _CompanionNote(),
               ],
             ),
           ),
@@ -404,11 +393,8 @@ class _CompanionFolio extends StatelessWidget {
   const _CompanionFolio();
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => SizedBox(
         height: MediaQuery.sizeOf(context).width <= 375 ? 52 : 60,
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: _distanceRule)),
-        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -416,12 +402,12 @@ class _CompanionFolio extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: '随行',
+                    text: '',
                     style: _companionSans(10,
                         color: AppColors.textMuted, spacing: .7),
                   ),
                   TextSpan(
-                    text: '  ·  SOUND WALK',
+                    text: 'SOUND WALK',
                     style: _companionSans(10,
                         color: const Color(0xff8d7b67), spacing: .7),
                   ),
@@ -429,7 +415,7 @@ class _CompanionFolio extends StatelessWidget {
               ),
             ),
             const Text(
-              '03',
+              '',
               style: TextStyle(
                 fontFamily: 'Georgia',
                 fontSize: 19,
@@ -490,31 +476,6 @@ class _CompanionTitle extends StatelessWidget {
                   ],
                 ),
               ],
-            ),
-            Positioned(
-              right: 7,
-              top: 1,
-              child: Transform.rotate(
-                angle: .175,
-                child: CustomPaint(
-                  painter: const _CompanionStampPainter(),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    child: Text(
-                      'LISTEN\nWHEN YOU ARRIVE',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 9,
-                        height: 1.6,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xffa16b57),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -582,17 +543,23 @@ class _CompanionStateSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final phase = starting ? _CompanionPhase.preparing : _companionPhase(state);
+    if (phase == _CompanionPhase.idle ||
+        phase == _CompanionPhase.preparing ||
+        (phase == _CompanionPhase.monitoring &&
+            state.status != 'permission_limited' &&
+            state.status != 'recoverable_error')) {
+      return state.errorMessage == null
+          ? phase == _CompanionPhase.monitoring &&
+                  state.locationMode == TourLocationMode.simulated
+              ? _CompanionTextButton(
+                  icon: DiscoveryMark.pin, label: '模拟靠近一处线索', onTap: onDemo)
+              : const SizedBox.shrink()
+          : Text(state.errorMessage!,
+              style: _companionSans(11, color: AppColors.terracotta));
+    }
     final copy = switch (phase) {
-      _CompanionPhase.idle => (
-          'READY WHEN YOU ARE',
-          '选择一条路线，\n让位置替你翻页。',
-          '进入随行不会请求定位。准备好了，再由你开启这一段城市声音。'
-        ),
-      _CompanionPhase.preparing => (
-          'PREPARING THE WALK',
-          '正在准备\n沿途讲述。',
-          '把声音和文字留在手机里，走到现场也能从容继续。'
-        ),
+      _CompanionPhase.idle => ('READY WHEN YOU ARE', '选择一条路线，\n让位置替你翻页。', ''),
+      _CompanionPhase.preparing => ('PREPARING THE WALK', '正在准备\n沿途讲述。', ''),
       _CompanionPhase.monitoring => (state.status == 'permission_limited' ||
               state.status == 'recoverable_error')
           ? (
@@ -600,22 +567,18 @@ class _CompanionStateSection extends StatelessWidget {
               '让位置，\n找到你。',
               state.locationMessage ?? '定位尚未就绪，点按重新开启定位。'
             )
-          : ('LISTENING FOR THE CITY', '沿着城市，慢慢走。', '靠近故事点时提醒你，准备好再听。'),
+          : ('LISTENING FOR THE CITY', '沿着城市，慢慢走。', ''),
       _CompanionPhase.nearby => (
           'A STORY IS NEAR',
           '这一处，已经靠近。',
-          '${state.current?.publicPlaceName ?? '这里'}的故事已在身边，准备好再听。'
+          state.current?.publicPlaceName ?? ''
         ),
       _CompanionPhase.playing => (
           'NOW PLAYING',
           state.current?.title ?? '这一段城市，\n正在被听见。',
-          '正在讲述。你可以随时暂停，回到眼前。'
+          ''
         ),
-      _CompanionPhase.paused => (
-          'THE WALK IS PAUSED',
-          '先把这一页，留在这里。',
-          '随行已暂停。线索和进度都在，回来时继续寻找。'
-        ),
+      _CompanionPhase.paused => ('THE WALK IS PAUSED', '先把这一页，留在这里。', '随行已暂停'),
     };
     if (phase == _CompanionPhase.playing) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -625,7 +588,6 @@ class _CompanionStateSection extends StatelessWidget {
               child: _CompanionTextButton(
                   icon: DiscoveryMark.pause, label: '暂停随行', onTap: onPause)),
           const SizedBox(width: 12),
-          _CompanionEndButton(onTap: onStop),
         ]),
       ]);
     }
@@ -651,9 +613,11 @@ class _CompanionStateSection extends StatelessWidget {
                     : 29,
                 height: compact ? 1.55 : 1.42,
                 spacing: compact ? -.8 : -1.7)),
-        SizedBox(height: compact ? 5 : 10),
-        Text(copy.$3,
-            style: _companionSans(11, height: 1.9, color: _distanceMuted)),
+        if (copy.$3.isNotEmpty) ...[
+          SizedBox(height: compact ? 5 : 10),
+          Text(copy.$3,
+              style: _companionSans(11, height: 1.9, color: _distanceMuted)),
+        ],
         if (phase == _CompanionPhase.idle && selected != null) ...[
           const SizedBox(height: 10),
           Text('本次随行 · ${selected!.title}',
@@ -687,7 +651,6 @@ class _CompanionStateSection extends StatelessWidget {
             ),
             if (compact) ...[
               const SizedBox(width: 12),
-              _CompanionEndButton(onTap: onStop),
             ],
           ],
         ),
@@ -701,23 +664,6 @@ class _CompanionStateSection extends StatelessWidget {
       ]),
     );
   }
-}
-
-class _CompanionEndButton extends StatelessWidget {
-  const _CompanionEndButton({required this.onTap});
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => DiscoveryTouch(
-        key: const ValueKey('companion-end'),
-        label: '结束本次随行',
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48, minWidth: 44),
-          child: Center(
-              child: Text('结束本次随行',
-                  style: _companionSans(11, color: _distanceMuted))),
-        ),
-      );
 }
 
 class _CompanionPrimaryButton extends StatelessWidget {
@@ -839,31 +785,6 @@ class _CompanionTextButton extends StatelessWidget {
           ])));
 }
 
-class _CompanionNote extends StatelessWidget {
-  const _CompanionNote();
-  @override
-  Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-      color: AppColors.lime.withValues(alpha: .48),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const DiscoveryIcon(DiscoveryMark.headphones,
-            size: 15, color: AppColors.moss),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Text.rich(TextSpan(children: [
-          TextSpan(
-              text: '声音不会突然播放。\n',
-              style: _companionSans(10,
-                  color: AppColors.moss,
-                  weight: FontWeight.w600,
-                  height: 1.75)),
-          TextSpan(
-              text: '默认先提醒你，再由你点击播放。',
-              style: _companionSans(10, color: AppColors.moss, height: 1.75))
-        ])))
-      ]));
-}
-
 /// A full-bleed field signal matching the editorial companion page. It
 /// communicates whether the companion is actually receiving a usable position
 /// without inventing a distance.
@@ -874,13 +795,17 @@ class _CompanionSignalWidget extends StatelessWidget {
     required this.horizontal,
     this.distance,
     this.onRetry,
+    this.onStart,
+    this.onStop,
+    this.starting = false,
   });
 
   final bool active;
   final ActiveTourState state;
   final double horizontal;
   final CompanionDistanceState? distance;
-  final VoidCallback? onRetry;
+  final VoidCallback? onRetry, onStart, onStop;
+  final bool starting;
 
   @override
   Widget build(BuildContext context) {
@@ -911,7 +836,9 @@ class _CompanionSignalWidget extends StatelessWidget {
                     : '定位正常'
                 : active
                     ? distance?.locationIssue ?? '等待定位'
-                    : '尚未定位';
+                    : starting
+                        ? '正在准备'
+                        : '未开启';
     final screenWidth = MediaQuery.sizeOf(context).width;
     final fieldHeight = screenWidth <= 375 ? 164.0 : 178.0;
     return SizedBox(
@@ -934,41 +861,81 @@ class _CompanionSignalWidget extends StatelessWidget {
             ),
           ),
           child: Stack(children: [
-            const Positioned.fill(
-                child: CustomPaint(painter: _CompanionSignalPainter())),
-            Center(
-              child: Transform.rotate(
-                angle: -5 * math.pi / 180,
-                child: Container(
-                  width: 91,
-                  height: 91,
-                  decoration: BoxDecoration(
-                    color: const Color(0xF0F5F0E7),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _distanceRed),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(number,
-                          key: const ValueKey('companion-distance-number'),
-                          style: const TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 35,
-                            height: 1,
-                            letterSpacing: -1.5,
-                            fontStyle: FontStyle.italic,
-                            color: _distanceRed,
-                          )),
-                      const SizedBox(height: 6),
-                      Text(unit,
-                          style: _companionSans(10,
-                              color: const Color(0xFF86745F))),
-                    ],
+            Positioned.fill(
+                child: TweenAnimationBuilder<double>(
+              tween: Tween(end: active ? 1.0 : 0.0),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 800),
+              curve: Curves.easeOutCubic,
+              builder: (_, progress, __) =>
+                  CustomPaint(painter: _CompanionSignalPainter(progress)),
+            )),
+            if (!active &&
+                !starting &&
+                !_companionRunning(state) &&
+                onStart != null)
+              Center(
+                  child: DiscoveryTouch(
+                      key: const ValueKey('companion-start'),
+                      label: '开启随行',
+                      onTap: onStart,
+                      child: Transform.rotate(
+                          angle: -5 * math.pi / 180,
+                          child: SizedBox(
+                              width: 166,
+                              height: 152,
+                              child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text('开启',
+                                        style: _companionSans(10,
+                                            color: const Color(0xff86745f),
+                                            spacing: 5)),
+                                    const SizedBox(height: 3),
+                                    Text('随行',
+                                        style: discoverySerif(31,
+                                            color: _distanceRed, spacing: 3)),
+                                    const SizedBox(height: 10),
+                                    Container(
+                                        width: 22,
+                                        height: 1,
+                                        color: const Color(0x80bc4432)),
+                                  ])))))
+            else
+              Center(
+                child: Transform.rotate(
+                  angle: -5 * math.pi / 180,
+                  child: Container(
+                    width: 91,
+                    height: 91,
+                    decoration: BoxDecoration(
+                      color: const Color(0xF0F5F0E7),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _distanceRed),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(number,
+                            key: const ValueKey('companion-distance-number'),
+                            style: const TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 35,
+                              height: 1,
+                              letterSpacing: -1.5,
+                              fontStyle: FontStyle.italic,
+                              color: _distanceRed,
+                            )),
+                        const SizedBox(height: 6),
+                        Text(unit,
+                            style: _companionSans(10,
+                                color: const Color(0xFF86745F))),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
             Positioned(
               right: horizontal,
               top: 16,
@@ -999,6 +966,27 @@ class _CompanionSignalWidget extends StatelessWidget {
                 ),
               ),
             ),
+            if (_companionRunning(state) && onStop != null)
+              Positioned(
+                  right: horizontal,
+                  bottom: 4,
+                  child: DiscoveryTouch(
+                      key: const ValueKey('companion-end'),
+                      label: '停止随行',
+                      onTap: onStop,
+                      child: SizedBox(
+                          height: 44,
+                          child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('停止随行',
+                                    style: discoverySerif(12,
+                                        color: _distanceRed)),
+                                const SizedBox(height: 6),
+                                Container(
+                                    width: 23, height: 1, color: _distanceRed),
+                              ])))),
             Positioned(
               left: horizontal,
               bottom: 15,
@@ -1014,7 +1002,8 @@ class _CompanionSignalWidget extends StatelessWidget {
 }
 
 class _CompanionSignalPainter extends CustomPainter {
-  const _CompanionSignalPainter();
+  const _CompanionSignalPainter(this.progress);
+  final double progress;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1033,12 +1022,13 @@ class _CompanionSignalPainter extends CustomPainter {
     }
 
     contour(253, 260, -18, const Color(0x70C2CC95));
-    contour(162, 115, 21, const Color(0x72BC4432));
-    contour(119, 161, -27, const Color(0x4ABC4432));
+    contour(162, 115, 12 + 9 * progress, const Color(0x72BC4432));
+    contour(119, 161, -18 - 9 * progress, const Color(0x4ABC4432));
   }
 
   @override
-  bool shouldRepaint(_CompanionSignalPainter oldDelegate) => false;
+  bool shouldRepaint(_CompanionSignalPainter oldDelegate) =>
+      progress != oldDelegate.progress;
 }
 
 class _CompanionRouteTile extends StatelessWidget {

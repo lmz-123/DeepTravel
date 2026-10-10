@@ -1,9 +1,11 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/travel_destinations.dart';
 import '../../domain/community_models.dart';
 import '../experience_providers.dart';
+import 'notes_controller.dart';
 import '../active_tour_controller.dart';
 import '../widgets/discovery_art.dart';
 import '../widgets/traveler_bottom_navigation.dart';
@@ -113,20 +115,23 @@ class NoteScaffold extends StatelessWidget {
       {super.key,
       required this.child,
       this.scrollController,
-      this.navigationEnabled = true});
+      this.navigationEnabled = true,
+      this.showNavigation = true});
   final Widget child;
   final ScrollController? scrollController;
-  final bool navigationEnabled;
+  final bool navigationEnabled, showNavigation;
   @override
   Widget build(BuildContext context) => Scaffold(
       backgroundColor: notePaper,
-      bottomNavigationBar: AbsorbPointer(
-          absorbing: !navigationEnabled,
-          child: const SafeArea(
-              top: false,
-              bottom: false,
-              child: TravelerBottomNavigation(
-                  active: TravelerSection.community, editorial: true))),
+      bottomNavigationBar: !showNavigation
+          ? null
+          : AbsorbPointer(
+              absorbing: !navigationEnabled,
+              child: const SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: TravelerBottomNavigation(
+                      active: TravelerSection.community, editorial: true))),
       body: SafeArea(
           bottom: false,
           child: SingleChildScrollView(
@@ -136,12 +141,15 @@ class NoteScaffold extends StatelessWidget {
 }
 
 class NoteTop extends StatelessWidget {
-  const NoteTop(this.label, {super.key, this.trailing});
+  const NoteTop(this.label,
+      {super.key, this.trailing, this.title, this.onBack});
   final String label;
+  final String? title;
+  final VoidCallback? onBack;
   final Widget? trailing;
   @override
   Widget build(BuildContext context) => Container(
-      height: 68,
+      height: title == null ? 68 : 78,
       margin: const EdgeInsets.only(bottom: 24),
       decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: noteLine))),
@@ -149,9 +157,10 @@ class NoteTop extends StatelessWidget {
         Expanded(
             child: NoteButton(
                 label: '返回',
-                onTap: () => context.canPop()
-                    ? context.pop()
-                    : context.go('/?tab=community'),
+                onTap: onBack ??
+                    () => context.canPop()
+                        ? context.pop()
+                        : context.go('/?tab=community'),
                 child: SizedBox(
                     height: 44,
                     child: Row(children: [
@@ -160,6 +169,10 @@ class NoteTop extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(label, style: noteSans(12, color: noteQuiet))
                     ])))),
+        if (title != null) ...[
+          Text(title!, style: noteSerif(15)),
+          const Spacer()
+        ],
         if (trailing != null) trailing!
       ]));
 }
@@ -175,14 +188,25 @@ class NoteAuthor extends StatelessWidget {
           child: Row(children: [
             NoteAvatar(post.author.displayName),
             const SizedBox(width: 9),
-            Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(post.author.displayName, style: noteSans(12)),
-                  Text(noteTime(post.createdAt),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                  Text(post.author.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: noteSans(12)),
+                  Text('${noteTime(post.createdAt)} 发布',
                       style: noteSans(10, color: noteQuiet))
-                ])
+                ])),
+            const SizedBox(width: 12),
+            Container(
+                padding: const EdgeInsets.only(left: 12),
+                decoration: const BoxDecoration(
+                    border: Border(left: BorderSide(color: noteLine))),
+                child: Text(post.category.label,
+                    style: noteSans(11, color: noteRed))),
           ])));
 }
 
@@ -208,87 +232,272 @@ class NoteAvatar extends StatelessWidget {
           style: noteSerif(15)));
 }
 
-class NotePhoto extends ConsumerStatefulWidget {
-  const NotePhoto(this.post, {super.key, this.height = 249, this.onTap});
+class NoteMediaImage extends ConsumerWidget {
+  const NoteMediaImage(this.media, {super.key, this.fit = BoxFit.cover});
+  final CommunityMedia media;
+  final BoxFit fit;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key =
+        CommunityMediaKey(ref.watch(currentUserIdProvider) ?? 'demo', media);
+    final bytes = ref.watch(communityMediaBytesProvider(key));
+    Widget retry() => ColoredBox(
+        color: const Color(0xffe8e6d8),
+        child: Center(
+            child: TextButton(
+                onPressed: () =>
+                    ref.invalidate(communityMediaBytesProvider(key)),
+                child: Text('重新加载照片', style: noteSans(11)))));
+    return bytes.when(
+        data: (data) => Image.memory(data,
+            fit: fit,
+            width: double.infinity,
+            height: double.infinity,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => retry()),
+        loading: () => const ColoredBox(
+            color: Color(0xffe8e6d8),
+            child: Center(
+                child: CircularProgressIndicator(
+                    strokeWidth: 1, color: noteQuiet))),
+        error: (_, __) => retry());
+  }
+}
+
+class NotePhoto extends StatelessWidget {
+  const NotePhoto(this.post,
+      {super.key, this.height = 249, this.onTap, this.onPhotoTap});
   final CommunityPost post;
   final double height;
   final VoidCallback? onTap;
-  @override
-  ConsumerState<NotePhoto> createState() => _NotePhotoState();
-}
-
-class _NotePhotoState extends ConsumerState<NotePhoto> {
-  int _index = 0;
+  final ValueChanged<int>? onPhotoTap;
   @override
   Widget build(BuildContext context) {
-    final post = widget.post;
-    final userId = ref.watch(currentUserIdProvider) ?? 'demo';
-    if (post.media.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-        height: widget.height,
-        child: Stack(children: [
-          ClipRRect(
-              borderRadius:
-                  const BorderRadius.only(topRight: Radius.circular(42)),
-              child: PageView.builder(
-                  itemCount: post.media.length,
-                  onPageChanged: (i) => setState(() => _index = i),
-                  itemBuilder: (_, index) {
-                    final media = post.media[index];
-                    final bytes = ref.watch(communityMediaBytesProvider(
-                        CommunityMediaKey(userId, media)));
-                    return NoteButton(
-                        label: '查看动态照片',
-                        onTap: widget.onTap,
-                        child: bytes.when(
-                            data: (data) => Image.memory(data,
-                                width: double.infinity,
-                                height: widget.height,
-                                fit: BoxFit.cover,
-                                gaplessPlayback: true,
-                                errorBuilder: (_, __, ___) =>
-                                    _photoError(media, userId)),
-                            loading: () => const ColoredBox(
-                                color: Color(0xffe8e6d8),
-                                child: Center(
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 1, color: noteQuiet))),
-                            error: (_, __) => _photoError(media, userId)));
-                  })),
-          Positioned(
-              left: 0,
-              bottom: 0,
-              child: Container(
-                  padding: const EdgeInsets.fromLTRB(0, 9, 15, 0),
-                  decoration: const BoxDecoration(
-                      color: notePaper,
-                      borderRadius:
-                          BorderRadius.only(topRight: Radius.circular(16))),
-                  child: Text(
-                      post.place?.theme.contains('海') == true
-                          ? '海边 / COAST'
-                          : '街巷 / STREETS',
-                      style: noteItalic(11)))),
-          if (post.media.length > 1)
-            Positioned(
-                right: 12,
-                bottom: 10,
-                child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    color: notePaper,
-                    child: Text('${_index + 1} / ${post.media.length}',
-                        style: noteItalic(11))))
-        ]));
+    final media = post.media;
+    if (media.isEmpty) return const SizedBox.shrink();
+    final narrow = MediaQuery.sizeOf(context).width <= 360;
+    Widget tile(int i, {bool round = false}) => Expanded(
+        child: ClipRRect(
+            borderRadius: BorderRadius.only(
+                topRight: Radius.circular(round
+                    ? media.length == 1
+                        ? 42
+                        : 32
+                    : 0)),
+            child: NoteButton(
+                label: '查看第 ${i + 1} 张照片，共 ${media.length} 张',
+                onTap: () {
+                  if (onPhotoTap != null) {
+                    onPhotoTap!(i);
+                  } else {
+                    onTap?.call();
+                  }
+                },
+                child: Stack(fit: StackFit.expand, children: [
+                  NoteMediaImage(media[i]),
+                  if (i == 2 && media.length > 3)
+                    ColoredBox(
+                        color: const Color(0x55252d24),
+                        child: Center(
+                            child: Text('+${media.length - 3}',
+                                style: noteItalic(27, color: notePaper))))
+                ]))));
+    return Column(children: [
+      SizedBox(
+          height: media.length == 1
+              ? height
+              : media.length == 2
+                  ? narrow
+                      ? 218
+                      : 245
+                  : narrow
+                      ? 235
+                      : 262,
+          child: media.length == 1
+              ? Row(children: [tile(0, round: true)])
+              : media.length == 2
+                  ? Row(children: [
+                      tile(0),
+                      const SizedBox(width: 5),
+                      tile(1, round: true)
+                    ])
+                  : Row(children: [
+                      Expanded(flex: 155, child: Row(children: [tile(0)])),
+                      const SizedBox(width: 5),
+                      Expanded(
+                          flex: 100,
+                          child: Column(children: [
+                            tile(1, round: true),
+                            const SizedBox(height: 5),
+                            tile(2)
+                          ]))
+                    ])),
+      SizedBox(
+          height: media.length > 1 ? 44 : 32,
+          child: Row(children: [
+            Text(
+                post.place?.theme.contains('海') == true
+                    ? '海边 / COAST'
+                    : '街巷 / STREETS',
+                style: noteItalic(11)),
+            const Spacer(),
+            if (media.length > 1)
+              NoteArrow('${media.length} 张照片', size: 11, underline: false,
+                  onTap: () {
+                if (onPhotoTap != null) {
+                  onPhotoTap!(0);
+                } else {
+                  onTap?.call();
+                }
+              })
+          ])),
+    ]);
+  }
+}
+
+class NoteGallery extends StatefulWidget {
+  const NoteGallery(this.post,
+      {super.key,
+      this.initialIndex = 0,
+      this.expanded = false,
+      this.onChanged});
+  final CommunityPost post;
+  final int initialIndex;
+  final bool expanded;
+  final ValueChanged<int>? onChanged;
+  @override
+  State<NoteGallery> createState() => _NoteGalleryState();
+}
+
+class _NoteGalleryState extends State<NoteGallery> {
+  late final PageController _pages;
+  late int _index;
+  @override
+  void initState() {
+    super.initState();
+    _index =
+        widget.initialIndex.clamp(0, math.max(0, widget.post.media.length - 1));
+    _pages = PageController(initialPage: _index);
   }
 
-  Widget _photoError(CommunityMedia media, String user) => ColoredBox(
-      color: const Color(0xffe8e6d8),
-      child: Center(
-          child: TextButton(
-              onPressed: () => ref.invalidate(
-                  communityMediaBytesProvider(CommunityMediaKey(user, media))),
-              child: Text('重新加载照片', style: noteSans(12)))));
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  void _select(int index) => _pages.animateToPage(index,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      curve: Curves.easeOut);
+  @override
+  Widget build(BuildContext context) {
+    final media = widget.post.media;
+    if (media.isEmpty) return const SizedBox.shrink();
+    final narrow = MediaQuery.sizeOf(context).width <= 360;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(
+          height: widget.expanded
+              ? narrow
+                  ? 355
+                  : 410
+              : 288,
+          child: ColoredBox(
+              color: widget.expanded ? notePaper : const Color(0xffe9e7dd),
+              child: PageView.builder(
+                  controller: _pages,
+                  itemCount: media.length,
+                  onPageChanged: (i) {
+                    setState(() => _index = i);
+                    widget.onChanged?.call(i);
+                  },
+                  itemBuilder: (_, i) => widget.expanded
+                      ? InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 4,
+                          child: NoteMediaImage(media[i], fit: BoxFit.contain))
+                      : NoteButton(
+                          label: '查看大图',
+                          onTap: () async {
+                            final selected = await Navigator.of(context)
+                                .push<int>(MaterialPageRoute(
+                                    builder: (context) => NoteScaffold(
+                                        showNavigation: false,
+                                        child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const NoteTop('照片'),
+                                              if (widget.post.title != null)
+                                                Padding(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        vertical: 20),
+                                                    child: Text(
+                                                        widget.post.title!,
+                                                        style: noteSerif(20))),
+                                              NoteGallery(widget.post,
+                                                  initialIndex: _index,
+                                                  expanded: true,
+                                                  onChanged: (i) {
+                                                if (mounted) _select(i);
+                                              })
+                                            ]))));
+                            if (mounted && selected != null) _select(selected);
+                          },
+                          child:
+                              NoteMediaImage(media[i], fit: BoxFit.contain))))),
+      SizedBox(
+          height: 48,
+          child: Row(children: [
+            Text('${_index + 1}', style: noteItalic(22, color: noteRed)),
+            Text(' / ${media.length}', style: noteItalic(12)),
+            const Spacer(),
+            if (media.length > 1) ...[
+              IconButton(
+                  tooltip: '上一张照片',
+                  onPressed: _index > 0 ? () => _select(_index - 1) : null,
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  color: noteRed),
+              IconButton(
+                  tooltip: '下一张照片',
+                  onPressed: _index + 1 < media.length
+                      ? () => _select(_index + 1)
+                      : null,
+                  icon: const Icon(Icons.arrow_forward, size: 18),
+                  color: noteRed),
+            ]
+          ])),
+      if (media.length > 1)
+        Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: LayoutBuilder(
+                builder: (context, constraints) =>
+                    Wrap(spacing: 7, runSpacing: 7, children: [
+                      for (var i = 0; i < media.length; i++)
+                        NoteButton(
+                            label: '第 ${i + 1} 张照片',
+                            selected: i == _index,
+                            onTap: () => _select(i),
+                            child: Container(
+                                width: (constraints.maxWidth -
+                                        7 * (narrow ? 4 : 5)) /
+                                    (narrow ? 5 : 6),
+                                height: 49,
+                                padding: const EdgeInsets.only(bottom: 5),
+                                decoration: BoxDecoration(
+                                    border: Border(
+                                        bottom: BorderSide(
+                                            color: i == _index
+                                                ? noteRed
+                                                : Colors.transparent))),
+                                child: Opacity(
+                                    opacity: i == _index ? 1 : .58,
+                                    child: NoteMediaImage(media[i]))))
+                    ]))),
+    ]);
+  }
 }
 
 class NotePlaceRow extends ConsumerWidget {
@@ -300,6 +509,8 @@ class NotePlaceRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final place = post.place;
     if (place == null) return const SizedBox.shrink();
+    final distance = noteDistanceLabel(
+        noteDistance(place, ref.watch(notesLocationProvider).value));
     final info = Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Padding(
           padding: EdgeInsets.only(top: 3),
@@ -313,7 +524,14 @@ class NotePlaceRow extends ConsumerWidget {
                 ? noteSerif(18, height: 1.6)
                 : noteSans(12, height: 1.7)),
         const SizedBox(height: 2),
-        Text(place.name, style: noteSans(11, color: noteQuiet, height: 1.8))
+        Text.rich(
+            TextSpan(children: [
+              TextSpan(text: '${place.name} · '),
+              TextSpan(
+                  text: distance == '距离未知' ? distance : '距你约 $distance',
+                  style: const TextStyle(color: noteRed))
+            ]),
+            style: noteSans(11, color: noteQuiet, height: 1.8))
       ]))
     ]);
     return Container(

@@ -203,8 +203,10 @@ class CityStoryService:
         with self.session_factory() as session:
             rows = session.scalars(
                 select(TravelerFavoriteModel)
-                .where(TravelerFavoriteModel.user_id == user_id,
-                       TravelerFavoriteModel.target_kind != "community_post")
+                .where(
+                    TravelerFavoriteModel.user_id == user_id,
+                    TravelerFavoriteModel.target_kind != "community_post",
+                )
                 .order_by(TravelerFavoriteModel.created_at.desc())
             ).all()
             return [self._favorite_payload(session, item) for item in rows]
@@ -538,11 +540,30 @@ class CityStoryService:
     def _validate_favorite_input(self, target_kind: str, target_id: str) -> tuple[str, str]:
         target_kind = str(target_kind).strip()
         target_id = str(target_id).strip()
-        if target_kind not in {"city", "point", "theme"} or not target_id or len(target_id) > 120:
-            raise ValidationError("收藏目标必须是有效的城市、景点或主题")
+        if (
+            target_kind not in {"city", "point", "theme", "route"}
+            or not target_id
+            or len(target_id) > 120
+        ):
+            raise ValidationError("收藏目标必须是有效的城市、景点、路线或主题")
         return target_kind, target_id
 
     def _resolve_favorite_target(self, session, kind: str, target_id: str) -> dict | None:
+        if kind == "route":
+            route = session.scalar(
+                select(RouteModel).where(
+                    RouteModel.id == target_id, RouteModel.content_status == "published"
+                )
+            )
+            return (
+                {
+                    "label": route.title,
+                    "slug": route.slug,
+                    "cover_image": self.asset_url_builder(route.hero_image),
+                }
+                if route
+                else None
+            )
         if kind == "city":
             city = session.scalar(
                 select(CityModel)

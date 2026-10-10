@@ -361,7 +361,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                           ),
                         ),
                         DiscoveryTouch(
-                          label: '打开随行，开启到点提醒',
+                          label: '打开随行',
                           onTap: () => widget.onCompanion(route),
                           child: Container(
                             width: double.infinity,
@@ -409,13 +409,10 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                                           weight: FontWeight.w600,
                                         ),
                                       ),
-                                      Text(
-                                        '到点先提醒，再决定听不听',
-                                        style: discoverySans(
-                                          9,
-                                          color: const Color(0xff8a7763),
-                                        ),
-                                      ),
+                                      const SizedBox(height: 3),
+                                      Text('边走边听，发现沿途故事',
+                                          style: discoverySans(11,
+                                              color: const Color(0xff887962))),
                                     ],
                                   ),
                                 ),
@@ -504,10 +501,8 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
               (incoming ? 1 : -1) * remaining * 6 * scale),
           child: Opacity(
             opacity: alpha,
-            child: DiscoveryTouch(
+            child: KeyedSubtree(
               key: ValueKey('route-card-${route.slug}'),
-              label: '查看${route.title}',
-              onTap: () => widget.onOpen(route),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -523,9 +518,6 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
                                   spacing: 0),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis)),
-                      SizedBox(width: 15.6 * scale),
-                      DiscoveryIcon(DiscoveryMark.arrowUpRight,
-                          size: 17.55 * scale, color: const Color(0xffcf4630)),
                     ]),
                     Text(_routeMetadata(route),
                         style: discoverySans(11 * scale,
@@ -555,7 +547,7 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
 
 String _routeMetadata(RouteExperience route) => !route.isPublished
     ? '筹备中 · 可看构想'
-    : '${route.durationMinutes} 分钟 · ${route.distanceKm.toStringAsFixed(1)} km · ${_routeFormat(route)}';
+    : '${route.durationMinutes} 分钟 · ${route.distanceKm.toStringAsFixed(1)} km';
 String _routeFormat(RouteExperience route) =>
     route.audioTour != null ? '声音导览' : '文字漫游';
 

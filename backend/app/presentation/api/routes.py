@@ -738,6 +738,12 @@ def discover_community_posts():
             "data": _services()["community"].discover(
                 g.current_user.id,
                 city_slug=request.args.get("city"),
+                category=request.args.get("category"),
+                latitude=request.args.get("latitude"),
+                longitude=request.args.get("longitude"),
+                radius_km=request.args.get("radius_km"),
+                order=request.args.get("order", "latest"),
+                saved_only=request.args.get("saved") == "true",
                 cursor=request.args.get("cursor"),
                 limit=_page_limit(),
             )
@@ -758,7 +764,7 @@ def share_place_post(fragment_id):
         g.current_user.id,
         None,
         fragment_id,
-        category="on_site",
+        category=request.form.get("category", "on_site"),
         title=request.form.get("title"),
         body=request.form.get("body"),
         idempotency_key=request.form.get("idempotency_key", ""),

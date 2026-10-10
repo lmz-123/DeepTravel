@@ -6,6 +6,7 @@ import '../experience_providers.dart';
 import '../widgets/discovery_art.dart';
 import 'notes_controller.dart';
 import 'notes_widgets.dart';
+import 'notes_filters.dart';
 
 class NotesPage extends ConsumerStatefulWidget {
   const NotesPage({super.key});
@@ -14,7 +15,7 @@ class NotesPage extends ConsumerStatefulWidget {
 }
 
 class _NotesPageState extends ConsumerState<NotesPage> {
-  bool _citiesOpen = false, _more = false;
+  bool _more = false;
   final _busy = <String>{};
   Future<void> _mutate(CommunityPost post, bool save) async {
     if (!_busy.add(post.id)) return;
@@ -25,6 +26,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
       CommunityPost updated;
       if (save) {
         await repo.setCommunitySaved(post.id, !post.viewerHasSaved);
+        ref.invalidate(savedNotesProvider);
         updated = post.copyWith(viewerHasSaved: !post.viewerHasSaved);
       } else {
         final value =
@@ -44,138 +46,34 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     }
   }
 
-  Future<void> _open(CommunityPost post) async {
-    await context.push('/community/post/${post.id}');
+  Future<void> _open(CommunityPost post, [int photo = 0]) async {
+    await context.push('/community/post/${post.id}?photo=$photo');
     if (mounted) ref.invalidate(notesFeedProvider);
   }
 
   @override
   Widget build(BuildContext context) {
     final feed = ref.watch(notesFeedProvider);
-    final places = ref.watch(notesPlacesProvider);
-    final selected = ref.watch(notesCityProvider);
-    final cities = <String, String>{
-      for (final p in places.value ?? <CommunityPlace>[]) p.citySlug: p.cityName
-    };
-    final cityName = cities[selected] ?? '全部城市';
     return NoteScaffold(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(
-          height: 78,
-          alignment: Alignment.centerLeft,
-          decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: noteLine))),
-          child: DiscoveryBrand(
-              editorial: true, onTap: () => context.push('/profile'))),
+      SizedBox(
+          height: 72,
+          child: Row(children: [
+            DiscoveryBrand(title: '见闻', onTap: () => context.push('/profile'))
+          ])),
       Padding(
-          padding: const EdgeInsets.fromLTRB(0, 24, 0, 18),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text.rich(
-                      TextSpan(children: [
-                        const TextSpan(text: '见闻'),
-                        TextSpan(
-                            text: '.',
-                            style: noteSerif(46, color: noteRed, height: 1.1))
-                      ]),
-                      style: noteSerif(
-                              MediaQuery.sizeOf(context).width <= 360 ? 42 : 46,
-                              height: 1.1,
-                              weight: FontWeight.w500)
-                          .copyWith(letterSpacing: 2)),
-                  const SizedBox(height: 10),
-                  Text('NOTES FROM THE WAY', style: noteItalic(10))
-                ])),
+          padding: const EdgeInsets.only(top: 1, bottom: 18),
+          child: Row(children: [
+            Expanded(child: Text('NOTES FROM THE WAY', style: noteItalic(10))),
             NoteArrow('留一则见闻',
-                size: 14,
+                size: 13,
                 icon: DiscoveryMark.pen,
                 leadingIcon: true, onTap: () async {
               await context.push('/community/write');
               if (mounted) ref.invalidate(notesFeedProvider);
             })
           ])),
-      Container(
-          margin: const EdgeInsets.only(top: 6, bottom: 24),
-          decoration: const BoxDecoration(
-              border:
-                  Border.symmetric(horizontal: BorderSide(color: noteLine))),
-          child: Column(children: [
-            NoteButton(
-                key: const ValueKey('notes-city-toggle'),
-                label: '选择城市，当前$cityName',
-                onTap: () => setState(() => _citiesOpen = !_citiesOpen),
-                child: SizedBox(
-                    height: 62,
-                    child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                              padding: const EdgeInsets.only(bottom: 2),
-                              decoration: BoxDecoration(
-                                  border: Border(
-                                      bottom: BorderSide(
-                                          color:
-                                              noteRed.withValues(alpha: .38)))),
-                              child: Text(cityName, style: noteSerif(20))),
-                          const SizedBox(width: 13),
-                          AnimatedRotation(
-                              turns: _citiesOpen ? -.25 : 0,
-                              duration: MediaQuery.disableAnimationsOf(context)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 220),
-                              child: const RotatedBox(
-                                  quarterTurns: 1,
-                                  child: DiscoveryIcon(
-                                      DiscoveryMark.arrowUpRight,
-                                      size: 17,
-                                      color: noteRed)))
-                        ]))),
-            AnimatedSize(
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 220),
-                alignment: Alignment.topCenter,
-                child: !_citiesOpen
-                    ? const SizedBox(width: double.infinity)
-                    : Container(
-                        key: const ValueKey('notes-city-directory'),
-                        padding: const EdgeInsets.only(top: 17, bottom: 20),
-                        decoration: const BoxDecoration(
-                            color: Color(0xfff9f5ed),
-                            border: Border(top: BorderSide(color: noteLine))),
-                        child: places.when(
-                            data: (_) => LayoutBuilder(builder: (context, box) {
-                                  final entries = <MapEntry<String?, String>>[
-                                    const MapEntry(null, '全部'),
-                                    ...cities.entries
-                                  ];
-                                  return Wrap(children: [
-                                    for (var i = 0; i < entries.length; i++)
-                                      SizedBox(
-                                          width: box.maxWidth / 3,
-                                          child: _CityChoice(
-                                              entries[i],
-                                              selected == entries[i].key,
-                                              i % 3 != 0, () {
-                                            ref
-                                                .read(
-                                                    notesCityProvider.notifier)
-                                                .select(entries[i].key);
-                                            setState(() => _citiesOpen = false);
-                                          }))
-                                  ]);
-                                }),
-                            error: (_, __) => NoteFailure('城市暂时无法读取',
-                                () => ref.invalidate(notesPlacesProvider)),
-                            loading: () => const SizedBox(
-                                height: 78,
-                                child: Center(
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 1, color: noteQuiet))))))
-          ])),
+      const NotesFilterBar(),
       feed.when(
           skipLoadingOnRefresh: true,
           data: (page) => Column(children: [
@@ -231,10 +129,11 @@ class _NotesPageState extends ConsumerState<NotesPage> {
           : null,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         NoteAuthor(post),
-        NotePhoto(post, onTap: () => _open(post)),
+        NotePhoto(post,
+            onTap: () => _open(post), onPhotoTap: (i) => _open(post, i)),
         if (post.title?.isNotEmpty == true)
           Padding(
-              padding: const EdgeInsets.only(top: 17),
+              padding: const EdgeInsets.only(top: 6),
               child: NoteButton(
                   label: '查看动态详情',
                   onTap: () => _open(post),
@@ -259,52 +158,4 @@ class _NotesPageState extends ConsumerState<NotesPage> {
             onSave: _busy.contains(post.id) ? null : () => _mutate(post, true),
             onComments: () => _open(post))
       ]));
-}
-
-class _CityChoice extends StatelessWidget {
-  const _CityChoice(this.city, this.selected, this.line, this.tap);
-  final MapEntry<String?, String> city;
-  final bool selected, line;
-  final VoidCallback tap;
-  @override
-  Widget build(BuildContext context) => NoteButton(
-      key: ValueKey('notes-city-${city.key ?? 'all'}'),
-      label: city.value,
-      selected: selected,
-      onTap: tap,
-      child: Container(
-          height: 78,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-              border: line
-                  ? const Border(left: BorderSide(color: noteLine))
-                  : null),
-          child: Stack(children: [
-            Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(city.value,
-                      style: noteSerif(24,
-                          color: selected ? noteRed : noteInk, height: 1.3)),
-                  const SizedBox(height: 8),
-                  Text(
-                      city.key?.replaceAll('-', ' ').toUpperCase() ??
-                          'ALL CITIES',
-                      style: noteItalic(9))
-                ]),
-            if (selected) ...[
-              const Positioned(
-                  right: 0,
-                  top: 6,
-                  child: DiscoveryIcon(DiscoveryMark.check,
-                      size: 12, color: noteRed)),
-              Positioned(
-                  left: 0,
-                  bottom: 0,
-                  child: Transform.rotate(
-                      angle: -.1,
-                      child: Container(width: 17, height: 1, color: noteRed)))
-            ]
-          ])));
 }

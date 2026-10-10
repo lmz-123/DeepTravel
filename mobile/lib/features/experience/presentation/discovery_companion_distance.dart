@@ -20,32 +20,23 @@ TextStyle _companionSans(
       letterSpacing: spacing,
     );
 
-class _CompanionStampPainter extends CustomPainter {
-  const _CompanionStampPainter();
-  @override
-  void paint(Canvas canvas, Size size) => canvas.drawOval(
-        Offset.zero & size,
-        Paint()
-          ..color = const Color(0x72BC4432)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
-      );
-  @override
-  bool shouldRepaint(_CompanionStampPainter oldDelegate) => false;
-}
-
 class _CompanionDistancePanel extends ConsumerStatefulWidget {
   const _CompanionDistancePanel({
     required this.route,
     required this.activeTour,
     required this.signalActive,
     required this.horizontal,
+    this.onStart,
+    this.onStop,
+    this.starting = false,
   });
 
   final RouteExperience route;
   final ActiveTourState activeTour;
   final bool signalActive;
   final double horizontal;
+  final VoidCallback? onStart, onStop;
+  final bool starting;
 
   @override
   ConsumerState<_CompanionDistancePanel> createState() =>
@@ -146,23 +137,25 @@ class _CompanionDistancePanelState
                     ? '等待沿途地点'
                     : '等待位置');
     final modeLabel = manual
-        ? '手动选定 · 距离目标'
+        ? '手动选定'
         : distance.allExplored
             ? '自动发现 · 附近地点'
             : '自动发现 · 最近未探索';
-    final note = distance.isPaused
-        ? '随行暂停 · 距离暂不更新'
-        : !distance.hasLocation
-            ? widget.activeTour.locationMode == TourLocationMode.simulated
-                ? '模拟预览 · 实地行走时显示距离'
-                : distance.locationIssue == '定位精度不足'
-                    ? '定位精度不足 · 点右上角重新定位'
-                    : '定位恢复后更新距离'
-            : manual
-                ? '目标保持不变 · 直线约距'
-                : distance.isApproximate
-                    ? '位置仍在校准 · 仅供估算'
-                    : '直线约距 · 随脚步更新';
+    final note = !widget.signalActive
+        ? ''
+        : distance.isPaused
+            ? '随行暂停 · 距离暂不更新'
+            : !distance.hasLocation
+                ? widget.activeTour.locationMode == TourLocationMode.simulated
+                    ? '模拟预览 · 实地行走时显示距离'
+                    : distance.locationIssue == '定位精度不足'
+                        ? '定位精度不足 · 点右上角重新定位'
+                        : '定位恢复后更新距离'
+                : manual
+                    ? ''
+                    : distance.isApproximate
+                        ? '位置仍在校准 · 仅供估算'
+                        : '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -171,6 +164,9 @@ class _CompanionDistancePanelState
           state: widget.activeTour,
           horizontal: widget.horizontal,
           distance: distance,
+          onStart: widget.onStart,
+          onStop: widget.onStop,
+          starting: widget.starting,
           onRetry: widget.signalActive &&
                   !distance.isPaused &&
                   !distance.hasLocation &&
@@ -214,9 +210,18 @@ class _CompanionDistancePanelState
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(modeLabel,
-                                style: _companionSans(9,
-                                    color: _distanceMuted, spacing: .7)),
+                            Row(children: [
+                              Expanded(
+                                  child: Text(
+                                      '${widget.route.title} · ${widget.signalActive ? '正在随行' : '本次随行'}',
+                                      key: const ValueKey(
+                                          'companion-selected-route'),
+                                      style: _companionSans(10,
+                                          color: _distanceMuted))),
+                              Text(modeLabel,
+                                  style: _companionSans(9,
+                                      color: _distanceMuted, spacing: .7))
+                            ]),
                             const SizedBox(height: 5),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -253,34 +258,35 @@ class _CompanionDistancePanelState
             ),
           ),
         ),
-        ConstrainedBox(
-          constraints: BoxConstraints(minHeight: manual ? 44 : 39),
-          child: Row(
-            children: [
-              Expanded(
-                  child: Text(note,
-                      style: _companionSans(10, color: _distanceMuted))),
-              if (manual) ...[
-                const SizedBox(width: 8),
-                TextButton(
-                  key: const ValueKey('companion-distance-automatic'),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(44, 44),
-                    foregroundColor: _distanceRed,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        if (note.isNotEmpty || manual)
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: manual ? 44 : 39),
+            child: Row(
+              children: [
+                Expanded(
+                    child: Text(note,
+                        style: _companionSans(10, color: _distanceMuted))),
+                if (manual) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    key: const ValueKey('companion-distance-automatic'),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
+                      foregroundColor: _distanceRed,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () {
+                      ref.read(provider.notifier).useAutomatic();
+                      _notice('已恢复自动发现');
+                    },
+                    child: Text('恢复自动发现 ↗',
+                        style: _companionSans(11, color: _distanceRed)),
                   ),
-                  onPressed: () {
-                    ref.read(provider.notifier).useAutomatic();
-                    _notice('已恢复自动发现');
-                  },
-                  child: Text('恢复自动发现 ↗',
-                      style: _companionSans(11, color: _distanceRed)),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -414,7 +420,7 @@ class _CompanionHeader extends StatelessWidget {
               horizontal: MediaQuery.sizeOf(context).width <= 375 ? 20 : 23),
           child:
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            DiscoveryBrand(onTap: () => context.push('/profile')),
+            DiscoveryBrand(title: '随行', onTap: () => context.push('/profile')),
             if (city != null)
               Text(city!, style: _companionSans(11, color: _distanceMuted)),
           ]),
@@ -447,8 +453,6 @@ class _CompanionListeningStrip extends StatelessWidget {
                   children: [
                 Text('正在听 · ${state.current?.publicPlaceName ?? '这一段城市'}',
                     style: _companionSans(11, color: AppColors.ink)),
-                Text('声音跟随当前讲述',
-                    style: _companionSans(9, color: _distanceMuted)),
               ])),
           Tooltip(
               message: '暂停讲述',

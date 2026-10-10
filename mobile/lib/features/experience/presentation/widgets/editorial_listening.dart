@@ -477,10 +477,10 @@ class EditorialPlaybackControls extends StatelessWidget {
         Text(
           status ??
               (isPlaying
-                  ? '正在播放，慢慢听。'
+                  ? '播放中'
                   : position > Duration.zero
-                  ? '已暂停，回来时从这里继续。'
-                  : '准备好了，就按下播放。'),
+                  ? '已暂停'
+                  : '待播放'),
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: editorialMuted,

@@ -130,7 +130,7 @@ void main() {
             findsOneWidget);
         expect(find.text('开启随行'), findsNothing);
         expect(find.text('行走准备'), findsNothing);
-        expect(find.text('定位发现 · 到点提醒'), findsOneWidget);
+        expect(find.text('定位发现 · 到点提醒'), findsNothing);
         await _capture(tester, 'route-cover-${size.width.toInt()}');
         await expectLater(
           find.byKey(const ValueKey('manual-evidence')),

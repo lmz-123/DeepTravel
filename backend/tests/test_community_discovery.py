@@ -104,3 +104,97 @@ def test_unpublished_places_and_invalid_visit_dates_rejected(app, client):
     assert _share(client, headers, place).status_code == 404
     assert client.get("/api/v1/community-posts", headers=headers).get_json()["data"]["items"] == []
     assert place not in client.get("/api/v1/community-places", headers=headers).get_json()["data"]
+
+
+def test_live_filters_nearest_pagination_and_saved_scope(app, client):
+    _, author = _login(client, "tester-a")
+    _, viewer = _login(client, "tester-b")
+    place = _publish_place(app, client, author)
+    first = _share(client, author, place, category="viewpoint").get_json()["data"]
+    second = _share(client, author, place, category="viewpoint").get_json()["data"]
+    _share(client, author, place, category="experience")
+    assert first["category"] == "viewpoint"
+    assert place["latitude"] is not None
+    query = dict(
+        category="viewpoint",
+        latitude=place["latitude"],
+        longitude=place["longitude"],
+        radius_km=5,
+        order="nearest",
+        limit=1,
+    )
+    response = client.get("/api/v1/community-posts", headers=viewer, query_string=query)
+    assert response.status_code == 200, response.get_json()
+    page = response.get_json()["data"]
+    assert page["total"] == 2
+    other = client.get(
+        "/api/v1/community-posts",
+        headers=viewer,
+        query_string={**query, "cursor": page["next_cursor"]},
+    ).get_json()["data"]
+    assert {page["items"][0]["id"], other["items"][0]["id"]} == {first["id"], second["id"]}
+    assert other["next_cursor"] is None
+    for changes in ({"category": "experience"}, {"latitude": 0}, {"order": "latest"}):
+        assert (
+            client.get(
+                "/api/v1/community-posts",
+                headers=viewer,
+                query_string={**query, **changes, "cursor": page["next_cursor"]},
+            ).status_code
+            == 422
+        )
+    far = client.get(
+        "/api/v1/community-posts",
+        headers=viewer,
+        query_string={**query, "latitude": 0, "longitude": 0},
+    ).get_json()["data"]
+    assert far["items"] == []
+    for invalid in (
+        {"order": "nearest"},
+        {"latitude": "nan", "longitude": 1},
+        {"radius_km": -1},
+        {"category": "unknown"},
+    ):
+        assert (
+            client.get("/api/v1/community-posts", headers=viewer, query_string=invalid).status_code
+            == 422
+        )
+    client.put(f"/api/v1/community-posts/{first['id']}/saved", headers=viewer)
+    saved = client.get("/api/v1/community-posts?saved=true", headers=viewer).get_json()["data"]
+    assert [p["id"] for p in saved["items"]] == [first["id"]]
+    assert (
+        client.get("/api/v1/community-posts?saved=true", headers=author).get_json()["data"]["items"]
+        == []
+    )
+    client.delete(f"/api/v1/community-posts/{first['id']}/saved", headers=viewer)
+    assert (
+        client.get("/api/v1/community-posts?saved=true", headers=viewer).get_json()["data"]["items"]
+        == []
+    )
+
+
+def test_nine_photos_keep_order_and_route_favorites_work(app, client):
+    _, headers = _login(client, "tester-a")
+    place = _publish_place(app, client, headers)
+    response = _share(
+        client,
+        headers,
+        place,
+        category="experience",
+        photos=[(_image(), f"photo-{i}.jpg") for i in range(9)],
+    )
+    assert response.status_code == 201, response.get_json()
+    post = response.get_json()["data"]
+    assert [m["position"] for m in post["media"]] == list(range(9))
+    assert (
+        _share(
+            client, headers, place, photos=[(_image(), f"photo-{i}.jpg") for i in range(10)]
+        ).status_code
+        == 422
+    )
+    url = f"/api/v1/favorites/route/{place['route_id']}"
+    assert client.put(url, headers=headers).status_code in (200, 201)
+    assert client.put(url, headers=headers).status_code in (200, 201)
+    favorites = client.get("/api/v1/favorites", headers=headers).get_json()["data"]
+    assert len([f for f in favorites if f["target_id"] == place["route_id"]]) == 1
+    assert client.delete(url, headers=headers).status_code in (200, 204)

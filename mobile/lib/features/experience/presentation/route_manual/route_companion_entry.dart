@@ -67,15 +67,6 @@ class _RouteCompanionEntryState extends State<RouteCompanionEntry> {
                               spacing: -.6,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '定位发现 · 到点提醒',
-                            style: manualType(
-                              11,
-                              height: 1.6,
-                              color: const Color(0xFF717567),
-                            ),
-                          ),
                         ],
                       ),
                     ),

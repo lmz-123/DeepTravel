@@ -18,8 +18,12 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('不赶路，'), findsOneWidget);
       expect(find.text('去听海。'), findsOneWidget);
-      expect(find.text('随刊'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('route-card-route-0')));
+      expect(find.text('发现'), findsNWidgets(2));
+      await tester.tap(find.byKey(const ValueKey('route-card-route-0')),
+          warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.text('detail:route-0'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('journal-photo-route-0')));
       await tester.pumpAndSettle();
       expect(find.text('detail:route-0'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -98,8 +102,8 @@ void main() {
     tester,
   ) async {
     await _pump(tester, tab: 'shelf');
-    expect(find.text('你的下一页，\n还没有写下。'), findsOneWidget);
-    await tester.tap(find.text('去翻一翻'));
+    expect(find.text('下一次想去哪里？'), findsOneWidget);
+    await tester.tap(find.text('去发现'));
     await tester.pumpAndSettle();
     expect(find.text('不赶路，'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -220,7 +224,8 @@ void main() {
     expect(_journalPages, findsOneWidget);
     final selected = _routeCard('shenzhen-mixc-world');
     expect(tester.getTopLeft(selected), origin);
-    await tester.tap(selected);
+    await tester
+        .tap(find.byKey(const ValueKey('journal-photo-shenzhen-mixc-world')));
     await tester.pumpAndSettle();
     expect(find.text('detail:shenzhen-mixc-world'), findsOneWidget);
     expect(tester.takeException(), isNull);

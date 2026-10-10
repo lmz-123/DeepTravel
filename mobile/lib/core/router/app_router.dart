@@ -20,8 +20,10 @@ final appRouter = GoRouter(
             NoteComposePage(fragmentId: state.uri.queryParameters['fragment'])),
     GoRoute(
         path: '/community/post/:id',
-        builder: (context, state) =>
-            NoteDetailPage(postId: state.pathParameters['id']!)),
+        builder: (context, state) => NoteDetailPage(
+            postId: state.pathParameters['id']!,
+            photoIndex:
+                int.tryParse(state.uri.queryParameters['photo'] ?? '') ?? 0)),
     GoRoute(
       path: '/',
       builder: (context, state) => DiscoveryPage(

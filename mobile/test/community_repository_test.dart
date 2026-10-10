@@ -51,6 +51,23 @@ void main() {
     await repo.discoverCommunity(citySlug: 'shenzhen', cursor: 'next');
     expect(requests.last.queryParameters,
         {'city': 'shenzhen', 'cursor': 'next', 'limit': 12});
+    await repo.discoverCommunity(
+        query: const CommunityQuery(
+            category: CommunityCategory.viewpoint,
+            latitude: 22.6,
+            longitude: 114.3,
+            radiusKm: 20,
+            order: 'nearest',
+            savedOnly: true));
+    expect(requests.last.queryParameters, {
+      'limit': 12,
+      'category': 'viewpoint',
+      'latitude': 22.6,
+      'longitude': 114.3,
+      'radius_km': 20.0,
+      'order': 'nearest',
+      'saved': 'true'
+    });
     final post = await repo.shareCommunityPost(
         'fragment-1',
         const CommunityPostDraft(

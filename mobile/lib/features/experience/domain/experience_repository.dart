@@ -129,7 +129,10 @@ abstract interface class ExperienceRepository {
   Future<CommunityPolicy> communityPolicy();
   Future<List<CommunityPlace>> communityPlaces();
   Future<CommunityPage<CommunityPost>> discoverCommunity(
-      {String? citySlug, String? cursor, int limit = 12});
+      {String? citySlug,
+      String? cursor,
+      int limit = 12,
+      CommunityQuery query = const CommunityQuery()});
   Future<CommunityPost> shareCommunityPost(
       String fragmentId, CommunityPostDraft draft);
   Future<void> setCommunitySaved(String postId, bool saved);

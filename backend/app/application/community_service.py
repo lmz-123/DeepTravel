@@ -1058,8 +1058,8 @@ class CommunityService(CommunityDiscovery):
     @staticmethod
     def _category_label(category: str) -> str:
         return {
-            "viewpoint": "经典机位",
-            "experience": "行走经验",
+            "viewpoint": "拍照机位",
+            "experience": "经验分享",
             "fact_supplement": "事实补充 · 旅行者内容",
-            "on_site": "现场发现",
+            "on_site": "日常记录",
         }.get(category, category)
