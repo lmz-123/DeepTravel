@@ -220,18 +220,13 @@ void main() {
           ],
           child: MaterialApp(
               theme: AppTheme.light,
-              home: Scaffold(
-                  body: SingleChildScrollView(
-                      padding: const EdgeInsets.all(23),
-                      child: RepaintBoundary(
-                          key: const ValueKey('preparation'),
-                          child: ColoredBox(
-                              color: AppColors.paper,
-                              child: PreparationBody(route: sample()))))))));
+              home: RepaintBoundary(
+                  key: const ValueKey('preparation'),
+                  child: PreparationBody(route: sample())))));
       await tester.pumpAndSettle();
       expect(find.text('前往官方购票'), findsOneWidget);
       expect(find.textContaining('¥'), findsNothing);
-      expect(find.text('接驳班车'), findsOneWidget);
+      expect(find.text('接驳班车'), findsNothing);
       expect(tester.takeException(), isNull);
       await expectLater(find.byKey(const ValueKey('preparation')),
           matchesGoldenFile('goldens/travel-preparation-$width.png'));
@@ -287,8 +282,8 @@ void main() {
                         padding: EdgeInsets.all(23),
                         child: MyPreparation('ocean')))))));
     await tester.pumpAndSettle();
-    expect(find.text('已备好 1 / 3'), findsOneWidget);
-    expect(find.text('查看原文'), findsOneWidget);
+    expect(find.text('1 / 3 已备好'), findsOneWidget);
+    expect(find.text('查看原文 ↗'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await expectLater(find.byKey(const ValueKey('guide-wallet')),
         matchesGoldenFile('goldens/guide-wallet-390.png'));
@@ -328,10 +323,15 @@ void main() {
             home: const RepaintBoundary(
                 key: ValueKey('wallet'), child: TravelPlanPage(id: 'ocean')))));
     await tester.pumpAndSettle();
-    expect(find.text('本人添加'), findsOneWidget);
+    expect(find.text('本人添加'), findsNothing);
     expect(find.text('已出票'), findsNothing);
     expect(tester.takeException(), isNull);
     await expectLater(find.byKey(const ValueKey('wallet')),
         matchesGoldenFile('goldens/travel-wallet-390.png'));
+    await tester.ensureVisible(find.text('我的票据'));
+    await tester.tap(find.text('我的票据'));
+    await tester.pumpAndSettle();
+    expect(find.text('本人添加'), findsOneWidget);
+    expect(find.text('海洋王国门票.pdf'), findsOneWidget);
   });
 }

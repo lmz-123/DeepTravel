@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/travel_preparation.dart';
 import '../route_manual/manual_visuals.dart';
+import '../community/notes_widgets.dart';
+import 'preparation_visuals.dart';
 
 void travelNotice(BuildContext context, String text) =>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -101,43 +103,83 @@ class TravelTicketCard extends StatelessWidget {
               border: Border(
                   top: BorderSide(color: Color(0xffc7cbb8)),
                   bottom: BorderSide(color: Color(0xffc7cbb8)))),
-          padding: const EdgeInsets.fromLTRB(19, 18, 19, 10),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 7),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(
-                  child: Text(title,
-                      style: manualType(19,
-                          serif: true, weight: FontWeight.w500))),
-              const Icon(Icons.confirmation_number_outlined,
-                  size: 24, color: Color(0xff66745b))
-            ]),
-            const SizedBox(height: 7),
-            Text(subtitle, style: manualType(11, color: AppColors.textMuted)),
-            const SizedBox(height: 17),
+            Text(title,
+                style: noteSerif(18, weight: FontWeight.w500, height: 1.6)),
+            Text(subtitle, style: noteSans(11, color: noteQuiet)),
+            const SizedBox(height: 16),
             const SizedBox(
                 height: 1,
                 width: double.infinity,
                 child: CustomPaint(painter: _TicketRule())),
-            Row(children: [
-              Expanded(
-                  child: Text(footnote,
-                      style: manualType(11, color: AppColors.textMuted))),
-              const SizedBox(width: 8),
-              TextButton(
-                  onPressed: onTap,
-                  style: TextButton.styleFrom(
-                      foregroundColor: AppColors.action,
-                      padding: EdgeInsets.zero),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(action,
-                        style: manualType(13,
-                            serif: true, color: AppColors.action)),
-                    const SizedBox(width: 7),
-                    const Icon(Icons.arrow_outward, size: 16)
-                  ]))
-            ]),
+            Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Row(children: [
+                  Expanded(
+                      child: Text(footnote,
+                          style: noteSans(11, color: noteQuiet))),
+                  const SizedBox(width: 8),
+                  PreparationLink(action, onTap: onTap),
+                ])),
           ])));
+}
+
+/// Both compact fact entries retain all CMS-configured fields in a sheet.
+Future<void> showPreparationFacts(BuildContext context, TravelPreparation prep,
+    {bool notices = false}) async {
+  final items = prep.items
+      .where((item) => notices ? item.title == '入园须知' : item.title != '入园须知')
+      .toList();
+  await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: notePaper,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(topRight: Radius.circular(28))),
+      builder: (sheet) => SafeArea(
+          child: SingleChildScrollView(
+              padding: const EdgeInsets.all(23),
+              child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text(notices ? '入园须知' : '开放与交通',
+                              style: noteSerif(23))),
+                      IconButton(
+                          tooltip: '关闭',
+                          onPressed: () => Navigator.pop(sheet),
+                          icon: const Icon(Icons.close, size: 18))
+                    ]),
+                    if (items.isEmpty)
+                      Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Text('信息待补充',
+                              style: noteSans(13, color: noteQuiet))),
+                    for (final item in items) ...[
+                      if (!notices)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 20, bottom: 8),
+                            child: Text(item.title, style: noteSerif(18))),
+                      if (item.body.isNotEmpty)
+                        SelectableText(item.body,
+                            style: noteSans(13, height: 1.9)),
+                      if (safePreparationUri(item.url) != null)
+                        PreparationLink('查看官方详情',
+                            onTap: () => openPreparationLink(sheet, item.url,
+                                external: prep.external)),
+                    ],
+                    if (safePreparationUri(prep.text('source_url')) != null)
+                      Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: TravelRow('信息来源',
+                              subtitle: prep.text('verified_on'),
+                              onTap: () => openPreparationLink(
+                                  sheet, prep.text('source_url')))),
+                  ]))));
 }
 
 Future<void> showPreparationItem(BuildContext context, PreparationItem item,
@@ -204,9 +246,9 @@ class _TicketClip extends CustomClipper<Path> {
       Path()..addRect(Offset.zero & size),
       Path()
         ..addOval(
-            Rect.fromCircle(center: Offset(0, size.height - 57), radius: 7))
+            Rect.fromCircle(center: Offset(0, size.height - 56), radius: 7))
         ..addOval(Rect.fromCircle(
-            center: Offset(size.width, size.height - 57), radius: 7)));
+            center: Offset(size.width, size.height - 56), radius: 7)));
   @override
   bool shouldReclip(_TicketClip oldClipper) => false;
 }

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/router/route_back.dart';
 import '../../../../core/router/travel_destinations.dart';
 import '../../domain/models.dart';
 import '../offline_package_controller.dart';
 import '../experience_providers.dart';
-import '../route_manual/manual_visuals.dart';
 import '../route_manual/route_companion_entry.dart';
 import 'travel_providers.dart';
 import 'travel_widgets.dart';
 import 'guide_preparation.dart';
+import 'preparation_visuals.dart';
+import '../community/notes_widgets.dart';
+import '../widgets/favorite_button.dart';
+import '../widgets/discovery_art.dart';
 
 class PreparationPage extends ConsumerWidget {
   const PreparationPage({super.key, required this.slug});
@@ -19,31 +21,18 @@ class PreparationPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final route = ref.watch(offlineAwareRouteProvider(slug));
-    return Scaffold(
-        backgroundColor: AppColors.paper,
-        appBar: AppBar(
-            title: Text('游玩准备', style: manualType(13)),
-            leading: IconButton(
-                tooltip: '返回',
-                icon: const Icon(Icons.arrow_back, size: 20),
-                onPressed: () => popOrGo(context, '/route/$slug'))),
-        body: route.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => Center(
+    return route.when(
+        loading: () => const PreparationScaffold(
+            title: '游玩准备',
+            child: Center(child: CircularProgressIndicator(strokeWidth: 1))),
+        error: (_, __) => PreparationScaffold(
+            title: '游玩准备',
+            child: Center(
                 child: TextButton(
                     onPressed: () =>
                         ref.invalidate(offlineAwareRouteProvider(slug)),
-                    child: const Text('重新加载景点'))),
-            data: (r) => RefreshIndicator(
-                onRefresh: () async {
-                  ref.invalidate(offlineAwareRouteProvider(slug));
-                  ref.invalidate(routeGuidesProvider(slug));
-                  await ref.read(offlineAwareRouteProvider(slug).future);
-                },
-                child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(23, 10, 23, 24),
-                    child: PreparationBody(route: r)))));
+                    child: const Text('重新加载景点')))),
+        data: (r) => PreparationBody(route: r));
   }
 }
 
@@ -93,98 +82,70 @@ class _PreparationBodyState extends ConsumerState<PreparationBody> {
   @override
   Widget build(BuildContext context) {
     final r = widget.route, p = r.travelPreparation;
-    final saved = ref.watch(travelPlanProvider(r.id)).asData?.value != null;
     ref.listen(currentUserIdProvider, (previous, next) {
       if (previous != next && mounted) setState(() => _opened = false);
     });
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(
-            child: Text(
-                [r.cityName, r.district].where((s) => s.isNotEmpty).join(' · '),
-                style: manualType(11, color: AppColors.textMuted))),
-        Text(r.mapCategory == 'park' ? '公园' : r.theme,
-            style: manualType(11, color: AppColors.textMuted))
-      ]),
-      const SizedBox(height: 13),
-      Text(r.title,
-          style: manualType(32,
-              serif: true, weight: FontWeight.w500, height: 1.4, spacing: -.8)),
-      const SizedBox(height: 10),
-      Text(r.subtitle, style: manualType(12, color: AppColors.textMuted)),
-      const SizedBox(height: 19),
-      ClipRRect(
-          borderRadius: const BorderRadius.only(topRight: Radius.circular(45)),
-          child: SizedBox(
-              height: 136,
-              width: double.infinity,
-              child: r.heroImage.isNotEmpty
-                  ? Image.network(r.heroImage,
-                      fit: BoxFit.cover,
-                      color: Colors.white,
-                      colorBlendMode: BlendMode.modulate,
-                      errorBuilder: (_, __, ___) => _cover(r))
-                  : _cover(r))),
-      const TravelHeading('游玩准备'),
-      if (p.enabled) ...[
-        if (p.canBook)
-          TravelTicketCard(
-              title: p.admission == 'reservation' ? '预约参观' : '门票与预约',
-              subtitle: p.channel,
-              action: _opened ? '继续办理' : p.action,
-              onTap: _book,
-              footnote: '在官方渠道完成'),
-        if (p.admission == 'free')
-          Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text('无需门票', style: manualType(14, serif: true))),
-        PreparationRows(p),
-        if (p.text('source_url').isNotEmpty)
-          TravelRow('信息来源',
-              subtitle: p.text('verified_on').isEmpty
-                  ? '查看来源'
-                  : '${p.text('verified_on')} 核实',
-              onTap: () => openPreparationLink(context, p.text('source_url'))),
-        if (!p.canBook && p.items.isEmpty && p.admission != 'free')
-          Text('准备信息待补充', style: manualType(13, color: AppColors.textMuted)),
-      ] else
-        Text('准备信息待补充', style: manualType(13, color: AppColors.textMuted)),
-      RouteGuideList(r.slug),
-      if (_opened)
-        TravelRow('添加已购票据', subtitle: '图片 / PDF', onTap: () => _save()),
-      const SizedBox(height: 22),
-      const Divider(height: 1),
-      const SizedBox(height: 15),
-      Row(children: [
-        Expanded(
-            child: OutlinedButton(
-                onPressed: _busy ? null : () => _save(),
-                style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(49),
-                    side: const BorderSide(color: Color(0xffd7d2c5)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4))),
+    return PreparationScaffold(
+        title: '游玩准备',
+        onBack: () => popOrGo(context, '/route/${r.slug}'),
+        trailing: FavoriteButton(
+            kind: 'route',
+            targetId: r.id,
+            color: noteInk,
+            mark: DiscoveryMark.bookmark),
+        onRefresh: () async {
+          ref.invalidate(offlineAwareRouteProvider(r.slug));
+          ref.invalidate(routeGuidesProvider(r.slug));
+          await ref.read(offlineAwareRouteProvider(r.slug).future);
+        },
+        footer: Row(children: [
+          Expanded(
+              child: PreparationOutline(_busy ? '正在保存…' : '我的准备',
+                  onTap: _busy ? null : () => _save())),
+          const SizedBox(width: 18),
+          RouteCompanionLink(
+              onTap: () => context
+                  .push(companionLocation(r.slug, requestSelection: true))),
+        ]),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(
                 child: Text(
-                    _busy
-                        ? '正在保存…'
-                        : saved
-                            ? '查看我的出游'
-                            : '＋ 加入出游',
-                    style: manualType(13)))),
-        const SizedBox(width: 20),
-        RouteCompanionLink(
-            onTap: () =>
-                context.push(companionLocation(r.slug, requestSelection: true)))
-      ]),
-    ]);
+                    [r.cityName, r.district]
+                        .where((s) => s.isNotEmpty)
+                        .join(' · '),
+                    style: noteSans(11, color: noteQuiet))),
+            Text(r.mapCategory == 'park' ? '公园' : r.theme,
+                style: noteSans(11, color: noteQuiet))
+          ]),
+          Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 21),
+              child: Text(r.title,
+                  style: noteSerif(
+                          MediaQuery.sizeOf(context).width < 350 ? 27 : 30,
+                          weight: FontWeight.w500)
+                      .copyWith(letterSpacing: -.7))),
+          if (p.canBook)
+            TravelTicketCard(
+                title: p.admission == 'reservation' ? '预约参观' : '门票与预约',
+                subtitle: p.channel,
+                action: _opened ? '继续办理' : p.action,
+                onTap: _book,
+                footnote: '按游玩日期查看'),
+          if (p.enabled && p.admission == 'free')
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text('无需门票', style: noteSerif(18))),
+          PreparationFacts(
+              left: '开放与交通',
+              right: '入园须知',
+              onLeft: () => showPreparationFacts(context, p),
+              onRight: () => showPreparationFacts(context, p, notices: true)),
+          RouteGuideList(r.slug),
+          if (_opened)
+            TravelRow('添加已购票据', subtitle: '图片 / PDF', onTap: () => _save()),
+        ]));
   }
-
-  Widget _cover(RouteExperience r) => ColoredBox(
-      color: const Color(0xffdce0c9),
-      child: Center(
-          child: Text(r.title.characters.firstOrNull ?? '',
-              style: manualType(70,
-                  serif: true, color: const Color(0xff687355)))));
 }
 
 /// Existing scenic cover and companion layout remain intact; new logistics entry.

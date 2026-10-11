@@ -15,6 +15,9 @@ import '../route_manual/route_companion_entry.dart';
 import 'travel_providers.dart';
 import 'travel_widgets.dart';
 import 'guide_preparation.dart';
+import 'preparation_visuals.dart';
+import '../community/notes_widgets.dart';
+import '../widgets/discovery_art.dart';
 
 class TravelPlansPage extends ConsumerWidget {
   const TravelPlansPage({super.key});
@@ -169,160 +172,244 @@ class _TravelPlanPageState extends ConsumerState<TravelPlanPage> {
     }
   }
 
+  Future<void> receipts(TravelPlan plan) => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: notePaper,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(topRight: Radius.circular(28))),
+      builder: (sheet) => SafeArea(
+          child: Padding(
+              padding: const EdgeInsets.all(23),
+              child: Consumer(builder: (context, ref, _) {
+                return ConstrainedBox(
+                    constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(context).height * .7),
+                    child: SingleChildScrollView(
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Row(children: [
+                            Expanded(child: Text('我的票据', style: noteSerif(23))),
+                            IconButton(
+                                tooltip: '关闭',
+                                onPressed: () => Navigator.pop(sheet),
+                                icon: const Icon(Icons.close, size: 18))
+                          ]),
+                          const SizedBox(height: 16),
+                          ref.watch(travelReceiptsProvider(plan.id)).when(
+                              loading: () =>
+                                  const LinearProgressIndicator(minHeight: 1),
+                              error: (_, __) => TextButton(
+                                  onPressed: () => ref.invalidate(
+                                      travelReceiptsProvider(plan.id)),
+                                  child: const Text('重新加载票据')),
+                              data: (items) => items.isEmpty
+                                  ? Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 20),
+                                      child: Text('还没有添加票据',
+                                          style:
+                                              noteSans(13, color: noteQuiet)))
+                                  : Column(children: [
+                                      for (final item in items)
+                                        TravelRow(item.name,
+                                            subtitle: '本人添加',
+                                            icon: item.kind == 'pdf'
+                                                ? Icons.picture_as_pdf_outlined
+                                                : Icons.image_outlined,
+                                            onTap: () {
+                                          Navigator.pop(sheet);
+                                          this.context.push(
+                                              '/travel/${plan.id}/receipt/${item.id}');
+                                        }),
+                                    ])),
+                          StatefulBuilder(
+                              builder: (c, update) =>
+                                  PreparationLink(busy ? '正在保存…' : '添加票据',
+                                      icon: DiscoveryMark.plus,
+                                      onTap: busy
+                                          ? null
+                                          : () async {
+                                              final future = importReceipt();
+                                              update(() {});
+                                              await future;
+                                              if (c.mounted) update(() {});
+                                            })),
+                          Text('图片 / PDF · 仅保存在本机',
+                              style: noteSans(11, color: noteQuiet)),
+                        ])));
+              }))));
+
+  Future<void> tripOptions(TravelPlan plan) => showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: notePaper,
+      builder: (sheet) => SafeArea(
+          child: Padding(
+              padding: const EdgeInsets.all(23),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TravelRow('修改出行日期', onTap: () {
+                  Navigator.pop(sheet);
+                  date(plan);
+                }),
+                TravelRow('暂不定日期', onTap: () async {
+                  final user = ref.read(currentUserIdProvider);
+                  Navigator.pop(sheet);
+                  try {
+                    final store = await ref.read(travelStoreProvider.future);
+                    if (!mounted || user != ref.read(currentUserIdProvider)) {
+                      return;
+                    }
+                    await store?.setDate(plan.id, null);
+                    if (mounted) refreshTravel(ref, plan.id);
+                  } catch (_) {
+                    if (mounted) travelNotice(context, '日期未能保存');
+                  }
+                }),
+                TravelRow('移除这次出游', onTap: () {
+                  Navigator.pop(sheet);
+                  removePlan(plan);
+                }),
+              ]))));
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        backgroundColor: AppColors.paper,
-        appBar: AppBar(
-            title: Text('我的出游', style: manualType(13)),
-            leading: IconButton(
-                tooltip: '返回',
-                icon: const Icon(Icons.arrow_back, size: 20),
-                onPressed: () => popOrGo(context, '/travel'))),
-        body: ref.watch(travelPlanProvider(widget.id)).when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => Center(
-                child: TextButton(
-                    onPressed: () => refreshTravel(ref, widget.id),
-                    child: const Text('重新加载出游'))),
-            data: (plan) {
-              if (plan == null) {
-                return Center(
-                    child: Text('这次出游已移除或属于其他账号',
-                        style: manualType(13, color: AppColors.textMuted)));
-              }
-              final route = ref.watch(offlineAwareRouteProvider(plan.slug));
-              final prep = route.asData?.value.travelPreparation;
-              final receipts = ref.watch(travelReceiptsProvider(plan.id));
-              return RefreshIndicator(
-                  onRefresh: () async {
-                    refreshTravel(ref, plan.id);
-                    ref.invalidate(offlineAwareRouteProvider(plan.slug));
-                    await ref.read(travelPlanProvider(plan.id).future);
-                  },
-                  child: ListView(
-                      padding: const EdgeInsets.fromLTRB(23, 10, 23, 25),
-                      children: [
-                        Row(children: [
-                          Expanded(
-                              child: Text(plan.city,
-                                  style: manualType(11,
-                                      color: AppColors.textMuted))),
-                          TextButton(
-                              onPressed: () => date(plan),
-                              child: Text('出行日期',
-                                  style:
-                                      manualType(12, color: AppColors.action)))
-                        ]),
-                        Text('我的出游',
-                            style: manualType(32,
-                                serif: true, weight: FontWeight.w500)),
-                        const SizedBox(height: 20),
-                        Text(
-                            plan.date == null
-                                ? '日期待定'
-                                : plan.date!.substring(5).replaceAll('-', '.'),
-                            style: TextStyle(
-                                fontFamily: plan.date == null
-                                    ? 'Noto Serif SC'
-                                    : 'Georgia',
-                                fontStyle: plan.date == null
-                                    ? FontStyle.normal
-                                    : FontStyle.italic,
-                                fontSize: plan.date == null ? 23 : 48,
-                                color: AppColors.ink)),
-                        if (plan.date != null)
-                          Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton(
-                                  onPressed: () async {
-                                    try {
-                                      await (await ref
-                                              .read(travelStoreProvider.future))
-                                          ?.setDate(plan.id, null);
-                                      if (mounted) refreshTravel(ref, plan.id);
-                                    } catch (_) {
-                                      if (context.mounted) {
-                                        travelNotice(context, '日期未能保存');
-                                      }
-                                    }
-                                  },
-                                  child: const Text('暂不定日期'))),
-                        const SizedBox(height: 23),
-                        Text(plan.title,
-                            style: manualType(22,
-                                serif: true, weight: FontWeight.w500)),
-                        const SizedBox(height: 16),
-                        if (prep != null && prep.canBook)
-                          TravelTicketCard(
-                              title: prep.admission == 'reservation'
-                                  ? '预约参观'
-                                  : '门票与预约',
-                              subtitle: prep.channel,
-                              action: prep.action,
-                              onTap: () => openPreparationLink(
-                                  context, prep.purchaseUrl,
-                                  external: prep.external),
-                              footnote: '在官方渠道完成'),
-                        if (prep != null && prep.enabled) PreparationRows(prep),
-                        if (route.isLoading)
-                          const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: LinearProgressIndicator()),
-                        if (route.hasError)
-                          TravelRow('准备信息暂不可用',
-                              subtitle: '点此重试',
-                              onTap: () => ref.invalidate(
-                                  offlineAwareRouteProvider(plan.slug))),
-                        MyPreparation(plan.id),
-                        TravelHeading('我的票据',
-                            trailing: TextButton(
-                                onPressed: busy ? null : importReceipt,
-                                child: Text(busy ? '正在保存…' : '＋ 添加',
-                                    style: manualType(13,
-                                        color: AppColors.action)))),
-                        receipts.when(
-                            loading: () => const LinearProgressIndicator(),
-                            error: (_, __) => TextButton(
-                                onPressed: () => ref.invalidate(
-                                    travelReceiptsProvider(plan.id)),
-                                child: const Text('重新加载票据')),
-                            data: (items) => items.isEmpty
-                                ? TravelTicketCard(
-                                    title: '收好这次出游的票据',
-                                    subtitle: '图片 / PDF · 仅保存在本机',
-                                    action: '添加票据',
-                                    onTap: importReceipt,
-                                    footnote: '已在其他平台购买')
-                                : Column(children: [
-                                    for (final item in items)
-                                      TravelRow(item.name,
-                                          icon: item.kind == 'pdf'
-                                              ? Icons.picture_as_pdf_outlined
-                                              : Icons.image_outlined,
-                                          subtitle: '本人添加',
-                                          onTap: () => context.push(
-                                              '/travel/${plan.id}/receipt/${item.id}'))
-                                  ])),
-                        const SizedBox(height: 12),
-                        Text('自行添加的票据不代表平台已核验订单。',
-                            style: manualType(11, color: AppColors.textMuted)),
-                        const SizedBox(height: 20),
-                        RouteCompanionEntry(
-                            routeName: plan.title,
-                            onTap: () => context.push(companionLocation(
-                                plan.slug,
-                                requestSelection: true))),
-                        TravelRow('景点详情',
-                            onTap: () => context.push('/route/${plan.slug}')),
-                        TextButton(
-                            onPressed: () => removePlan(plan),
-                            child: Text('移除这次出游',
-                                style: manualType(12,
-                                    color: AppColors.textMuted))),
-                      ]));
-            }));
-  }
+  Widget build(BuildContext context) =>
+      ref.watch(travelPlanProvider(widget.id)).when(
+          loading: () => const PreparationScaffold(
+              title: '我的准备',
+              child: Center(child: CircularProgressIndicator(strokeWidth: 1))),
+          error: (_, __) => PreparationScaffold(
+              title: '我的准备',
+              child: Center(
+                  child: TextButton(
+                      onPressed: () => refreshTravel(ref, widget.id),
+                      child: const Text('重新加载出游')))),
+          data: (plan) {
+            if (plan == null) {
+              return PreparationScaffold(
+                  title: '我的准备',
+                  child: Center(
+                      child: Text('这次出游已移除或属于其他账号',
+                          style: noteSans(13, color: noteQuiet))));
+            }
+            final route = ref.watch(offlineAwareRouteProvider(plan.slug));
+            final prep = route.asData?.value.travelPreparation;
+            final visit = DateTime.tryParse(plan.date ?? '');
+            final region = [plan.city, route.asData?.value.district ?? '']
+                .where((s) => s.isNotEmpty)
+                .join(' · ');
+            return PreparationScaffold(
+                title: '我的准备',
+                onBack: () => popOrGo(context, '/travel'),
+                trailing: PreparationLink('写攻略',
+                    icon: DiscoveryMark.pen,
+                    onTap: () => RouteGuideList(plan.slug).write(context, ref)),
+                onRefresh: () async {
+                  refreshTravel(ref, plan.id);
+                  ref.invalidate(preparationTasksProvider(plan.id));
+                  ref.invalidate(importedGuidesProvider(plan.id));
+                  ref.invalidate(offlineAwareRouteProvider(plan.slug));
+                  await ref.read(travelPlanProvider(plan.id).future);
+                },
+                footer: Row(children: [
+                  Expanded(
+                      child: PreparationOutline('游玩准备',
+                          onTap: () =>
+                              context.push('/route/${plan.slug}/prepare'))),
+                  const SizedBox(width: 18),
+                  RouteCompanionLink(
+                      onTap: () => context.push(
+                          companionLocation(plan.slug, requestSelection: true)))
+                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                            child: Text(region,
+                                style: noteSans(11, color: noteQuiet))),
+                        NoteButton(
+                            label: '管理我的出游',
+                            onTap: () => tripOptions(plan),
+                            child: Text('我的出游',
+                                style: noteSans(11, color: noteQuiet)))
+                      ]),
+                      Padding(
+                          padding: const EdgeInsets.only(top: 14, bottom: 24),
+                          child: NoteButton(
+                              label: '选择出行日期',
+                              onTap: () => date(plan),
+                              child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                        visit == null
+                                            ? '日期待定'
+                                            : '${visit.month.toString().padLeft(2, '0')}.${visit.day.toString().padLeft(2, '0')}',
+                                        style: visit == null
+                                            ? noteSerif(25)
+                                            : noteItalic(36, color: noteInk)
+                                                .copyWith(height: 1.2)),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                        visit == null
+                                            ? '选择日期'
+                                            : [
+                                                '星期一',
+                                                '星期二',
+                                                '星期三',
+                                                '星期四',
+                                                '星期五',
+                                                '星期六',
+                                                '星期日'
+                                              ][visit.weekday - 1],
+                                        style: noteSans(11, color: noteQuiet)),
+                                  ]))),
+                      Padding(
+                          padding: const EdgeInsets.only(bottom: 18),
+                          child: Text(plan.title,
+                              style: noteSerif(20,
+                                  height: 1.6, weight: FontWeight.w500))),
+                      if (prep?.canBook == true)
+                        TravelTicketCard(
+                            title: prep!.admission == 'reservation'
+                                ? '预约参观'
+                                : '门票与预约',
+                            subtitle: prep.channel,
+                            action: prep.action,
+                            footnote: '按游玩日期查看',
+                            onTap: () => openPreparationLink(
+                                context, prep.purchaseUrl,
+                                external: prep.external)),
+                      if (prep?.enabled == true && prep?.admission == 'free')
+                        Text('无需门票', style: noteSerif(18)),
+                      if (route.isLoading)
+                        const LinearProgressIndicator(minHeight: 1),
+                      if (route.hasError)
+                        TravelRow('准备信息暂不可用',
+                            subtitle: '点此重试',
+                            onTap: () => ref.invalidate(
+                                offlineAwareRouteProvider(plan.slug))),
+                      MyPreparation(plan.id,
+                          onBrowse: () =>
+                              context.push('/route/${plan.slug}/prepare')),
+                      PreparationFacts(
+                          left: '我的票据',
+                          right: '入园须知',
+                          onLeft: () => receipts(plan),
+                          onRight: () {
+                            if (prep != null) {
+                              showPreparationFacts(context, prep,
+                                  notices: true);
+                            } else {
+                              travelNotice(context, '景点信息暂不可用，请稍后重试');
+                            }
+                          }),
+                    ]));
+          });
 }
 
 class TravelReceiptPage extends ConsumerStatefulWidget {

@@ -319,6 +319,8 @@ void main() {
           'photos': []
         });
     expect(find.byKey(const ValueKey('guide-title')), findsOneWidget);
+    await tester.tap(find.text('攻略'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('日常记录'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('guide-title')), findsNothing);

@@ -16,6 +16,7 @@ import 'notes_controller.dart';
 import 'notes_widgets.dart';
 import '../route_manual/route_companion_entry.dart';
 import '../travel/guide_preparation.dart';
+import '../travel/preparation_visuals.dart';
 
 final notePhotoPickerProvider = Provider<Future<List<String>> Function()>(
     (ref) => () async => (await ImagePicker()
@@ -36,6 +37,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
   final _title = TextEditingController();
   final _items = <GuidePreparationItem>[const GuidePreparationItem('')];
   bool _publishing = false;
+  bool _guidePhotos = false;
   bool get _guide => _category == CommunityCategory.guide;
   bool get _validGuide =>
       !_guide ||
@@ -311,6 +313,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
     final max = math.min(600, policy?.bodyMaxLength ?? 600);
     final places = placesState.value ?? <CommunityPlace>[];
     final place = places.where((p) => p.fragmentId == _fragment).firstOrNull;
+    if (_guide) return _guidePage(policy, places, place, max);
     return PopScope(
         canPop: !_busy && !_picking && (!_hasChanges || _allowExit),
         onPopInvokedWithResult: (didPop, result) {
@@ -323,7 +326,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               NoteTop('返回',
                   onBack: _leave,
-                  title: _guide ? '写攻略' : '写见闻',
+                  title: '写见闻',
                   trailing: NotePublishAction(
                       key: const ValueKey('note-publish'),
                       publishing: _publishing,
@@ -344,9 +347,9 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                 const SizedBox(height: 8),
                 Text.rich(
                     TextSpan(children: [
-                      TextSpan(text: _guide ? '写一份出发前的准备' : '留一则见闻'),
+                      const TextSpan(text: '留一则见闻'),
                     ]),
-                    style: noteSerif(_guide ? 27 : 32)),
+                    style: noteSerif(32)),
               ],
               if (_loading)
                 const Padding(
@@ -403,39 +406,19 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                                     ])))),
                     ])),
                 const SizedBox(height: 20),
-                if (_guide)
-                  TextField(
-                      key: const ValueKey('guide-title'),
-                      controller: _title,
-                      enabled: !_busy,
-                      maxLength: policy?.titleMaxLength ?? 60,
-                      style: noteSerif(23),
-                      onChanged: (_) => setState(() => _saved = false),
-                      decoration: InputDecoration(
-                          hintText: '给攻略起个标题',
-                          hintStyle: noteSerif(23, color: noteQuiet),
-                          counterText: '',
-                          filled: false,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 10),
-                          border: InputBorder.none)),
                 ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: _guide ? 100 : 160),
+                    constraints: const BoxConstraints(minHeight: 160),
                     child: TextField(
                         key: const ValueKey('note-compose-body'),
                         controller: _body,
                         enabled: !_busy,
                         maxLength: max,
-                        minLines: _guide ? 2 : 4,
+                        minLines: 4,
                         maxLines: null,
                         style: noteSerif(17, height: 2),
                         onChanged: (_) => setState(() => _saved = false),
                         decoration: InputDecoration(
-                            hintText: _guide
-                                ? '有哪些经验，想分享给下一位出发的人？'
-                                : '这里有什么，让你想多停留一会儿？',
+                            hintText: '这里有什么，让你想多停留一会儿？',
                             hintStyle: noteSerif(17,
                                 color: const Color(0xff958c7d), height: 2),
                             filled: false,
@@ -459,7 +442,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                       style: noteItalic(11))
                 ]),
                 const SizedBox(height: 20),
-                if (!_guide) _photoEditor(math.min(9, policy?.maxMedia ?? 9)),
+                _photoEditor(math.min(9, policy?.maxMedia ?? 9)),
                 const SizedBox(height: 24),
                 _row(
                     '关联地点',
@@ -514,11 +497,6 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                                           DiscoveryMark.arrowRight,
                                           size: 14)
                                     ]))))),
-                if (_guide) ...[
-                  const SizedBox(height: 20),
-                  _guideEditor(),
-                  _photoEditor(math.min(9, policy?.maxMedia ?? 9)),
-                ],
                 if (placesState.hasError)
                   NoteFailure(
                       '地点暂时无法读取', () => ref.invalidate(notesPlacesProvider)),
@@ -533,58 +511,280 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
             ])));
   }
 
+  Future<void> _chooseGuidePlace(List<CommunityPlace> places) async {
+    if (_busy || places.isEmpty) return;
+    final selected = await Navigator.of(context).push<String>(MaterialPageRoute(
+        builder: (_) => NotePlacePicker(places: places, selected: _fragment)));
+    if (selected != null && mounted) {
+      setState(() {
+        _fragment = selected;
+        _saved = false;
+      });
+    }
+  }
+
+  Widget _guidePage(CommunityPolicy? policy, List<CommunityPlace> places,
+          CommunityPlace? place, int max) =>
+      PopScope(
+          canPop: !_busy && !_picking && (!_hasChanges || _allowExit),
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _leave();
+          },
+          child: PreparationScaffold(
+              title: '分享见闻',
+              onBack: _leave,
+              trailing: PreparationLink(_publishing ? '发布中' : '发布',
+                  key: const ValueKey('note-publish'),
+                  pencil: true,
+                  busy: _publishing,
+                  onTap: _busy ||
+                          _picking ||
+                          _loading ||
+                          policy?.enabled != true ||
+                          place == null ||
+                          !_validGuide ||
+                          _body.text.trim().isEmpty
+                      ? null
+                      : () => _publish(policy!)),
+              footer: Row(children: [
+                NoteButton(
+                    label: '存草稿',
+                    onTap: _busy || _picking ? null : _save,
+                    child: SizedBox(
+                        height: 44,
+                        child: Center(
+                            child: Text(_saved ? '已存草稿' : '存草稿',
+                                style: noteSans(11, color: noteQuiet))))),
+                const SizedBox(width: 18),
+                NoteButton(
+                    label: '添加照片',
+                    onTap: _busy || _picking
+                        ? null
+                        : () => setState(() => _guidePhotos = !_guidePhotos),
+                    child: SizedBox(
+                        height: 44,
+                        child: Center(
+                            child: Text('照片 ${_photos.length}',
+                                style: noteSans(11, color: noteQuiet))))),
+                const Spacer(),
+                PreparationLink('查看地点',
+                    icon: DiscoveryMark.arrowRight,
+                    onTap: _busy || place == null
+                        ? null
+                        : () => context.push('/route/${place.routeSlug}')),
+              ]),
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1, color: noteQuiet))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                          SizedBox(
+                              height: 22,
+                              child: Row(children: [
+                                NoteButton(
+                                    label: '切换见闻类型',
+                                    onTap: _busy
+                                        ? null
+                                        : () => showModalBottomSheet<void>(
+                                            context: context,
+                                            backgroundColor: notePaper,
+                                            builder: (sheet) => SafeArea(
+                                                child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            23),
+                                                    child: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          for (final category
+                                                              in [
+                                                            CommunityCategory
+                                                                .viewpoint,
+                                                            CommunityCategory
+                                                                .onSite,
+                                                            CommunityCategory
+                                                                .experience,
+                                                            CommunityCategory
+                                                                .guide
+                                                          ])
+                                                            ListTile(
+                                                                contentPadding:
+                                                                    EdgeInsets
+                                                                        .zero,
+                                                                title: Text(
+                                                                    category
+                                                                        .label,
+                                                                    style: noteSerif(
+                                                                        18,
+                                                                        color: category ==
+                                                                                _category
+                                                                            ? preparationRed
+                                                                            : noteInk)),
+                                                                onTap: () {
+                                                                  Navigator.pop(
+                                                                      sheet);
+                                                                  setState(() {
+                                                                    _category =
+                                                                        category;
+                                                                    _saved =
+                                                                        false;
+                                                                  });
+                                                                }),
+                                                        ])))),
+                                    child: Row(children: [
+                                      Text('攻略',
+                                          style: noteSans(11,
+                                              color: preparationRed)),
+                                      const SizedBox(width: 5),
+                                      const DiscoveryIcon(DiscoveryMark.down,
+                                          size: 11, color: preparationRed)
+                                    ])),
+                                const Spacer(),
+                                Text('准备攻略',
+                                    style: noteSans(11, color: noteQuiet)),
+                              ])),
+                          TextField(
+                              key: const ValueKey('guide-title'),
+                              controller: _title,
+                              enabled: !_busy,
+                              maxLength: policy?.titleMaxLength ?? 60,
+                              maxLines: 1,
+                              style: noteSerif(23, height: 1.7),
+                              onChanged: (_) => setState(() => _saved = false),
+                              decoration: _guideField('给攻略起个标题')),
+                          TextField(
+                              key: const ValueKey('note-compose-body'),
+                              controller: _body,
+                              enabled: !_busy,
+                              maxLength: max,
+                              minLines: 3,
+                              maxLines: null,
+                              style: noteSans(16, height: 1.7),
+                              onChanged: (_) => setState(() => _saved = false),
+                              decoration: _guideField('有哪些经验，想分享给下一位出发的人？')),
+                          NoteButton(
+                              label: '选择关联地点',
+                              onTap: _busy || places.isEmpty
+                                  ? null
+                                  : () => _chooseGuidePlace(places),
+                              child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  decoration: const BoxDecoration(
+                                      border: Border(
+                                          bottom: BorderSide(color: noteLine))),
+                                  child: Row(children: [
+                                    const DiscoveryIcon(DiscoveryMark.pin,
+                                        size: 14, color: preparationRed),
+                                    const SizedBox(width: 7),
+                                    Expanded(
+                                        child: Text(
+                                            place?.routeTitle ?? '选择关联地点',
+                                            style: noteSans(12))),
+                                    Text(place?.cityName ?? '',
+                                        style: noteSans(11, color: noteQuiet)),
+                                  ]))),
+                          _guideEditor(),
+                          Text('发布后，别人可以把这份清单加入自己的准备。',
+                              style: noteSans(11, color: noteQuiet)),
+                          if (_guidePhotos || _photos.isNotEmpty)
+                            Padding(
+                                padding: const EdgeInsets.only(top: 20),
+                                child: _photoEditor(
+                                    math.min(9, policy?.maxMedia ?? 9))),
+                          if (policy?.enabled == false)
+                            Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: Text('见闻分享暂未开放',
+                                    style: noteSans(12, color: noteQuiet))),
+                          if (ref.watch(notesPlacesProvider).hasError)
+                            NoteFailure('地点暂时无法读取',
+                                () => ref.invalidate(notesPlacesProvider)),
+                          if (ref.watch(notesPolicyProvider).hasError)
+                            NoteFailure('发布设置暂时无法读取',
+                                () => ref.invalidate(notesPolicyProvider)),
+                        ])));
+
+  InputDecoration _guideField(String hint) => InputDecoration(
+      hintText: hint,
+      hintStyle: noteSans(16, color: noteQuiet),
+      counterText: '',
+      filled: false,
+      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      border:
+          const UnderlineInputBorder(borderSide: BorderSide(color: noteLine)),
+      enabledBorder:
+          const UnderlineInputBorder(borderSide: BorderSide(color: noteLine)),
+      focusedBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: preparationGreen)));
+
   Widget _guideEditor() => Container(
-      margin: const EdgeInsets.only(bottom: 25),
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
-      decoration: const BoxDecoration(
-          color: Color(0xffeee9dd),
-          border: Border(
-              top: BorderSide(color: noteLine),
-              bottom: BorderSide(color: noteLine))),
+      margin: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      color: preparationSheet,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('出发前准备', style: noteSerif(21)),
-        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+              child: Text('出发前准备',
+                  style: noteSerif(18, weight: FontWeight.w500, height: 1.6))),
+          Text('${_items.length} 项', style: noteSans(11, color: noteQuiet))
+        ]),
+        const SizedBox(height: 6),
         for (var i = 0; i < _items.length; i++)
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(
-                padding: const EdgeInsets.only(top: 17, right: 12),
-                child: Text('${i + 1}'.padLeft(2, '0'), style: noteItalic(13))),
-            Expanded(
-                child: Column(children: [
-              TextFormField(
-                  key: ValueKey('guide-item-$i-${_items.length}'),
-                  initialValue: _items[i].title,
-                  enabled: !_busy,
-                  maxLength: 60,
-                  style: noteSerif(16),
-                  onChanged: (v) => setState(() {
-                        _items[i] =
-                            GuidePreparationItem(v, body: _items[i].body);
-                        _saved = false;
-                      }),
-                  decoration: const InputDecoration(
-                      hintText: '需要准备什么',
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 12),
-                      counterText: '',
-                      filled: false,
-                      border: InputBorder.none)),
-              const Divider(color: noteLine),
-            ])),
-            IconButton(
-                tooltip: '删除准备项',
-                onPressed: _busy || _items.length == 1
-                    ? null
-                    : () => setState(() {
-                          _items.removeAt(i);
-                          _saved = false;
-                        }),
-                icon: const Icon(Icons.close, size: 15, color: noteQuiet)),
-          ]),
+          Container(
+              decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: noteLine))),
+              child: Row(children: [
+                SizedBox(
+                    width: 18,
+                    child: Text('${i + 1}',
+                        style: noteItalic(17, color: const Color(0xff7d856e)))),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: TextFormField(
+                        key: ValueKey('guide-item-$i-${_items.length}'),
+                        initialValue: _items[i].title,
+                        enabled: !_busy,
+                        maxLength: 60,
+                        maxLines: null,
+                        style: noteSans(14, height: 1.7),
+                        onChanged: (value) => setState(() {
+                              _items[i] = GuidePreparationItem(value,
+                                  body: _items[i].body);
+                              _saved = false;
+                            }),
+                        decoration: const InputDecoration(
+                            hintText: '需要准备什么',
+                            isDense: true,
+                            counterText: '',
+                            filled: false,
+                            contentPadding: EdgeInsets.symmetric(vertical: 10),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none))),
+                SizedBox(
+                    width: 36,
+                    child: IconButton(
+                        tooltip: '删除准备项',
+                        constraints:
+                            const BoxConstraints(minWidth: 36, minHeight: 44),
+                        padding: EdgeInsets.zero,
+                        onPressed: _busy
+                            ? null
+                            : () => setState(() {
+                                  _items.removeAt(i);
+                                  _saved = false;
+                                }),
+                        icon: const Icon(Icons.remove,
+                            size: 15, color: noteQuiet))),
+              ])),
         if (_items.length < 12)
-          NoteArrow('添加一项',
-              size: 14,
+          PreparationLink('添加准备事项',
+              leadingIcon: true,
+              icon: DiscoveryMark.plus,
               onTap: _busy
                   ? null
                   : () => setState(() {
