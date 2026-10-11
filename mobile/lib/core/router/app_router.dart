@@ -3,6 +3,7 @@ import '../../features/experience/presentation/travel/travel_pages.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/experience/presentation/community/note_detail_page.dart';
 import '../../features/experience/presentation/community/note_compose_page.dart';
+import '../../features/experience/domain/community_models.dart';
 
 import '../../features/experience/presentation/discovery_page.dart';
 import '../../features/experience/presentation/footprint_detail_page.dart';
@@ -32,8 +33,11 @@ final appRouter = GoRouter(
             receiptId: state.pathParameters['receiptId']!)),
     GoRoute(
         path: '/community/write',
-        builder: (context, state) =>
-            NoteComposePage(fragmentId: state.uri.queryParameters['fragment'])),
+        builder: (context, state) => NoteComposePage(
+            fragmentId: state.uri.queryParameters['fragment'],
+            initialCategory: state.uri.queryParameters['category'] == 'guide'
+                ? CommunityCategory.guide
+                : null)),
     GoRoute(
         path: '/community/post/:id',
         builder: (context, state) => NoteDetailPage(

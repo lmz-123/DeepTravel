@@ -545,6 +545,8 @@ class DemoExperienceRepository implements ExperienceRepository {
               .where((p) =>
                   (citySlug == null || p.place?.citySlug == citySlug) &&
                   (query.category == null || p.category == query.category) &&
+                  (query.routeSlug == null ||
+                      p.place?.routeSlug == query.routeSlug) &&
                   (!query.savedOnly || p.viewerHasSaved))
               .take(limit)
               .toList());
@@ -651,6 +653,7 @@ class DemoExperienceRepository implements ExperienceRepository {
           .firstOrNull,
       title: draft.title,
       body: draft.body ?? '',
+      preparationItems: draft.preparationItems,
       author: const CommunityAuthor(displayName: '演示旅行者', avatar: 'default'),
       media: const [],
       likeCount: 0,

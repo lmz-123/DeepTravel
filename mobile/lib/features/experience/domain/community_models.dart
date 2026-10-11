@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 enum CommunityCategory {
+  guide('guide', '攻略'),
   viewpoint('viewpoint', '拍照机位'),
   experience('experience', '经验分享'),
   factSupplement('fact_supplement', '事实补充 · 旅行者内容'),
@@ -131,6 +132,15 @@ class CommunityPlace {
       longitude: (json['longitude'] as num?)?.toDouble());
 }
 
+class GuidePreparationItem {
+  const GuidePreparationItem(this.title, {this.body = ''});
+  final String title, body;
+  factory GuidePreparationItem.fromJson(Map<String, dynamic> json) =>
+      GuidePreparationItem(json['title'] as String? ?? '',
+          body: json['body'] as String? ?? '');
+  Map<String, dynamic> toJson() => {'title': title, 'body': body};
+}
+
 class CommunityPost {
   const CommunityPost({
     required this.id,
@@ -148,6 +158,7 @@ class CommunityPost {
     this.bodyTruncated = false,
     this.place,
     this.visitedOn,
+    this.preparationItems = const [],
     this.viewerHasSaved = false,
   });
 
@@ -159,6 +170,7 @@ class CommunityPost {
   final bool bodyTruncated;
   final CommunityPlace? place;
   final String? visitedOn;
+  final List<GuidePreparationItem> preparationItems;
   final bool viewerHasSaved;
   final CommunityAuthor author;
   final List<CommunityMedia> media;
@@ -183,6 +195,7 @@ class CommunityPost {
         bodyTruncated: bodyTruncated,
         place: place,
         visitedOn: visitedOn,
+        preparationItems: preparationItems,
         viewerHasSaved: viewerHasSaved ?? this.viewerHasSaved,
         author: author,
         media: media,
@@ -204,6 +217,9 @@ class CommunityPost {
             ? CommunityPlace.fromJson(_map(json['place']))
             : null,
         visitedOn: _text(json['visited_on']),
+        preparationItems: _maps(json['preparation_items'])
+            .map(GuidePreparationItem.fromJson)
+            .toList(),
         viewerHasSaved: json['viewer_has_saved'] == true,
         author: CommunityAuthor.fromJson(_map(json['author'])),
         media: _maps(json['media'])
@@ -319,6 +335,7 @@ class CommunityPostDraft {
     this.photoPaths = const [],
     this.evidenceIds = const [],
     this.visitedOn,
+    this.preparationItems = const [],
   });
   final CommunityCategory category;
   final String idempotencyKey;
@@ -327,6 +344,7 @@ class CommunityPostDraft {
   final List<String> photoPaths;
   final List<String> evidenceIds;
   final String? visitedOn;
+  final List<GuidePreparationItem> preparationItems;
 }
 
 class CommunityMediaBytes {
@@ -361,17 +379,20 @@ String? _text(Object? value) {
 class CommunityQuery {
   const CommunityQuery(
       {this.category,
+      this.routeSlug,
       this.latitude,
       this.longitude,
       this.radiusKm,
       this.order = 'latest',
       this.savedOnly = false});
   final CommunityCategory? category;
+  final String? routeSlug;
   final double? latitude, longitude, radiusKm;
   final String order;
   final bool savedOnly;
   Map<String, dynamic> get parameters => {
         if (category != null) 'category': category!.id,
+        if (routeSlug != null) 'route': routeSlug,
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
         if (radiusKm != null) 'radius_km': radiusKm,

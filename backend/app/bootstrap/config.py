@@ -61,5 +61,5 @@ class Config:
     COMMUNITY_AUTO_HOLD_REPORT_THRESHOLD = int(
         os.getenv("COMMUNITY_AUTO_HOLD_REPORT_THRESHOLD", "3")
     )
-    COMMUNITY_CATEGORIES = ("viewpoint", "experience", "fact_supplement", "on_site")
+    COMMUNITY_CATEGORIES = ("viewpoint", "experience", "fact_supplement", "on_site", "guide")
     COMMUNITY_REPORT_REASONS = ("spam", "abuse", "privacy", "misinformation", "other")

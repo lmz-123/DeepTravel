@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 
@@ -711,6 +712,9 @@ class ApiExperienceRepository implements ExperienceRepository {
       if (draft.visitedOn != null) MapEntry('visited_on', draft.visitedOn!),
       if (draft.title != null) MapEntry('title', draft.title!),
       if (draft.body != null) MapEntry('body', draft.body!),
+      if (draft.preparationItems.isNotEmpty)
+        MapEntry('preparation_items',
+            jsonEncode(draft.preparationItems.map((i) => i.toJson()).toList())),
       ...draft.evidenceIds.map((id) => MapEntry('evidence_ids[]', id)),
     ]);
     for (final path in draft.photoPaths) {

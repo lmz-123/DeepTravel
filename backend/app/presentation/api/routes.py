@@ -742,6 +742,7 @@ def create_community_post(journey_id: str, fragment_id: str):
         idempotency_key=request.form.get("idempotency_key", ""),
         files=request.files.getlist("photos") + request.files.getlist("photos[]"),
         evidence_ids=[value for value in evidence_ids if value],
+        preparation_items=request.form.get("preparation_items"),
     )
     return jsonify({"data": result}), 201
 
@@ -754,6 +755,7 @@ def discover_community_posts():
             "data": _services()["community"].discover(
                 g.current_user.id,
                 city_slug=request.args.get("city"),
+                route_slug=request.args.get("route"),
                 category=request.args.get("category"),
                 latitude=request.args.get("latitude"),
                 longitude=request.args.get("longitude"),
@@ -785,6 +787,7 @@ def share_place_post(fragment_id):
         body=request.form.get("body"),
         idempotency_key=request.form.get("idempotency_key", ""),
         visited_on=request.form.get("visited_on"),
+        preparation_items=request.form.get("preparation_items"),
         files=request.files.getlist("photos") + request.files.getlist("photos[]"),
         evidence_ids=[],
     )

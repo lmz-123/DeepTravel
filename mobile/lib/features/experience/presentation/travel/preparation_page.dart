@@ -11,6 +11,7 @@ import '../route_manual/manual_visuals.dart';
 import '../route_manual/route_companion_entry.dart';
 import 'travel_providers.dart';
 import 'travel_widgets.dart';
+import 'guide_preparation.dart';
 
 class PreparationPage extends ConsumerWidget {
   const PreparationPage({super.key, required this.slug});
@@ -36,6 +37,7 @@ class PreparationPage extends ConsumerWidget {
             data: (r) => RefreshIndicator(
                 onRefresh: () async {
                   ref.invalidate(offlineAwareRouteProvider(slug));
+                  ref.invalidate(routeGuidesProvider(slug));
                   await ref.read(offlineAwareRouteProvider(slug).future);
                 },
                 child: SingleChildScrollView(
@@ -147,6 +149,7 @@ class _PreparationBodyState extends ConsumerState<PreparationBody> {
           Text('准备信息待补充', style: manualType(13, color: AppColors.textMuted)),
       ] else
         Text('准备信息待补充', style: manualType(13, color: AppColors.textMuted)),
+      RouteGuideList(r.slug),
       if (_opened)
         TravelRow('添加已购票据', subtitle: '图片 / PDF', onTap: () => _save()),
       const SizedBox(height: 22),

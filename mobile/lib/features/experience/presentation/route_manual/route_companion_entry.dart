@@ -185,6 +185,48 @@ class _EntryArrow extends CustomPainter {
 }
 
 /// Compact variant for the travel wallet, using the same editorial marks.
+class NotePublishAction extends StatelessWidget {
+  const NotePublishAction({super.key, this.onTap, this.publishing = false});
+  final VoidCallback? onTap;
+  final bool publishing;
+  @override
+  Widget build(BuildContext context) => Semantics(
+      button: true,
+      enabled: onTap != null,
+      liveRegion: publishing,
+      label: publishing ? '发布中' : '发布见闻',
+      child: InkWell(
+          onTap: onTap,
+          child: Opacity(
+              opacity: onTap == null && !publishing ? .4 : 1,
+              child: SizedBox(
+                  width: publishing ? 100 : 80,
+                  height: 49,
+                  child: Stack(children: [
+                    Center(
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(publishing ? '发布中' : '发布',
+                          style: manualType(16,
+                              serif: true, color: const Color(0xffbc4432))),
+                      const SizedBox(width: 9),
+                      SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: publishing
+                              ? const CircularProgressIndicator(
+                                  strokeWidth: 1.4, color: Color(0xffbc4432))
+                              : const CustomPaint(painter: _EntryArrow())),
+                    ])),
+                    const Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: SizedBox(
+                            height: 12,
+                            child: CustomPaint(painter: _PencilUnderline()))),
+                  ])))));
+}
+
 class RouteCompanionLink extends StatelessWidget {
   const RouteCompanionLink({super.key, required this.onTap});
   final VoidCallback onTap;

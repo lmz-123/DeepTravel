@@ -179,7 +179,8 @@ class _NotesFilterBarState extends ConsumerState<NotesFilterBar> {
                       for (final c in [
                         CommunityCategory.viewpoint,
                         CommunityCategory.onSite,
-                        CommunityCategory.experience
+                        CommunityCategory.experience,
+                        CommunityCategory.guide
                       ])
                         _choice(c.label, filters.category == c,
                             () => _update(category: c))

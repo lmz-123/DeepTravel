@@ -66,6 +66,7 @@ class CommunityDiscovery:
         *,
         city_slug=None,
         category=None,
+        route_slug=None,
         latitude=None,
         longitude=None,
         radius_km=None,
@@ -76,7 +77,13 @@ class CommunityDiscovery:
     ):
         self._require_enabled()
         limit = self._limit(limit)
-        if category and category not in {"viewpoint", "on_site", "experience", "fact_supplement"}:
+        if category and category not in {
+            "viewpoint",
+            "on_site",
+            "experience",
+            "fact_supplement",
+            "guide",
+        }:
             raise ValidationError("见闻类型无效")
         if order not in {"latest", "nearest"}:
             raise ValidationError("排序方式无效")
@@ -99,7 +106,17 @@ class CommunityDiscovery:
         if (radius_km is not None or order == "nearest") and latitude is None:
             raise ValidationError("请先开启定位")
         scope = "discover:" + json.dumps(
-            [user_id, city_slug, category, latitude, longitude, radius_km, order, saved_only]
+            [
+                user_id,
+                city_slug,
+                category,
+                latitude,
+                longitude,
+                radius_km,
+                order,
+                saved_only,
+                route_slug,
+            ]
         )
         boundary = self._decode_cursor(cursor, scope) if cursor else None
         with self.session_factory() as session:
@@ -131,6 +148,8 @@ class CommunityDiscovery:
             )
             if city_slug:
                 query = query.where(CityModel.slug == city_slug)
+            if route_slug:
+                query = query.where(RouteModel.slug == route_slug)
             if category:
                 query = query.where(CommunityPostModel.category == category)
             if saved_only:

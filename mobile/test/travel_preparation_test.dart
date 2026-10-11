@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:jiandi/features/experience/presentation/travel/guide_preparation.dart';
+import 'package:jiandi/features/experience/domain/community_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,10 +109,16 @@ void main() {
       expect(receipt.kind, 'pdf');
       expect(await first.file(receipt).exists(), isTrue);
       expect(await other.receipts('ocean'), isEmpty);
+      // Recreate the original v1 schema with real saved tickets before upgrading.
+      await first.database.execute('DROP TABLE preparation_tasks');
+      await first.database.execute('DROP TABLE guide_imports');
+      await first.database.setVersion(1);
       await first.close();
       final reopened = await TravelPlanStore.open(dir, 'api|one',
           factory: databaseFactoryFfi);
       expect((await reopened.receipts('ocean')).length, 1);
+      expect(await reopened.tasks('ocean'), isEmpty);
+      expect((await reopened.plan('ocean'))!.date, '2026-10-17');
       await reopened.removePlan('ocean');
       expect(await reopened.plans(), isEmpty);
       expect(await reopened.file(receipt).exists(), isFalse);
@@ -120,6 +128,62 @@ void main() {
       await dir.delete(recursive: true);
     }
   });
+  test(
+      'guide imports deduplicate, preserve progress, isolate accounts and survive reopening',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('guide-test-');
+    var store =
+        await TravelPlanStore.open(dir, 'api|one', factory: databaseFactoryFfi);
+    final other =
+        await TravelPlanStore.open(dir, 'api|two', factory: databaseFactoryFfi);
+    final post = CommunityPost(
+        id: 'guide-1',
+        fragmentId: 'fragment',
+        category: CommunityCategory.guide,
+        author: const CommunityAuthor(displayName: '阿岚', avatar: 'default'),
+        media: const [],
+        likeCount: 0,
+        commentCount: 0,
+        viewerHasLiked: false,
+        viewerIsAuthor: false,
+        createdAt: null,
+        title: '出发前准备',
+        preparationItems: const [
+          GuidePreparationItem('证件'),
+          GuidePreparationItem('雨具')
+        ],
+        place: const CommunityPlace(
+            fragmentId: 'fragment',
+            name: '入口',
+            routeSlug: 'ocean',
+            routeTitle: '海洋王国',
+            citySlug: 'zhuhai',
+            cityName: '珠海'));
+    try {
+      await store.importGuide(sample(), post);
+      await store.checkTask(
+          (await store.tasks('ocean')).first['id'] as String, true);
+      await store.importGuide(sample(), post);
+      expect((await store.tasks('ocean')).length, 2);
+      expect((await store.tasks('ocean')).first['done'], 1);
+      expect((await store.guides('ocean')).single['author'], '阿岚');
+      expect(await other.tasks('ocean'), isEmpty);
+      await store.addTask('ocean', '水壶');
+      await store.close();
+      store = await TravelPlanStore.open(dir, 'api|one',
+          factory: databaseFactoryFfi);
+      expect((await store.tasks('ocean')).length, 3);
+      expect((await store.tasks('ocean')).first['done'], 1);
+      await store.removePlan('ocean');
+      expect(await store.tasks('ocean'), isEmpty);
+      expect(await store.guides('ocean'), isEmpty);
+    } finally {
+      await store.close();
+      await other.close();
+      await dir.delete(recursive: true);
+    }
+  });
+
   test('receipt importer rejects executable and oversized files', () async {
     expect(receiptKind(Uint8List.fromList('MZfake.pdf'.codeUnits)), isNull);
     final dir = await Directory.systemTemp.createTemp('travel-limits-');
@@ -177,6 +241,59 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+  testWidgets(
+      'imported preparation shows source, progress and a paper checklist',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(ProviderScope(
+        overrides: [
+          preparationTasksProvider('ocean').overrideWith((ref) async => [
+                {
+                  'id': '1',
+                  'post_id': 'guide',
+                  'title': '带好购票证件',
+                  'body': '把证件和入园凭证放在一起。',
+                  'done': 1
+                },
+                {
+                  'id': '2',
+                  'post_id': 'guide',
+                  'title': '帽子、防晒与雨具',
+                  'body': '',
+                  'done': 0
+                },
+                {
+                  'id': '3',
+                  'post_id': 'guide',
+                  'title': '充电宝与舒适的鞋',
+                  'body': '',
+                  'done': 0
+                },
+              ]),
+          importedGuidesProvider('ocean').overrideWith((ref) async => [
+                {'post_id': 'guide', 'author': '阿岚', 'title': '第一次去海洋王国'}
+              ]),
+        ],
+        child: MaterialApp(
+            theme: AppTheme.light,
+            home: const RepaintBoundary(
+                key: ValueKey('guide-wallet'),
+                child: Scaffold(
+                    backgroundColor: AppColors.paper,
+                    body: Padding(
+                        padding: EdgeInsets.all(23),
+                        child: MyPreparation('ocean')))))));
+    await tester.pumpAndSettle();
+    expect(find.text('已备好 1 / 3'), findsOneWidget);
+    expect(find.text('查看原文'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await expectLater(find.byKey(const ValueKey('guide-wallet')),
+        matchesGoldenFile('goldens/guide-wallet-390.png'));
+  });
+
   testWidgets('wallet displays manually added receipts, never issued status',
       (tester) async {
     tester.view.physicalSize = const Size(390, 1100);

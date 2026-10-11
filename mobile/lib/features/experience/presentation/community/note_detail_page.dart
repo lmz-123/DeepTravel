@@ -6,6 +6,7 @@ import '../experience_providers.dart';
 import '../widgets/discovery_art.dart';
 import 'notes_controller.dart';
 import 'notes_widgets.dart';
+import '../travel/guide_preparation.dart';
 
 class NoteDetailPage extends ConsumerStatefulWidget {
   const NoteDetailPage({super.key, required this.postId, this.photoIndex = 0});
@@ -108,6 +109,9 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                     Text(p.body,
                         style: noteSans(13,
                             color: const Color(0xff525748), height: 2)),
+                    if (p.category == CommunityCategory.guide &&
+                        p.preparationItems.isNotEmpty)
+                      GuideChecklist(p),
                     NotePlaceRow(p, detail: true),
                     NoteActions(p,
                         onLike: state.isMutating

@@ -14,6 +14,7 @@ import '../route_manual/manual_visuals.dart';
 import '../route_manual/route_companion_entry.dart';
 import 'travel_providers.dart';
 import 'travel_widgets.dart';
+import 'guide_preparation.dart';
 
 class TravelPlansPage extends ConsumerWidget {
   const TravelPlansPage({super.key});
@@ -145,7 +146,7 @@ class _TravelPlanPageState extends ConsumerState<TravelPlanPage> {
         context: context,
         builder: (c) => AlertDialog(
                 title: const Text('移除这次出游？'),
-                content: const Text('本机保存的相关票据也会删除。'),
+                content: const Text('本机保存的相关票据和准备清单也会删除。'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(c, false),
@@ -273,6 +274,7 @@ class _TravelPlanPageState extends ConsumerState<TravelPlanPage> {
                               subtitle: '点此重试',
                               onTap: () => ref.invalidate(
                                   offlineAwareRouteProvider(plan.slug))),
+                        MyPreparation(plan.id),
                         TravelHeading('我的票据',
                             trailing: TextButton(
                                 onPressed: busy ? null : importReceipt,

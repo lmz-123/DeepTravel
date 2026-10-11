@@ -304,6 +304,66 @@ void main() {
         router.routeInformationProvider.value.uri.queryParameters['fragment'],
         'dameisha-0');
   });
+  testWidgets(
+      'guide editor restores checklist, switches categories, and shows pending publish',
+      (tester) async {
+    final (_, repo, store) = await pump(
+        tester, '/community/write?fragment=dameisha-0', 390,
+        draftData: {
+          'body': '第一次来海边，准备好这些就出发。',
+          'title': '去海边的准备',
+          'category': 'guide',
+          'preparation_items': [
+            {'title': '帽子与防晒', 'body': ''}
+          ],
+          'photos': []
+        });
+    expect(find.byKey(const ValueKey('guide-title')), findsOneWidget);
+    await tester.tap(find.text('日常记录'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('guide-title')), findsNothing);
+    await tester.tap(find.text('攻略'));
+    await tester.pumpAndSettle();
+    expect(find.text('去海边的准备'), findsOneWidget);
+    expect(find.text('帽子与防晒'), findsOneWidget);
+    await expectLater(find.byKey(const ValueKey('screen')),
+        matchesGoldenFile('goldens/guide-compose-390.png'));
+    repo.pendingPublish = Completer<CommunityPost>();
+    await tester.tap(find.byKey(const ValueKey('note-publish')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('发布中'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('note-publish')));
+    expect(repo.publishCalls, 1);
+    expect(repo.draft!.title, '去海边的准备');
+    expect(repo.draft!.preparationItems.single.title, '帽子与防晒');
+    await expectLater(find.byKey(const ValueKey('screen')),
+        matchesGoldenFile('goldens/guide-publishing-390.png'));
+    repo.pendingPublish!.completeError(Exception('offline'));
+    await tester.pumpAndSettle();
+    expect(find.text('发布中'), findsNothing);
+    expect(store.values['community_draft_user-a']!['preparation_items'],
+        isNotEmpty);
+    expect(find.text('去海边的准备'), findsOneWidget);
+  });
+
+  testWidgets('guide editor fits a narrow screen', (tester) async {
+    await pump(tester, '/community/write?fragment=dameisha-0', 320, draftData: {
+      'body': '准备好就出发。',
+      'title': '第一次出发前的准备',
+      'category': 'guide',
+      'preparation_items': [
+        {'title': '证件与入园凭证'},
+        {'title': '帽子、防晒与雨具'},
+        {'title': '充电宝与舒适的鞋'}
+      ]
+    });
+    expect(tester.takeException(), isNull);
+    await expectLater(find.byKey(const ValueKey('screen')),
+        matchesGoldenFile('goldens/guide-compose-320.png'));
+  });
+
   testWidgets('draft survives reopening and publish uses selected place',
       (tester) async {
     final (router, repo, store) =
@@ -424,8 +484,8 @@ void main() {
     await expectLater(find.byKey(const ValueKey('screen')),
         matchesGoldenFile('goldens/v14-compose-nine-390.png'));
     await tester.ensureVisible(find.byKey(const ValueKey('note-publish')));
-    await tester.tap(find.byKey(const ValueKey('note-publish')));
     await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('note-publish')));
       await Future<void>.delayed(const Duration(milliseconds: 150));
     });
     await tester.pumpAndSettle();
@@ -503,6 +563,8 @@ class _Repo extends DemoExperienceRepository {
   final cityCalls = <String?>[];
   String? publishedFragment;
   CommunityPostDraft? draft;
+  Completer<CommunityPost>? pendingPublish;
+  int publishCalls = 0;
   @override
   Future<List<CommunityPlace>> communityPlaces() async => [place, shanghai];
   @override
@@ -583,9 +645,12 @@ class _Repo extends DemoExperienceRepository {
   @override
   Future<CommunityPostDetail> shareCommunityPost(
       String fragmentId, CommunityPostDraft value) async {
+    publishCalls++;
     publishedFragment = fragmentId;
     draft = value;
-    return fixturePost();
+    return pendingPublish == null
+        ? fixturePost()
+        : await pendingPublish!.future;
   }
 }
 

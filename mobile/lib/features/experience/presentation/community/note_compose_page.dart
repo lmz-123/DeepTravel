@@ -14,6 +14,8 @@ import '../experience_providers.dart';
 import '../widgets/discovery_art.dart';
 import 'notes_controller.dart';
 import 'notes_widgets.dart';
+import '../route_manual/route_companion_entry.dart';
+import '../travel/guide_preparation.dart';
 
 final notePhotoPickerProvider = Provider<Future<List<String>> Function()>(
     (ref) => () async => (await ImagePicker()
@@ -22,7 +24,8 @@ final notePhotoPickerProvider = Provider<Future<List<String>> Function()>(
         .toList());
 
 class NoteComposePage extends ConsumerStatefulWidget {
-  const NoteComposePage({super.key, this.fragmentId});
+  const NoteComposePage({super.key, this.fragmentId, this.initialCategory});
+  final CommunityCategory? initialCategory;
   final String? fragmentId;
   @override
   ConsumerState<NoteComposePage> createState() => _NoteComposePageState();
@@ -30,6 +33,15 @@ class NoteComposePage extends ConsumerStatefulWidget {
 
 class _NoteComposePageState extends ConsumerState<NoteComposePage> {
   final _body = TextEditingController();
+  final _title = TextEditingController();
+  final _items = <GuidePreparationItem>[const GuidePreparationItem('')];
+  bool _publishing = false;
+  bool get _guide => _category == CommunityCategory.guide;
+  bool get _validGuide =>
+      !_guide ||
+      (_title.text.trim().isNotEmpty &&
+          _items.isNotEmpty &&
+          _items.every((i) => i.title.trim().isNotEmpty));
   final _photos = <String>[];
   final _persistedPhotos = <String>{};
   String? _fragment, _user;
@@ -38,7 +50,11 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
   int _selectedPhoto = -1;
   bool _allowExit = false, _leaving = false;
   bool get _hasChanges =>
-      !_saved && (_body.text.trim().isNotEmpty || _photos.isNotEmpty);
+      !_saved &&
+      (_body.text.trim().isNotEmpty ||
+          _photos.isNotEmpty ||
+          _title.text.trim().isNotEmpty ||
+          _items.any((i) => i.title.isNotEmpty || i.body.isNotEmpty));
   bool _loading = true, _busy = false, _picking = false, _saved = false;
   String get _draftKey => 'community_draft_${_user ?? 'demo'}';
   @override
@@ -46,6 +62,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
     super.initState();
     _user = ref.read(currentUserIdProvider);
     _fragment = widget.fragmentId;
+    _category = widget.initialCategory ?? CommunityCategory.onSite;
     _restore();
   }
 
@@ -55,9 +72,20 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
       if (!mounted || _user != ref.read(currentUserIdProvider)) return;
       if (data != null && data['body'] is String) {
         _body.text = data['body'] as String;
-        _fragment = data['fragment'] as String? ?? _fragment;
+        _title.text = data['title'] as String? ?? '';
+        if (data['preparation_items'] is List) {
+          _items
+            ..clear()
+            ..addAll((data['preparation_items'] as List).whereType<Map>().map(
+                (i) => GuidePreparationItem.fromJson(
+                    Map<String, dynamic>.from(i))));
+          if (_items.isEmpty) _items.add(const GuidePreparationItem(''));
+        }
+        _fragment =
+            widget.fragmentId ?? data['fragment'] as String? ?? _fragment;
         _idempotency = data['idempotency'] as String? ?? _idempotency;
-        _category = CommunityCategory.parse(data['category']);
+        _category =
+            widget.initialCategory ?? CommunityCategory.parse(data['category']);
         for (final path
             in (data['photos'] as List? ?? []).whereType<String>()) {
           if (await File(path).exists()) {
@@ -81,6 +109,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
       _deletePhoto(path);
     }
     _body.dispose();
+    _title.dispose();
     super.dispose();
   }
 
@@ -95,6 +124,8 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
     final photos = List<String>.of(_photos);
     await ref.read(tourStoreProvider).saveJson(_draftKey, {
       'body': _body.text,
+      'title': _title.text,
+      'preparation_items': _items.map((i) => i.toJson()).toList(),
       'fragment': _fragment,
       'category': _category.id,
       'photos': List.of(_photos),
@@ -120,7 +151,12 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
     } catch (_) {
       if (mounted) noteNotice(context, '草稿未能保存，请重试');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _publishing = false;
+        });
+      }
     }
   }
 
@@ -210,6 +246,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
   Future<void> _publish(CommunityPolicy policy) async {
     if (_busy ||
         !policy.enabled ||
+        !_validGuide ||
         _fragment == null ||
         _body.text.trim().isEmpty) {
       return;
@@ -218,7 +255,10 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
       noteNotice(context, '最多添加 ${math.min(9, policy.maxMedia)} 张照片');
       return;
     }
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _publishing = true;
+    });
     try {
       await _store();
       if (!mounted || _user != ref.read(currentUserIdProvider)) return;
@@ -227,6 +267,8 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
           _fragment!,
           CommunityPostDraft(
               category: _category,
+              title: _guide ? _title.text.trim() : null,
+              preparationItems: _guide ? List.of(_items) : const [],
               idempotencyKey: _idempotency,
               body: _body.text.trim(),
               photoPaths: List.of(_photos)));
@@ -243,12 +285,18 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
       if (!mounted) return;
       ref.read(notesCityProvider.notifier).select(null);
       ref.invalidate(notesFeedProvider);
+      ref.invalidate(routeGuidesProvider);
       context.go('/?tab=community');
       noteNotice(context, '见闻已发布');
     } catch (_) {
       if (mounted) noteNotice(context, '发布未成功，内容已保留，请重试');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _publishing = false;
+        });
+      }
     }
   }
 
@@ -275,56 +323,31 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               NoteTop('返回',
                   onBack: _leave,
-                  title: '写见闻',
-                  trailing: Opacity(
-                      opacity: !_busy &&
-                              policy?.enabled == true &&
-                              place != null &&
-                              _body.text.trim().isNotEmpty
-                          ? 1
-                          : .4,
-                      child: NoteButton(
-                          key: const ValueKey('note-publish'),
-                          label: '发布见闻',
-                          onTap: _busy ||
-                                  _loading ||
-                                  _picking ||
-                                  policy == null ||
-                                  !policy.enabled ||
-                                  place == null ||
-                                  _body.text.trim().isEmpty
-                              ? null
-                              : () => _publish(policy),
-                          child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 15, vertical: 10.75),
-                              decoration: const BoxDecoration(
-                                  color: noteRed,
-                                  borderRadius: BorderRadius.only(
-                                      topLeft: Radius.circular(3),
-                                      topRight: Radius.circular(3),
-                                      bottomLeft: Radius.circular(3),
-                                      bottomRight: Radius.circular(3))),
-                              child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(_busy ? '发布中' : '发布',
-                                        style: noteSerif(15, color: notePaper)),
-                                    const SizedBox(width: 10),
-                                    const DiscoveryIcon(
-                                        DiscoveryMark.arrowUpRight,
-                                        size: 14,
-                                        color: notePaper)
-                                  ]))))),
-              const SizedBox(height: 7),
-              Text('A NOTE TO REMEMBER',
-                  style: noteItalic(10).copyWith(letterSpacing: 1)),
-              const SizedBox(height: 8),
-              Text.rich(
-                  TextSpan(children: [
-                    const TextSpan(text: '留一则见闻'),
-                  ]),
-                  style: noteSerif(32)),
+                  title: _guide ? '写攻略' : '写见闻',
+                  trailing: NotePublishAction(
+                      key: const ValueKey('note-publish'),
+                      publishing: _publishing,
+                      onTap: _busy ||
+                              _loading ||
+                              _picking ||
+                              policy == null ||
+                              !policy.enabled ||
+                              place == null ||
+                              !_validGuide ||
+                              _body.text.trim().isEmpty
+                          ? null
+                          : () => _publish(policy))),
+              if (!_guide) ...[
+                const SizedBox(height: 7),
+                Text('A NOTE TO REMEMBER',
+                    style: noteItalic(10).copyWith(letterSpacing: 1)),
+                const SizedBox(height: 8),
+                Text.rich(
+                    TextSpan(children: [
+                      TextSpan(text: _guide ? '写一份出发前的准备' : '留一则见闻'),
+                    ]),
+                    style: noteSerif(_guide ? 27 : 32)),
+              ],
               if (_loading)
                 const Padding(
                     padding: EdgeInsets.all(30),
@@ -339,7 +362,8 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                       for (final entry in [
                         CommunityCategory.viewpoint,
                         CommunityCategory.onSite,
-                        CommunityCategory.experience
+                        CommunityCategory.experience,
+                        CommunityCategory.guide
                       ].asMap().entries)
                         Expanded(
                             child: NoteButton(
@@ -379,19 +403,39 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                                     ])))),
                     ])),
                 const SizedBox(height: 20),
+                if (_guide)
+                  TextField(
+                      key: const ValueKey('guide-title'),
+                      controller: _title,
+                      enabled: !_busy,
+                      maxLength: policy?.titleMaxLength ?? 60,
+                      style: noteSerif(23),
+                      onChanged: (_) => setState(() => _saved = false),
+                      decoration: InputDecoration(
+                          hintText: '给攻略起个标题',
+                          hintStyle: noteSerif(23, color: noteQuiet),
+                          counterText: '',
+                          filled: false,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 10),
+                          border: InputBorder.none)),
                 ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
+                    constraints: BoxConstraints(minHeight: _guide ? 100 : 160),
                     child: TextField(
                         key: const ValueKey('note-compose-body'),
                         controller: _body,
                         enabled: !_busy,
                         maxLength: max,
-                        minLines: 4,
+                        minLines: _guide ? 2 : 4,
                         maxLines: null,
                         style: noteSerif(17, height: 2),
                         onChanged: (_) => setState(() => _saved = false),
                         decoration: InputDecoration(
-                            hintText: '这里有什么，让你想多停留一会儿？',
+                            hintText: _guide
+                                ? '有哪些经验，想分享给下一位出发的人？'
+                                : '这里有什么，让你想多停留一会儿？',
                             hintStyle: noteSerif(17,
                                 color: const Color(0xff958c7d), height: 2),
                             filled: false,
@@ -415,7 +459,7 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                       style: noteItalic(11))
                 ]),
                 const SizedBox(height: 20),
-                _photoEditor(math.min(9, policy?.maxMedia ?? 9)),
+                if (!_guide) _photoEditor(math.min(9, policy?.maxMedia ?? 9)),
                 const SizedBox(height: 24),
                 _row(
                     '关联地点',
@@ -470,6 +514,11 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
                                           DiscoveryMark.arrowRight,
                                           size: 14)
                                     ]))))),
+                if (_guide) ...[
+                  const SizedBox(height: 20),
+                  _guideEditor(),
+                  _photoEditor(math.min(9, policy?.maxMedia ?? 9)),
+                ],
                 if (placesState.hasError)
                   NoteFailure(
                       '地点暂时无法读取', () => ref.invalidate(notesPlacesProvider)),
@@ -483,6 +532,66 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
               ]
             ])));
   }
+
+  Widget _guideEditor() => Container(
+      margin: const EdgeInsets.only(bottom: 25),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+      decoration: const BoxDecoration(
+          color: Color(0xffeee9dd),
+          border: Border(
+              top: BorderSide(color: noteLine),
+              bottom: BorderSide(color: noteLine))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('出发前准备', style: noteSerif(21)),
+        const SizedBox(height: 12),
+        for (var i = 0; i < _items.length; i++)
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+                padding: const EdgeInsets.only(top: 17, right: 12),
+                child: Text('${i + 1}'.padLeft(2, '0'), style: noteItalic(13))),
+            Expanded(
+                child: Column(children: [
+              TextFormField(
+                  key: ValueKey('guide-item-$i-${_items.length}'),
+                  initialValue: _items[i].title,
+                  enabled: !_busy,
+                  maxLength: 60,
+                  style: noteSerif(16),
+                  onChanged: (v) => setState(() {
+                        _items[i] =
+                            GuidePreparationItem(v, body: _items[i].body);
+                        _saved = false;
+                      }),
+                  decoration: const InputDecoration(
+                      hintText: '需要准备什么',
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      counterText: '',
+                      filled: false,
+                      border: InputBorder.none)),
+              const Divider(color: noteLine),
+            ])),
+            IconButton(
+                tooltip: '删除准备项',
+                onPressed: _busy || _items.length == 1
+                    ? null
+                    : () => setState(() {
+                          _items.removeAt(i);
+                          _saved = false;
+                        }),
+                icon: const Icon(Icons.close, size: 15, color: noteQuiet)),
+          ]),
+        if (_items.length < 12)
+          NoteArrow('添加一项',
+              size: 14,
+              onTap: _busy
+                  ? null
+                  : () => setState(() {
+                        _items.add(const GuidePreparationItem(''));
+                        _saved = false;
+                      })),
+      ]));
 
   void _movePhoto(int destination) {
     setState(() {

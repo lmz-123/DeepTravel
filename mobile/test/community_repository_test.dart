@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,6 +80,24 @@ void main() {
     final fields = Map.fromEntries((requests.last.data as FormData).fields);
     expect(fields['visited_on'], '2026-10-04');
     expect(fields['idempotency_key'], 'share-once');
+    await repo.shareCommunityPost(
+        'fragment-1',
+        const CommunityPostDraft(
+            category: CommunityCategory.guide,
+            idempotencyKey: 'guide-once',
+            title: '准备',
+            body: '准备好就出发',
+            preparationItems: [GuidePreparationItem('证件')]));
+    final guideFields =
+        Map.fromEntries((requests.last.data as FormData).fields);
+    expect(guideFields['category'], 'guide');
+    expect(jsonDecode(guideFields['preparation_items']!), [
+      {'title': '证件', 'body': ''}
+    ]);
+    await repo.discoverCommunity(
+        query: const CommunityQuery(
+            category: CommunityCategory.guide, routeSlug: 'dameisha'));
+    expect(requests.last.queryParameters['route'], 'dameisha');
     await repo.setCommunitySaved('post-1', true);
     expect(requests.last.method, 'PUT');
     await repo.setCommunitySaved('post-1', false);

@@ -260,7 +260,7 @@ class NoteMediaImage extends ConsumerWidget {
         ref.watch(currentUserIdProvider) ?? 'demo', media, variant);
     final bytes = ref.watch(communityMediaBytesProvider(key));
     Widget retry() => ColoredBox(
-        color: const Color(0xffe8e6d8),
+        color: notePaper,
         child: Center(
             child: TextButton(
                 onPressed: () =>
@@ -274,7 +274,7 @@ class NoteMediaImage extends ConsumerWidget {
             gaplessPlayback: true,
             errorBuilder: (_, __, ___) => retry()),
         loading: () => const ColoredBox(
-            color: Color(0xffe8e6d8),
+            color: notePaper,
             child: Center(
                 child: CircularProgressIndicator(
                     strokeWidth: 1, color: noteQuiet))),
@@ -422,7 +422,7 @@ class _NoteGalleryState extends State<NoteGallery> {
                   : 410
               : 288,
           child: ColoredBox(
-              color: widget.expanded ? notePaper : const Color(0xffe9e7dd),
+              color: notePaper,
               child: PageView.builder(
                   controller: _pages,
                   itemCount: media.length,

@@ -145,6 +145,7 @@ class CommunityService(CommunityDiscovery):
         files: list,
         evidence_ids: list[str],
         visited_on: str | None = None,
+        preparation_items: str | None = None,
     ) -> dict:
         self._require_enabled()
         title = (title or "").strip() or None
@@ -162,6 +163,30 @@ class CommunityService(CommunityDiscovery):
         if not title and not body and not files and not evidence_ids:
             raise ValidationError("动态需要标题、文字或图片")
 
+        items = []
+        if preparation_items is not None:
+            try:
+                items = json.loads(preparation_items)
+            except (ValueError, TypeError) as exc:
+                raise ValidationError("准备清单格式无效") from exc
+        if not isinstance(items, list) or len(items) > 12:
+            raise ValidationError("准备清单最多 12 项")
+        for item in items:
+            if (
+                not isinstance(item, dict)
+                or set(item) - {"title", "body"}
+                or not isinstance(item.get("title"), str)
+                or not item["title"].strip()
+                or len(item["title"]) > 60
+                or not isinstance(item.get("body", ""), str)
+                or len(item.get("body", "")) > 300
+            ):
+                raise ValidationError("准备项需要标题（最多 60 字），说明最多 300 字")
+        if category == "guide" and (not title or not body or not items):
+            raise ValidationError("攻略需要标题、正文和至少一项准备")
+        if category != "guide" and items:
+            raise ValidationError("只有攻略可以附带准备清单")
+        items = [{"title": i["title"].strip(), "body": i.get("body", "").strip()} for i in items]
         visited_on = self._visit_date(visited_on)
         staged: list[tuple[object, str]] = []
         with self.session_factory() as session:
@@ -224,6 +249,7 @@ class CommunityService(CommunityDiscovery):
                     author_user_id=user_id,
                     category=category,
                     visited_on=visited_on,
+                    preparation_items=items or None,
                     title=title,
                     body=body,
                     status="visible",
@@ -785,6 +811,7 @@ class CommunityService(CommunityDiscovery):
                 "fragment_id": post.fragment_id,
                 "place": places.get(post.fragment_id),
                 "visited_on": post.visited_on,
+                "preparation_items": post.preparation_items or [],
                 "viewer_has_saved": post.id in saved,
                 "category": post.category,
                 "category_label": self._category_label(post.category),
@@ -1065,5 +1092,6 @@ class CommunityService(CommunityDiscovery):
             "viewpoint": "拍照机位",
             "experience": "经验分享",
             "fact_supplement": "事实补充 · 旅行者内容",
+            "guide": "攻略",
             "on_site": "日常记录",
         }.get(category, category)
