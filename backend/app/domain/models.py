@@ -68,6 +68,7 @@ class Route:
     content_status: ContentStatus
     stops: tuple[Stop, ...] = field(default_factory=tuple)
     map_category: str | None = None
+    travel_preparation: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)

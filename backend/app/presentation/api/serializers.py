@@ -36,6 +36,9 @@ def route_to_dict(route: Route, *, include_stops: bool = True) -> dict:
         "difficulty": route.difficulty,
         "theme": route.theme,
         "map_category": route.map_category,
+        "travel_preparation": route.travel_preparation
+        if (route.travel_preparation or {}).get("enabled")
+        else None,
         "hero_image": asset_url(route.hero_image),
         "is_featured": route.is_featured,
         "content_status": route.content_status.value,
@@ -101,9 +104,7 @@ def journey_to_dict(journey: Journey, stop_count: int | None = None) -> dict:
 def journey_library_item_to_dict(item: JourneyLibraryItem) -> dict:
     journey = journey_to_dict(item.journey)
     journey["completed_stops"] = item.collected_count
-    journey["progress"] = (
-        item.collected_count / item.total_count if item.total_count > 0 else 0.0
-    )
+    journey["progress"] = item.collected_count / item.total_count if item.total_count > 0 else 0.0
     if item.journey.status is JourneyStatus.COMPLETED:
         journey["progress"] = 1.0
     return {

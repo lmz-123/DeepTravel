@@ -89,6 +89,12 @@ class ProfilePage extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 34),
+                      _ProfileLinkRow(
+                          icon: Icons.luggage_outlined,
+                          title: '我的出游',
+                          subtitle: '游玩准备与随身票据',
+                          onTap: () => context.push('/travel')),
+                      const SizedBox(height: 30),
                       const _ProfileSectionLabel(label: '01 / KEPT FOR LATER'),
                       const SizedBox(height: 10),
                       _ShelfSummary(

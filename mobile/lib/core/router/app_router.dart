@@ -1,3 +1,5 @@
+import '../../features/experience/presentation/travel/preparation_page.dart';
+import '../../features/experience/presentation/travel/travel_pages.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/experience/presentation/community/note_detail_page.dart';
 import '../../features/experience/presentation/community/note_compose_page.dart';
@@ -14,6 +16,19 @@ import '../../features/experience/presentation/profile_page.dart';
 
 final appRouter = GoRouter(
   routes: [
+    GoRoute(
+        path: '/route/:slug/prepare',
+        builder: (_, state) =>
+            PreparationPage(slug: state.pathParameters['slug']!)),
+    GoRoute(path: '/travel', builder: (_, state) => const TravelPlansPage()),
+    GoRoute(
+        path: '/travel/:id',
+        builder: (_, state) => TravelPlanPage(id: state.pathParameters['id']!)),
+    GoRoute(
+        path: '/travel/:id/receipt/:receiptId',
+        builder: (_, state) => TravelReceiptPage(
+            planId: state.pathParameters['id']!,
+            receiptId: state.pathParameters['receiptId']!)),
     GoRoute(
         path: '/community/write',
         builder: (context, state) =>

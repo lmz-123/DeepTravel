@@ -264,7 +264,9 @@ def list_city_stories(city_slug: str):
 @api.get("/routes/<route_slug>")
 def get_route(route_slug: str):
     route = _services()["catalog"].get_route(route_slug)
-    return jsonify({"data": _route_payload(route)})
+    response = jsonify({"data": _route_payload(route)})
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @api.get("/routes/<route_slug>/offline-package")

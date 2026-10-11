@@ -90,6 +90,7 @@ def _route_to_domain(
         difficulty=model.difficulty,
         theme=model.theme,
         map_category=model.map_category,
+        travel_preparation=model.travel_preparation,
         hero_image=resolve_media(model.hero_image),
         is_featured=model.is_featured,
         content_status=content_status,

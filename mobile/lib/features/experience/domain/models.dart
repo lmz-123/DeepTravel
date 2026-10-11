@@ -1,3 +1,4 @@
+import 'travel_preparation.dart';
 import 'fragment_models.dart';
 import 'city_story.dart';
 
@@ -145,6 +146,7 @@ class RouteExperience {
     this.pretrip,
     this.predeparture,
     this.mapCategory,
+    this.travelPreparation = const TravelPreparation({}),
     this.centerLatitude,
     this.centerLongitude,
   });
@@ -173,6 +175,7 @@ class RouteExperience {
   final PretripExperience? pretrip;
   final PredepartureIntroduction? predeparture;
   final String? mapCategory;
+  final TravelPreparation travelPreparation;
   final double? centerLatitude;
   final double? centerLongitude;
 
@@ -199,6 +202,8 @@ class RouteExperience {
         cityName: (json['city'] as Map?)?['name'] as String? ?? '',
         citySlug: (json['city'] as Map?)?['slug'] as String? ?? '',
         mapCategory: json['map_category'] as String?,
+        travelPreparation:
+            TravelPreparation.fromJson(json['travel_preparation']),
         centerLatitude: json['center'] is Map<String, dynamic> &&
                 (json['center'] as Map<String, dynamic>)['latitude'] is num
             ? ((json['center'] as Map<String, dynamic>)['latitude'] as num)

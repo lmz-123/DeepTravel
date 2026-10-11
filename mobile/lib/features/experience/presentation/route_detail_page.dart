@@ -1,3 +1,4 @@
+import 'travel/preparation_page.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -332,6 +333,8 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                               routeName: route.title,
                               onTap: _openCompanion),
                         ),
+                      if (route.travelPreparation.enabled)
+                        RoutePreparationEntry(route: route),
                       Row(children: [
                         Expanded(
                             child: Text('沿途故事',

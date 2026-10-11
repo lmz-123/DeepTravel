@@ -187,3 +187,38 @@ class _EntryArrow extends CustomPainter {
   @override
   bool shouldRepaint(covariant _EntryArrow oldDelegate) => false;
 }
+
+/// Compact variant for the travel wallet, using the same editorial marks.
+class RouteCompanionLink extends StatelessWidget {
+  const RouteCompanionLink({super.key, required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: SizedBox(
+            width: 89,
+            height: 49,
+            child: Stack(children: [
+              Center(
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('去随行',
+                    style: manualType(15,
+                        serif: true,
+                        weight: FontWeight.w500,
+                        color: const Color(0xffbc4432))),
+                const SizedBox(width: 8),
+                const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CustomPaint(painter: _EntryArrow()))
+              ])),
+              const Positioned(
+                  left: 0,
+                  bottom: 0,
+                  child: SizedBox(
+                      width: 83,
+                      height: 12,
+                      child: CustomPaint(painter: _PencilUnderline()))),
+            ])),
+      );
+}
