@@ -1,3 +1,4 @@
+import 'package:jiandi/features/experience/presentation/places_controller.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -77,26 +78,27 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(ProviderScope(
+          overrides: [placeRepositoryProvider.overrideWithValue(null)],
           child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        home: Scaffold(
-            body: RepaintBoundary(
-          key: const ValueKey('atlas'),
-          child: ColoredBox(
-              color: AppColors.paper,
-              child: CityAtlas(
-                citySlug: city.key,
-                cityName: city.value.$1,
-                routes: const [],
-                saved: const {},
-                busyFavorites: const {},
-                onFavorite: (_) {},
-                onOpen: (_) {},
-                onBack: () {},
-              )),
-        )),
-      )));
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            home: Scaffold(
+                body: RepaintBoundary(
+              key: const ValueKey('atlas'),
+              child: ColoredBox(
+                  color: AppColors.paper,
+                  child: CityAtlas(
+                    citySlug: city.key,
+                    cityName: city.value.$1,
+                    routes: const [],
+                    saved: const {},
+                    busyFavorites: const {},
+                    onFavorite: (_) {},
+                    onOpen: (_) {},
+                    onBack: () {},
+                  )),
+            )),
+          )));
       await tester.tap(find.byTooltip('地图'));
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 50));

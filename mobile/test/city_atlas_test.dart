@@ -1,3 +1,4 @@
+import 'package:jiandi/features/experience/presentation/places_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -68,6 +69,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(ProviderScope(
+          overrides: [placeRepositoryProvider.overrideWithValue(null)],
           child: MaterialApp(
               theme: AppTheme.light,
               home: Scaffold(
@@ -131,6 +133,7 @@ void main() {
   testWidgets('long lists build lazily and paginate without losing filters',
       (tester) async {
     await tester.pumpWidget(ProviderScope(
+        overrides: [placeRepositoryProvider.overrideWithValue(null)],
         child: MaterialApp(
             theme: AppTheme.light,
             home: Scaffold(

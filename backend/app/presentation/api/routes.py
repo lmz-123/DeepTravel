@@ -11,7 +11,7 @@ from app.application.city_maps import city_map_manifest
 from app.domain.errors import ValidationError
 from app.domain.models import ContentStatus, JourneyStatus
 from app.presentation.api.auth import require_user
-from app.presentation.api.media import send_media_asset
+from app.presentation.api.media import public_image_variants, send_media_asset
 from app.presentation.api.serializers import (
     city_to_dict,
     journey_library_item_to_dict,
@@ -242,6 +242,9 @@ def get_city_map(city_slug: str):
 
 @api.get("/cities/<city_slug>/routes")
 def list_city_routes(city_slug: str):
+    if request.args.get("summary") == "1":
+        result = _services()["places"].browse(city_slug, {}, directory=True)
+        return jsonify({"data": {"routes": [_place_images(p) for p in result["items"]]}})
     city, routes = _services()["catalog"].list_city_routes(city_slug)
     route_payloads = [
         _route_payload(route, include_stops=False, include_center=True) for route in routes
@@ -254,6 +257,28 @@ def list_city_routes(city_slug: str):
             }
         }
     )
+
+
+def _place_images(place):
+    images = public_image_variants(place.get("hero_image", ""))
+    return {**place, "hero_image": images["full"], "image_variants": images}
+
+
+@api.get("/cities/<city_slug>/places")
+def discover_places(city_slug: str):
+    result = _services()["places"].browse(city_slug, request.args)
+    result["items"] = [_place_images(p) for p in result["items"]]
+    return jsonify({"data": result})
+
+
+@api.get("/cities/<city_slug>/place-markers")
+def discover_place_markers(city_slug: str):
+    return jsonify({"data": _services()["places"].browse(city_slug, request.args, markers=True)})
+
+
+@api.get("/places/<route_slug>")
+def place_brief(route_slug: str):
+    return jsonify({"data": _place_images(_services()["places"].place(route_slug))})
 
 
 @api.get("/cities/<city_slug>/stories")

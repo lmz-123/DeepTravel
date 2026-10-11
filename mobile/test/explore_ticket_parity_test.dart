@@ -1,3 +1,4 @@
+import 'package:jiandi/features/experience/presentation/places_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,6 +82,7 @@ void main() {
                         onOpen: (_) {},
                         onBack: () {}));
         await tester.pumpWidget(ProviderScope(
+            overrides: [placeRepositoryProvider.overrideWithValue(null)],
             child: MaterialApp(
                 debugShowCheckedModeBanner: false,
                 theme: AppTheme.light,

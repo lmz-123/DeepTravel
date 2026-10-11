@@ -50,7 +50,8 @@ class ApiExperienceRepository implements ExperienceRepository {
 
   @override
   Future<CityDiscoveryCatalog> discoveryForCity(String citySlug) async {
-    final response = await _request(() => _dio.get('/cities/$citySlug/routes'));
+    final response = await _request(() =>
+        _dio.get('/cities/$citySlug/routes', queryParameters: {'summary': 1}));
     final data = response.data['data'] as Map<String, dynamic>;
     final summaries = data['routes'] as List<dynamic>;
     final routes = summaries

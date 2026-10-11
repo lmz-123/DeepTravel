@@ -147,6 +147,8 @@ class RouteExperience {
     this.predeparture,
     this.mapCategory,
     this.travelPreparation = const TravelPreparation({}),
+    this.thumbnailImage = '',
+    this.supportsCompanion = false,
     this.centerLatitude,
     this.centerLongitude,
   });
@@ -178,6 +180,8 @@ class RouteExperience {
   final TravelPreparation travelPreparation;
   final double? centerLatitude;
   final double? centerLongitude;
+  final String thumbnailImage;
+  final bool supportsCompanion;
 
   bool get isPublished => contentStatus == 'published';
   int get numberOfStops =>
@@ -198,6 +202,9 @@ class RouteExperience {
         contentStatus: json['content_status'] as String,
         isFeatured: json['is_featured'] as bool? ?? false,
         stopCount: json['stop_count'] as int?,
+        thumbnailImage:
+            (json['image_variants'] as Map?)?['thumbnail'] as String? ?? '',
+        supportsCompanion: json['supports_companion'] == true,
         district: json['district'] as String? ?? '',
         cityName: (json['city'] as Map?)?['name'] as String? ?? '',
         citySlug: (json['city'] as Map?)?['slug'] as String? ?? '',

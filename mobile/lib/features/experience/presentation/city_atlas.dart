@@ -1,4 +1,7 @@
 import 'dart:math' as math;
+import 'atlas_gestures.dart';
+import '../data/place_repository.dart';
+import 'places_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -182,10 +185,39 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
 
   @override
   void dispose() {
+    _feed?.dispose();
     _arrival.dispose();
     _scroll.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  PlacesController? _feed;
+  RouteExperience? _selectedBrief;
+  bool _briefLoading = false, _briefFailed = false;
+  int _selectionRequest = 0;
+  PlaceQuery get _serverQuery {
+    final location = ref.read(notesLocationProvider).value;
+    return PlaceQuery(widget.citySlug,
+        search: _query,
+        category: placeCategories.entries
+                .where((e) => e.value == _filter)
+                .firstOrNull
+                ?.key ??
+            '',
+        district: _region == '全部区域' ? '' : _region,
+        nearest: _nearest && location != null,
+        latitude: _nearest ? location?.latitude : null,
+        longitude: _nearest ? location?.longitude : null);
+  }
+
+  void _reload() {
+    if (!mounted || !widget.visible) return;
+    _feed?.reload(_serverQuery, withMap: _mapMode);
+  }
+
+  void _feedChanged() {
+    if (mounted) setState(() {});
   }
 
   String _filter = '全部', _region = '全部区域', _query = '';
@@ -197,8 +229,9 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
   final _search = TextEditingController();
   double _zoom = 1, _startZoom = 1;
   Offset _pan = Offset.zero, _startPan = Offset.zero, _startFocal = Offset.zero;
-  List<RouteExperience> get _routes =>
-      widget.routes.where((r) => r.isPublished).toList();
+  List<RouteExperience> get _routes => _feed == null
+      ? widget.routes.where((r) => r.isPublished).toList()
+      : (_feed!.map?.items ?? _feed!.page?.items ?? []);
   double? _distance(RouteExperience r) {
     final point = cityAtlasCoordinate(r);
     if (point == null) return null;
@@ -216,6 +249,9 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
   }
 
   List<RouteExperience> get _visible {
+    if (_feed != null) {
+      return (_mapMode ? _feed!.map : _feed!.page)?.items ?? [];
+    }
     final result = _routes
         .where((r) =>
             (_filter == '全部' || cityAtlasCategory(r) == _filter) &&
@@ -234,7 +270,20 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
   @override
   void initState() {
     super.initState();
+    final repository = ref.read(placeRepositoryProvider);
+    if (repository != null) {
+      _feed = PlacesController(repository)..addListener(_feedChanged);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
+    }
     _scroll.addListener(() {
+      if (_feed != null) {
+        if (!_mapMode &&
+            _scroll.position.extentAfter < 600 &&
+            !_feed!.moreFailed) {
+          _feed!.loadMore();
+        }
+        return;
+      }
       if (!_mapMode &&
           _scroll.position.extentAfter < 500 &&
           _pageSize < _visible.length) {
@@ -243,19 +292,30 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
     });
   }
 
-  void _filterChanged(VoidCallback change) => setState(() {
-        change();
-        _pageSize = 20;
-        if (!_visible.any((r) => r.id == _selected)) _selected = null;
-        _zoom = 1;
-        _pan = Offset.zero;
-      });
+  void _filterChanged(VoidCallback change) {
+    setState(() {
+      change();
+      _pageSize = 20;
+      if (_feed != null || !_visible.any((r) => r.id == _selected)) {
+        _selected = null;
+        _selectedBrief = null;
+        _selectionRequest++;
+        _briefLoading = _briefFailed = false;
+      }
+      _zoom = 1;
+      _pan = Offset.zero;
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+    _reload();
+  }
+
   @override
   void didUpdateWidget(CityAtlas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.visible && widget.visible) {
       _mapMode = false;
       if (!MediaQuery.disableAnimationsOf(context)) _arrival.forward(from: 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
     }
     if (oldWidget.citySlug != widget.citySlug) {
       _filter = '全部';
@@ -268,6 +328,9 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
       _pageSize = 20;
       _zoom = 1;
       _pan = Offset.zero;
+      _selectedBrief = null;
+      _selectionRequest++;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
     }
   }
 
@@ -280,13 +343,33 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
     });
   }
 
-  void _select(RouteExperience r) {
+  Future<void> _select(RouteExperience r, {bool focus = true}) async {
+    final request = ++_selectionRequest;
     setState(() {
       _selected = r.id;
-      _focus = r.id;
+      if (focus) _focus = r.id;
       _mapMode = true;
+      _selectedBrief = r;
+      _briefLoading = _feed != null;
+      _briefFailed = false;
     });
-    if (_scroll.hasClients) _scroll.jumpTo(0);
+    _feed?.loadMap();
+    if (focus && _scroll.hasClients) _scroll.jumpTo(0);
+    if (_feed == null) return;
+    try {
+      final detail = await _feed!.repository.brief(r.slug);
+      if (mounted && request == _selectionRequest) {
+        setState(() => _selectedBrief = detail);
+      }
+    } catch (_) {
+      if (mounted && request == _selectionRequest) {
+        setState(() => _briefFailed = true);
+      }
+    } finally {
+      if (mounted && request == _selectionRequest) {
+        setState(() => _briefLoading = false);
+      }
+    }
   }
 
   Future<void> _regions() async {
@@ -297,10 +380,12 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
                 child: ListView(shrinkWrap: true, children: [
               for (final region in [
                 '全部区域',
-                ..._routes
-                    .map((r) => r.district)
-                    .where((s) => s.isNotEmpty)
-                    .toSet()
+                ...(_feed?.page?.districts ??
+                    _routes
+                        .map((r) => r.district)
+                        .where((s) => s.isNotEmpty)
+                        .toSet()
+                        .toList())
               ])
                 ListTile(
                     title: Text(region, style: discoverySerif(18)),
@@ -322,12 +407,23 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
   @override
   Widget build(BuildContext context) {
     ref.watch(notesLocationProvider);
+    ref.listen(notesLocationProvider, (previous, next) {
+      if (_nearest && previous?.value != next.value) _reload();
+    });
     final visible = _visible;
-    final selected = visible.where((r) => r.id == _selected).firstOrNull;
+    final selected = _selectedBrief?.id == _selected
+        ? _selectedBrief
+        : visible.where((r) => r.id == _selected).firstOrNull;
+    final total =
+        (_mapMode ? _feed?.map?.total : _feed?.page?.total) ?? visible.length;
     final categories = [
       '全部',
-      ...{'街巷', '海边', '山野', '建筑', '公园', '其他'}
-          .where(_routes.map(cityAtlasCategory).toSet().contains)
+      ...(_feed?.page?.categories
+              .map((key) => placeCategories[key] ?? '其他')
+              .toList() ??
+          {'街巷', '海边', '山野', '建筑', '公园', '其他'}
+              .where(_routes.map(cityAtlasCategory).toSet().contains)
+              .toList())
     ];
     final side = MediaQuery.sizeOf(context).width < 350 ? 19.0 : 23.0;
     return FadeTransition(
@@ -448,12 +544,18 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
                         if (!_mapMode)
                           Padding(
                               padding: const EdgeInsets.only(top: 14),
-                              child: Text('${visible.length} 处景点',
+                              child: Text('$total 处景点',
                                   style: discoverySans(11, color: _muted))),
                       ]))),
               if (_mapMode)
                 SliverToBoxAdapter(
                     child: Column(children: [
+                  if (_feed?.loadingMap == true)
+                    const LinearProgressIndicator(minHeight: 1, color: _rust),
+                  if (_feed?.mapFailed == true)
+                    TextButton(
+                        onPressed: _feed!.loadMap,
+                        child: const Text('地图地点加载失败，点击重试')),
                   CityMapGeometryView(
                       city: widget.citySlug,
                       updates: widget.mapUpdates,
@@ -464,8 +566,14 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
                       padding: EdgeInsets.fromLTRB(side, 15, side, 15),
                       child: Align(
                           alignment: Alignment.centerLeft,
-                          child: Text('${visible.length} 处景点',
+                          child: Text('$total 处景点',
                               style: discoverySans(11, color: _muted)))),
+                  if (_briefLoading)
+                    const LinearProgressIndicator(minHeight: 1, color: _rust),
+                  if (_briefFailed && selected != null)
+                    TextButton(
+                        onPressed: () => _select(selected),
+                        child: const Text('景点介绍加载失败，点击重试')),
                   if (selected != null) _sheet(selected),
                   Padding(
                       padding: const EdgeInsets.all(15),
@@ -476,9 +584,40 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
                 SliverPadding(
                     padding: EdgeInsets.symmetric(horizontal: side),
                     sliver: SliverList.builder(
-                        itemCount: math.min(_pageSize, visible.length),
+                        itemCount: _feed != null
+                            ? visible.length
+                            : math.min(_pageSize, visible.length),
                         itemBuilder: (context, i) => _listRow(visible[i]))),
-              if (visible.isEmpty)
+              if (!_mapMode && _feed?.loading == true)
+                const SliverToBoxAdapter(
+                    child: Padding(
+                        padding: EdgeInsets.all(60),
+                        child: Center(
+                            child: CircularProgressIndicator(
+                                strokeWidth: 1, color: _rust)))),
+              if (!_mapMode && _feed?.failed == true)
+                SliverToBoxAdapter(
+                    child: Center(
+                        child: TextButton(
+                            onPressed: _reload,
+                            child: const Text('景点加载失败，点击重试')))),
+              if (!_mapMode && _feed?.page?.nextCursor != null)
+                SliverToBoxAdapter(
+                    child: Center(
+                        child: TextButton(
+                            onPressed:
+                                _feed!.loadingMore ? null : _feed!.loadMore,
+                            child: Text(_feed!.loadingMore
+                                ? '正在加载'
+                                : _feed!.moreFailed
+                                    ? '加载失败，点击重试'
+                                    : '更多景点')))),
+              if (visible.isEmpty &&
+                  (_feed == null ||
+                      (!_feed!.loading &&
+                          !_feed!.failed &&
+                          !_feed!.loadingMap &&
+                          !_feed!.mapFailed)))
                 SliverToBoxAdapter(
                     child: Padding(
                         padding: const EdgeInsets.all(40),
@@ -494,7 +633,10 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
       child: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: InkWell(
-              onTap: () => setState(() => _mapMode = map),
+              onTap: () {
+                setState(() => _mapMode = map);
+                if (map) _feed?.loadMap();
+              },
               child: Container(
                   height: 44,
                   decoration: BoxDecoration(
@@ -576,8 +718,9 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
           ])
         ]))
       ]));
-  Widget _image(RouteExperience r) =>
-      ScenicThumbnail(url: r.heroImage, label: r.title);
+  Widget _image(RouteExperience r) => ScenicThumbnail(
+      url: r.thumbnailImage.isNotEmpty ? r.thumbnailImage : r.heroImage,
+      label: r.title);
 
   Widget _map(List<CityAtlasDistrict> districts, List<RouteExperience> visible,
       String? selected) {
@@ -585,164 +728,172 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
         _routes.map(cityAtlasCoordinate).whereType<Offset>().toList();
     return LayoutBuilder(builder: (context, constraints) {
       final size = Size(constraints.maxWidth, 370);
-      final signature = Object.hashAll(
-          districts.map((d) => Object.hash(d.name, d.polygons.length)));
-      if (_geometrySignature != signature) {
-        _geometrySignature = signature;
-        _focus ??= selected;
-      }
       final projection = _Projection(districts, coordinates, size);
-      if (_focus != null) {
-        final route = visible.where((r) => r.id == _focus).firstOrNull;
-        final point = route == null ? null : cityAtlasCoordinate(route);
-        if (point != null) {
-          _zoom = 3;
-          _pan = size.center(Offset.zero) - projection.project(point) * _zoom;
+      return StatefulBuilder(builder: (context, redrawMap) {
+        final signature = Object.hash(
+            Object.hashAll(
+                districts.map((d) => Object.hash(d.name, d.polygons.length))),
+            Object.hashAll(coordinates));
+        if (_geometrySignature != signature) {
+          _geometrySignature = signature;
+          _focus ??= selected;
         }
-        _focus = null;
-      }
-      final groups = <List<({RouteExperience route, Offset point})>>[];
-      for (final route in visible) {
-        final coordinate = cityAtlasCoordinate(route);
-        if (coordinate == null) continue;
-        final point = projection.project(coordinate) * _zoom + _pan;
-        if (!Rect.fromLTWH(-60, -60, size.width + 120, size.height + 120)
-            .contains(point)) {
-          continue;
+        if (_focus != null) {
+          final route = visible.where((r) => r.id == _focus).firstOrNull ??
+              (_selectedBrief?.id == _focus ? _selectedBrief : null);
+          final point = route == null ? null : cityAtlasCoordinate(route);
+          if (point != null) {
+            _zoom = 3;
+            _pan = size.center(Offset.zero) - projection.project(point) * _zoom;
+            _focus = null;
+          }
         }
-        final group = groups
-            .where((g) =>
-                (g.first.point - point).distance < 48 &&
-                g.first.route.id != selected &&
-                route.id != selected)
-            .firstOrNull;
-        if (group == null) {
-          groups.add([(route: route, point: point)]);
-        } else {
-          group.add((route: route, point: point));
+        final groups = <List<({RouteExperience route, Offset point})>>[];
+        for (final route in visible) {
+          final coordinate = cityAtlasCoordinate(route);
+          if (coordinate == null) continue;
+          final point = projection.project(coordinate) * _zoom + _pan;
+          if (!Rect.fromLTWH(-60, -60, size.width + 120, size.height + 120)
+              .contains(point)) {
+            continue;
+          }
+          final group = groups
+              .where((g) =>
+                  (g.first.point - point).distance < 48 &&
+                  g.first.route.id != selected &&
+                  route.id != selected)
+              .firstOrNull;
+          if (group == null) {
+            groups.add([(route: route, point: point)]);
+          } else {
+            group.add((route: route, point: point));
+          }
         }
-      }
-      groups.sort((a, b) => (a.first.route.id == selected ? 1 : 0)
-          .compareTo(b.first.route.id == selected ? 1 : 0));
-      return SizedBox.fromSize(
-          size: size,
-          child: ClipRect(
-              child: GestureDetector(
-                  key: const ValueKey('city-map-canvas'),
-                  behavior: HitTestBehavior.opaque,
-                  onScaleStart: (d) {
-                    _startZoom = _zoom;
-                    _startPan = _pan;
-                    _startFocal = d.localFocalPoint;
-                  },
-                  onScaleUpdate: (d) => setState(() {
-                        _zoom = (_startZoom * d.scale).clamp(1.0, 24.0);
-                        _pan = d.localFocalPoint -
-                            (_startFocal - _startPan) * (_zoom / _startZoom);
-                      }),
-                  child: ColoredBox(
-                      color: const Color(0xffe9e9df),
-                      child: Stack(children: [
-                        Positioned.fill(
-                            child: CustomPaint(
-                                painter: _AtlasPainter(
-                                    cityLabel: widget.cityName,
-                                    districts: districts,
-                                    coordinates: coordinates,
-                                    zoom: _zoom,
-                                    pan: _pan))),
-                        for (final group in groups)
-                          if (group.length == 1)
-                            _marker(group.first.route, group.first.point,
-                                group.first.route.id == selected)
-                          else
-                            Positioned(
-                                left: group.first.point.dx - 24,
-                                top: group.first.point.dy - 24,
-                                child: Semantics(
-                                    label: '${group.length} 处景点，放大查看',
-                                    button: true,
-                                    child: GestureDetector(
-                                        onTap: () {
-                                          if (_zoom >= 24) {
-                                            _showGroup(group
-                                                .map((m) => m.route)
-                                                .toList());
-                                            return;
-                                          }
-                                          setState(() {
-                                            final next =
-                                                (_zoom * 2).clamp(1.0, 24.0);
-                                            _pan = size.center(Offset.zero) -
-                                                (group.first.point - _pan) *
-                                                    (next / _zoom);
-                                            _zoom = next;
-                                          });
-                                        },
-                                        child: SizedBox(
-                                            width: 48,
-                                            height: 48,
-                                            child: Stack(
-                                                alignment: Alignment.center,
-                                                children: [
-                                                  Transform.rotate(
-                                                      angle: -.22,
-                                                      child: Container(
-                                                          width: 33,
-                                                          height: 36,
-                                                          decoration: BoxDecoration(
-                                                              color: const Color(
-                                                                  0xffd8dbc7),
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          18),
-                                                              border: Border.all(
-                                                                  color: const Color(
-                                                                      0xff9da48b))))),
-                                                  Container(
-                                                      width: 32,
-                                                      height: 32,
-                                                      alignment:
-                                                          Alignment.center,
-                                                      decoration: BoxDecoration(
-                                                          color: _paper,
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(18),
-                                                          border: Border.all(
-                                                              color: const Color(
-                                                                  0xff9da48b))),
-                                                      child: Text(
-                                                          '${group.length}',
-                                                          style: discoverySerif(
-                                                              16)))
-                                                ]))))),
-                        Positioned(
-                            left: 22,
-                            top: 15,
-                            child: IgnorePointer(
-                                child: Text('N ↑',
-                                    style: discoverySans(12, color: _muted)))),
-                        Positioned(
-                            right: 17,
-                            bottom: 20,
-                            child: Container(
-                                color: _paper,
-                                child: Column(children: [
-                                  _tool('放大地图', '+',
-                                      () => _changeZoom(_zoom * 1.5, size)),
-                                  _tool('缩小地图', '−',
-                                      () => _changeZoom(_zoom / 1.5, size)),
-                                  _tool(
-                                      '查看全城',
-                                      '⛶',
-                                      () => setState(() {
-                                            _zoom = 1;
-                                            _pan = Offset.zero;
-                                          }))
-                                ]))),
-                      ])))));
+        groups.sort((a, b) => (a.first.route.id == selected ? 1 : 0)
+            .compareTo(b.first.route.id == selected ? 1 : 0));
+        return SizedBox.fromSize(
+            size: size,
+            child: ClipRect(
+                child: AtlasGestureSurface(
+                    key: const ValueKey('city-map-canvas'),
+                    onStart: (d) {
+                      _startZoom = _zoom;
+                      _startPan = _pan;
+                      _startFocal = d.localFocalPoint;
+                    },
+                    onUpdate: (d) => redrawMap(() {
+                          _zoom = (_startZoom * d.scale).clamp(1.0, 24.0);
+                          _pan = d.localFocalPoint -
+                              (_startFocal - _startPan) * (_zoom / _startZoom);
+                        }),
+                    child: ColoredBox(
+                        color: const Color(0xffe9e9df),
+                        child: Stack(children: [
+                          Positioned.fill(
+                              child: CustomPaint(
+                                  painter: _AtlasPainter(
+                                      projection: projection,
+                                      cityLabel: widget.cityName,
+                                      districts: districts,
+                                      coordinates: coordinates,
+                                      zoom: _zoom,
+                                      pan: _pan))),
+                          for (final group in groups)
+                            if (group.length == 1)
+                              _marker(group.first.route, group.first.point,
+                                  group.first.route.id == selected)
+                            else
+                              Positioned(
+                                  left: group.first.point.dx - 24,
+                                  top: group.first.point.dy - 24,
+                                  child: Semantics(
+                                      label: '${group.length} 处景点，放大查看',
+                                      button: true,
+                                      child: GestureDetector(
+                                          onTap: () {
+                                            if (_zoom >= 24) {
+                                              _showGroup(group
+                                                  .map((m) => m.route)
+                                                  .toList());
+                                              return;
+                                            }
+                                            redrawMap(() {
+                                              final next =
+                                                  (_zoom * 2).clamp(1.0, 24.0);
+                                              _pan = size.center(Offset.zero) -
+                                                  (group.first.point - _pan) *
+                                                      (next / _zoom);
+                                              _zoom = next;
+                                            });
+                                          },
+                                          child: SizedBox(
+                                              width: 48,
+                                              height: 48,
+                                              child: Stack(
+                                                  alignment: Alignment.center,
+                                                  children: [
+                                                    Transform.rotate(
+                                                        angle: -.22,
+                                                        child: Container(
+                                                            width: 33,
+                                                            height: 36,
+                                                            decoration: BoxDecoration(
+                                                                color: const Color(
+                                                                    0xffd8dbc7),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            18),
+                                                                border: Border.all(
+                                                                    color: const Color(
+                                                                        0xff9da48b))))),
+                                                    Container(
+                                                        width: 32,
+                                                        height: 32,
+                                                        alignment:
+                                                            Alignment.center,
+                                                        decoration: BoxDecoration(
+                                                            color: _paper,
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        18),
+                                                            border: Border.all(
+                                                                color: const Color(
+                                                                    0xff9da48b))),
+                                                        child: Text(
+                                                            '${group.length}',
+                                                            style:
+                                                                discoverySerif(
+                                                                    16)))
+                                                  ]))))),
+                          Positioned(
+                              left: 22,
+                              top: 15,
+                              child: IgnorePointer(
+                                  child: Text('N ↑',
+                                      style:
+                                          discoverySans(12, color: _muted)))),
+                          Positioned(
+                              right: 17,
+                              bottom: 20,
+                              child: Container(
+                                  color: _paper,
+                                  child: Column(children: [
+                                    _tool('放大地图', '+',
+                                        () => _changeZoom(_zoom * 1.5, size)),
+                                    _tool('缩小地图', '−',
+                                        () => _changeZoom(_zoom / 1.5, size)),
+                                    _tool(
+                                        '查看全城',
+                                        '⛶',
+                                        () => redrawMap(() {
+                                              _zoom = 1;
+                                              _pan = Offset.zero;
+                                            }))
+                                  ]))),
+                        ])))));
+      });
     });
   }
 
@@ -770,7 +921,7 @@ class _CityAtlasState extends ConsumerState<CityAtlas>
           key: ValueKey('city-map-point-${route.id}'),
           selected: selected,
           label: '${route.title}，${cityAtlasCategory(route)}，查看介绍',
-          onTap: () => setState(() => _selected = route.id),
+          onTap: () => _select(route, focus: false),
           child: ExcludeSemantics(
               child: SizedBox(
                   width: width,
@@ -961,7 +1112,9 @@ class _AtlasPainter extends CustomPainter {
       required this.coordinates,
       required this.zoom,
       required this.pan,
-      this.miniature = false});
+      this.miniature = false,
+      this.projection});
+  final _Projection? projection;
   final String cityLabel;
   final List<CityAtlasDistrict> districts;
   final List<Offset> coordinates;
@@ -970,7 +1123,7 @@ class _AtlasPainter extends CustomPainter {
   final bool miniature;
   @override
   void paint(Canvas canvas, Size size) {
-    final projection =
+    final projection = this.projection ??
         _Projection(districts, coordinates, size, miniature: miniature);
     Offset project(Offset coordinate) =>
         projection.project(coordinate) * zoom + pan;

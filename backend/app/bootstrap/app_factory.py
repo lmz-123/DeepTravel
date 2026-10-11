@@ -15,6 +15,7 @@ from app.application.fragment_services import FragmentTourService
 from app.application.historical_content_service import HistoricalContentService
 from app.application.media_migration import MediaMigrationService
 from app.application.media_readiness import MediaReadinessService
+from app.application.place_discovery import PlaceDiscovery
 from app.application.services import (
     AuthenticationService,
     CatalogService,
@@ -129,6 +130,7 @@ def create_app(test_config: Mapping[str, object] | None = None) -> Flask:
     )
     app.extensions["services"] = {
         "catalog": CatalogService(uow_factory),
+        "places": PlaceDiscovery(database.session_factory, app.config["SECRET_KEY"]),
         "guest_sessions": GuestSessionService(
             uow_factory,
             token_codec,

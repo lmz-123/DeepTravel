@@ -11,6 +11,7 @@ import 'package:jiandi/core/router/travel_destinations.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
 import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
+import 'package:jiandi/features/experience/data/place_repository.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/application/nearby_story_points.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
@@ -402,6 +403,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('summary route loads its narration before starting companion',
+      (tester) async {
+    final full = _routes.first;
+    final summary = placeFromJson({
+      'id': full.id,
+      'slug': full.slug,
+      'title': full.title,
+      'supports_companion': true,
+      'stop_count': 1,
+    });
+    final harness = _CompanionHarness(
+      routes: [summary],
+      detailedRoutes: {full.slug: full},
+      routeLoadDelays: {full.slug: const Duration(seconds: 1)},
+    );
+    await _pump(tester, harness: harness);
+    final primary = find.byKey(const ValueKey('companion-start'));
+    await _reveal(tester, primary);
+    await tester.tap(primary);
+    await tester.pump();
+    expect(harness.journey.startCalls, 0);
+    expect(harness.tour.startCalls, 0);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(harness.journey.startCalls, 1);
+    expect(harness.tour.snapshot.route, same(full));
+    expect(harness.tour.snapshot.route?.audioTour?.fragments, isNotEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('starting disables repeated taps while preparing',
       (tester) async {
     final harness = _CompanionHarness(startDelay: const Duration(seconds: 2));
@@ -547,6 +578,8 @@ Future<GoRouter> _pump(
           final delay = fixture.routeLoadDelays[slug];
           if (delay != null) await Future<void>.delayed(delay);
           final route = [
+            if (fixture.detailedRoutes[slug] != null)
+              fixture.detailedRoutes[slug]!,
             ...fixture.discovery.routes,
             if (fixture.requestedRoute != null) fixture.requestedRoute!,
           ].where((route) => route.slug == slug).firstOrNull;
@@ -646,6 +679,7 @@ class _CompanionHarness {
     List<RouteExperience>? routes,
     this.requestedRoute,
     this.routeLoadDelays = const {},
+    this.detailedRoutes = const {},
     CityExperience city = _city,
     ActiveTourState initialTour = const ActiveTourState(),
   })  : journey = _TestJourney(),
@@ -655,6 +689,7 @@ class _CompanionHarness {
   final Duration startDelay;
   final RouteExperience? requestedRoute;
   final Map<String, Duration> routeLoadDelays;
+  final Map<String, RouteExperience> detailedRoutes;
   final _TestJourney journey;
   final _TestTour tour;
   final _TestDiscovery discovery;

@@ -281,7 +281,7 @@ class _DiscoveryCompanion extends ConsumerWidget {
 }
 
 bool _supportsCompanion(RouteExperience route) =>
-    route.audioTour?.fragments.isNotEmpty ?? false;
+    route.supportsCompanion || (route.audioTour?.fragments.isNotEmpty ?? false);
 
 void _resetDistanceTarget(
     WidgetRef ref, RouteExperience? previous, RouteExperience next) {
@@ -1113,7 +1113,7 @@ class _CompanionRouteTile extends StatelessWidget {
                                   : AppColors.ink)),
                       const SizedBox(height: 3),
                       Text(
-                          route.audioTour != null
+                          _supportsCompanion(route)
                               ? '声音导览 · ${route.numberOfStops} 段线索'
                               : '现场文字 · 可随行阅读',
                           maxLines: 1,

@@ -168,6 +168,10 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
     setState(() => _startingCompanion = true);
     try {
       if (_companionRunning(ref.read(activeTourControllerProvider))) return;
+      if (route.audioTour == null) {
+        route = await ref.read(offlineAwareRouteProvider(route.slug).future);
+        if (!mounted) return;
+      }
       final journeyId = await _startCompanionSession(route);
       if (!mounted) return;
       final journey = ref.read(journeyControllerProvider);
@@ -427,10 +431,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                                   setState(() => _cityMapOpen = true),
                               onCompanion: (route) => setState(() {
                                 _companionRouteId =
-                                    (route.audioTour?.fragments.isNotEmpty ??
-                                            false)
-                                        ? route.id
-                                        : null;
+                                    _supportsCompanion(route) ? route.id : null;
                                 _section = TravelerSection.companion;
                               }),
                               onRefresh: _refresh,
