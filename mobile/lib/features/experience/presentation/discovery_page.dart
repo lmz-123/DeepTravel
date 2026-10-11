@@ -15,7 +15,6 @@ import '../../../core/router/travel_destinations.dart';
 import 'community/notes_controller.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
-import 'audio_ownership_controller.dart';
 import 'companion_walk_settings.dart';
 import 'companion_distance_controller.dart';
 import 'companion_point_picker.dart';
@@ -57,7 +56,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   var _coldStartPrepared = false;
   var _section = TravelerSection.journal;
   final _busyFavorites = <String>{};
-  RouteExperience? _lastOpened;
   String? _companionRouteId;
   String? _distanceRouteSlug;
   bool _startingCompanion = false;
@@ -164,7 +162,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   }
 
   void _openRoute(RouteExperience route) {
-    setState(() => _lastOpened = route);
     context.push('/route/${route.slug}');
   }
 
@@ -341,7 +338,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
         .where((f) => f.kind == 'route')
         .map((f) => f.targetId)
         .toSet();
-    final ownership = ref.watch(audioOwnershipProvider);
     final tour = ref.watch(activeTourControllerProvider);
     final requestedSlug = widget.initialCompanionRouteSlug;
     if (!_companionRunning(tour) &&
@@ -400,19 +396,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
         starting: _startingCompanion,
       ),
     );
-    final hasTour = tour.session != null &&
-        tour.route != null &&
-        tour.status != 'stopped' &&
-        tour.status != 'idle';
-    final resumeTitle = ownership.isActive
-        ? ownership.title
-        : hasTour
-            ? tour.route!.title
-            : _lastOpened?.title;
-    final bottom = MediaQuery.paddingOf(context)
-        .bottom
-        .clamp(15.0, double.infinity)
-        .toDouble();
     return Scaffold(
       backgroundColor: AppColors.paper,
       body: Stack(
@@ -524,72 +507,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     ),
                   ),
           ),
-          if (resumeTitle != null &&
-              _section != TravelerSection.companion &&
-              !_cityMapOpen)
-            Positioned(
-              left: 23,
-              right: 23,
-              bottom: bottom + 75,
-              child: DiscoveryTouch(
-                label: '继续查看$resumeTitle',
-                onTap: () {
-                  if (ownership.kind == AudioOwnerKind.onSite ||
-                      (!ownership.isActive && hasTour)) {
-                    setState(() => _section = TravelerSection.companion);
-                  } else if (ownership.isActive) {
-                    context.push(ownership.destination);
-                  } else if (_lastOpened != null) {
-                    _openRoute(_lastOpened!);
-                  }
-                },
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 45),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.ink,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Row(
-                    children: [
-                      DiscoveryIcon(
-                        ownership.isActive || hasTour
-                            ? DiscoveryMark.headphones
-                            : DiscoveryMark.book,
-                        size: 17,
-                        color: AppColors.paper,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          resumeTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: discoverySans(11, color: AppColors.paper),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '继续查看',
-                        style: discoverySans(
-                          10,
-                          color: const Color(0xffdbe782),
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      const DiscoveryIcon(
-                        DiscoveryMark.arrowUpRight,
-                        size: 14,
-                        color: Color(0xffdbe782),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           Positioned(
             left: 0,
             right: 0,

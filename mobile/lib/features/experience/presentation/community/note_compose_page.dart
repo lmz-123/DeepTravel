@@ -323,7 +323,6 @@ class _NoteComposePageState extends ConsumerState<NoteComposePage> {
               Text.rich(
                   TextSpan(children: [
                     const TextSpan(text: '留一则见闻'),
-                    TextSpan(text: '。', style: noteSerif(32, color: noteRed))
                   ]),
                   style: noteSerif(32)),
               if (_loading)

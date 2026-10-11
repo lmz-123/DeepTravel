@@ -214,10 +214,6 @@ class _RouteChapterDirectoryState extends State<RouteChapterDirectory> {
                                   TextSpan(
                                     children: [
                                       TextSpan(text: '哪一页'),
-                                      TextSpan(
-                                        text: '。',
-                                        style: TextStyle(color: manualRed),
-                                      ),
                                     ],
                                   ),
                                 ),

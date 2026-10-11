@@ -133,8 +133,6 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
                     child: Text.rich(
                         TextSpan(children: [
                           const TextSpan(text: '我的收藏'),
-                          TextSpan(
-                              text: '。', style: noteSerif(34, color: noteRed))
                         ]),
                         style: noteSerif(34))),
                 const DiscoveryIcon(DiscoveryMark.bookmark,
@@ -277,17 +275,22 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
             ])));
   }
 
-  Widget _empty(bool notes) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 55),
-      child: Column(children: [
-        const DiscoveryIcon(DiscoveryMark.bookmark, size: 30, color: noteQuiet),
-        const SizedBox(height: 20),
-        Text(notes ? '留住值得再看的见闻。' : '下一次想去哪里？', style: noteSerif(23)),
-        const SizedBox(height: 18),
-        NoteArrow(notes ? '去看见闻' : '去发现',
-            onTap:
-                notes ? () => context.go('/?tab=community') : widget.onBrowse)
-      ]));
+  Widget _empty(bool notes) => SizedBox(
+      width: double.infinity,
+      child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 55),
+          child: Column(children: [
+            const DiscoveryIcon(DiscoveryMark.bookmark,
+                size: 30, color: noteQuiet),
+            const SizedBox(height: 20),
+            Text(notes ? '留住值得再看的见闻。' : '下一次想去哪里？',
+                style: noteSerif(23), textAlign: TextAlign.center),
+            const SizedBox(height: 18),
+            NoteArrow(notes ? '去看见闻' : '去发现',
+                onTap: notes
+                    ? () => context.go('/?tab=community')
+                    : widget.onBrowse)
+          ])));
   Widget _place(TravelerFavorite favorite, _ShelfEntry? entry,
           {required bool loading, required bool failed}) =>
       Padding(

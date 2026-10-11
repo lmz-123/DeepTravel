@@ -1,0 +1,182 @@
+[
+  {
+    "title": "万象天地",
+    "slug": "shenzhen-mixc-world",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "公共街区散步无需门票。店铺消费、展览及活动以各运营方安排为准。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "南头古城",
+    "slug": "nantou-time-layers",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "古城公共街巷无需门票。博物馆、展馆及活动可能另有开放时间或预约要求。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "大梅沙",
+    "slug": "shenzhen-dameisha",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "请出发前确认海滨公园当日开放、限流及预约安排；园内经营项目另行办理。",
+      "admission": "unknown",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "梧桐山",
+    "slug": "shenzhen-wutong-mountain",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "请出发前确认登山入口、开放时段及临时封山公告。园区内其他经营项目不包含在公共步行路线中。",
+      "admission": "unknown",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "梧桐树下的城市切片",
+    "slug": "wukang-urban-slices",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "本路线沿公共街道步行，无需门票。建筑以外观欣赏为主，请勿进入未开放的住宅；馆内参观另按各场馆要求办理。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "情侣路海滨",
+    "slug": "zhuhai-lovers-road",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "本路线为公共海滨步道，无需门票。海上活动、观光交通及其他经营项目另行收费。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "永庆坊",
+    "slug": "guangzhou-yongqingfang",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "公共街区无需门票。粤剧艺术博物馆等场馆的开放、预约及演出安排请另行确认。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "沙面",
+    "slug": "guangzhou-shamian",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "公共街道散步无需门票。教堂、酒店及其他建筑内部并非随时开放，请遵守现场规定。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "野狸岛·日月贝",
+    "slug": "zhuhai-yeli-island",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "本路线为野狸岛公共步道及日月贝外观游览，无需门票。珠海大剧院的演出及馆内活动不包含在内，需按具体场次办理。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "",
+      "extra_items": [],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  }
+]

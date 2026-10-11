@@ -34,7 +34,7 @@ void main() {
     testWidgets('point directory matches ${size.width.toInt()}px design',
         (tester) async {
       await _open(tester, size: size);
-      expect(find.text('选一处，\n慢慢靠近。', findRichText: true), findsOneWidget);
+      expect(find.text('选一处，\n慢慢靠近', findRichText: true), findsOneWidget);
       expect(find.text('自动发现的下一处'), findsOneWidget);
       expect(find.byKey(const ValueKey('companion-point-p1')), findsOneWidget);
       expect(tester.takeException(), isNull);

@@ -214,7 +214,7 @@ class _CompanionPointPickerState extends State<CompanionPointPicker> {
             child: Text.rich(
               TextSpan(children: [
                 const TextSpan(text: '选一处，\n'),
-                const TextSpan(text: '慢慢靠近。', style: TextStyle(color: _red)),
+                const TextSpan(text: '慢慢靠近', style: TextStyle(color: _red)),
               ]),
               style: _type(small ? 30 : 32,
                   serif: true,

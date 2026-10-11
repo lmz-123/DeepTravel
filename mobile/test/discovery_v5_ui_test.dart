@@ -26,6 +26,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('journal-photo-route-0')));
       await tester.pumpAndSettle();
       expect(find.text('detail:route-0'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('继续查看'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -52,7 +55,7 @@ void main() {
     'city index searches real metadata and restores selection after detail',
     (tester) async {
       await _pump(tester, tab: 'atlas');
-      expect(find.text('城市索引.'), findsOneWidget);
+      expect(find.text('城市索引'), findsOneWidget);
       expect(find.text('收录 37 条路线'), findsOneWidget);
       await tester.enterText(find.byType(TextField), '测试路线 36');
       await tester.pumpAndSettle();

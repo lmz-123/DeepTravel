@@ -55,10 +55,6 @@ class _RouteCompanionEntryState extends State<RouteCompanionEntry> {
                           Text.rich(
                             TextSpan(children: const [
                               TextSpan(text: '边走边发现'),
-                              TextSpan(
-                                text: '。',
-                                style: TextStyle(color: accent),
-                              ),
                             ]),
                             style: manualType(
                               narrow ? 20 : 21,

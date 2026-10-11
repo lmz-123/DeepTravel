@@ -181,7 +181,6 @@ class _CompanionWalkSettingsState
               Text.rich(
                 TextSpan(children: [
                   const TextSpan(text: '准备好，\n再出发'),
-                  TextSpan(text: '。', style: manualType(33, color: _red)),
                 ]),
                 style: manualType(33,
                     serif: true,

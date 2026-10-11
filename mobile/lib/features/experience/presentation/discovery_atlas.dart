@@ -498,14 +498,6 @@ class _DiscoveryAtlasState extends State<_DiscoveryAtlas> {
                             TextSpan(
                               children: [
                                 const TextSpan(text: '城市索引'),
-                                TextSpan(
-                                  text: '.',
-                                  style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    color: AppColors.terracotta,
-                                    letterSpacing: 0,
-                                  ),
-                                ),
                               ],
                             ),
                             style: discoverySerif(

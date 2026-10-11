@@ -284,7 +284,7 @@ class _CityAtlasState extends State<CityAtlas>
                                     spacing: -2.3)),
                             Padding(
                                 padding: const EdgeInsets.only(left: 35),
-                                child: Text('走进城市。',
+                                child: Text('走进城市',
                                     style: discoverySerif(39,
                                         color: _rust,
                                         height: 1.22,

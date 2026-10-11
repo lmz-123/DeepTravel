@@ -131,6 +131,23 @@ void main() {
       expect(router.canPop(), isTrue);
       expect(find.text('收藏的地点与见闻'), findsNothing);
       expect(find.text('下一次想去哪里？'), findsOneWidget);
+      expect(tester.getCenter(find.text('下一次想去哪里？')).dx, closeTo(195, 1));
+      expect(find.text('我的收藏', findRichText: true), findsOneWidget);
+      expect(find.text('我的收藏。', findRichText: true), findsNothing);
+      await tester.tap(find.text('见闻'));
+      await tester.pumpAndSettle();
+      expect(tester.getCenter(find.text('留住值得再看的见闻。')).dx, closeTo(195, 1));
+      if (tab == 'journal') {
+        await expectLater(find.byType(FavoritesPage),
+            matchesGoldenFile('goldens/favorites-empty-notes-390.png'));
+      }
+      await tester.tap(find.text('地点'));
+      await tester.pumpAndSettle();
+      if (tab == 'journal') {
+        await expectLater(find.byType(FavoritesPage),
+            matchesGoldenFile('goldens/favorites-empty-places-390.png'));
+      }
+
       expect(find.byType(TravelerBottomNavigation), findsNothing);
       if (tab == 'community') {
         await tester.binding.handlePopRoute();

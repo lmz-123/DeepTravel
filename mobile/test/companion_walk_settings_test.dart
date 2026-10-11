@@ -16,7 +16,7 @@ void main() {
     testWidgets('preparation sheet fits ${size.width.toInt()}px phone',
         (tester) async {
       await _open(tester, size: size);
-      expect(find.text('准备好，\n再出发。', findRichText: true), findsOneWidget);
+      expect(find.text('准备好，\n再出发', findRichText: true), findsOneWidget);
       expect(find.text('真实行走'), findsOneWidget);
       expect(find.text('模拟预览'), findsOneWidget);
       expect(find.byKey(const ValueKey('companion-settings-done')),
