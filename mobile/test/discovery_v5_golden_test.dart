@@ -120,7 +120,7 @@ void main() {
   }
 
   for (final width in [390.0, 360.0]) {
-    for (final tab in ['journal', 'atlas', 'shelf']) {
+    for (final tab in ['journal']) {
       testWidgets('$tab approved typography ${width.toInt()}', (tester) async {
         final size = Size(width, width == 390 ? 844 : 800);
         tester.view.physicalSize = size;

@@ -35,21 +35,6 @@ Future<bool> openPreparationLink(BuildContext context, String value,
   return opened;
 }
 
-class TravelHeading extends StatelessWidget {
-  const TravelHeading(this.title, {super.key, this.trailing});
-  final String title;
-  final Widget? trailing;
-  @override
-  Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.only(top: 25, bottom: 15),
-      child: Row(children: [
-        Expanded(
-            child: Text(title,
-                style: manualType(23, serif: true, weight: FontWeight.w500))),
-        if (trailing != null) trailing!
-      ]));
-}
-
 class TravelRow extends StatelessWidget {
   const TravelRow(this.title,
       {super.key, this.subtitle, this.onTap, this.icon});
@@ -180,62 +165,6 @@ Future<void> showPreparationFacts(BuildContext context, TravelPreparation prep,
                               onTap: () => openPreparationLink(
                                   sheet, prep.text('source_url')))),
                   ]))));
-}
-
-Future<void> showPreparationItem(BuildContext context, PreparationItem item,
-    {bool external = false}) async {
-  await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.paper,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-              topRight: Radius.circular(28), topLeft: Radius.circular(4))),
-      builder: (sheet) => SafeArea(
-          child: Padding(
-              padding: const EdgeInsets.all(23),
-              child: SingleChildScrollView(
-                  child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Row(children: [
-                      Expanded(
-                          child: Text(item.title,
-                              style: manualType(23, serif: true))),
-                      IconButton(
-                          onPressed: () => Navigator.pop(sheet),
-                          tooltip: '关闭',
-                          icon: const Icon(Icons.close))
-                    ]),
-                    const SizedBox(height: 16),
-                    if (item.body.isNotEmpty)
-                      SelectableText(item.body,
-                          style: manualType(14, height: 1.9)),
-                    if (safePreparationUri(item.url) != null) ...[
-                      const SizedBox(height: 22),
-                      Text(Uri.parse(item.url).host,
-                          style: manualType(11, color: AppColors.textMuted)),
-                      const SizedBox(height: 10),
-                      ManualPaperAction(
-                          label: '查看官方详情',
-                          onPressed: () => openPreparationLink(sheet, item.url,
-                              external: external))
-                    ],
-                  ])))));
-}
-
-class PreparationRows extends StatelessWidget {
-  const PreparationRows(this.preparation, {super.key});
-  final TravelPreparation preparation;
-  @override
-  Widget build(BuildContext context) => Column(children: [
-        for (final item in preparation.items)
-          TravelRow(item.title,
-              subtitle: item.url.isNotEmpty ? '查看详情' : null,
-              onTap: () => showPreparationItem(context, item,
-                  external: preparation.external)),
-      ]);
 }
 
 class _TicketClip extends CustomClipper<Path> {

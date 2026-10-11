@@ -1043,11 +1043,6 @@ final narrationVoicePreferenceProvider =
     FutureProvider.family<String?, NarrationVoicePreferenceKey>((ref, key) =>
         ref.watch(narrationVoicePreferenceRepositoryProvider).read(key));
 
-final recapProvider =
-    FutureProvider.family<JourneyRecap, String>((ref, journeyId) {
-  return ref.watch(experienceRepositoryProvider).recap(journeyId);
-});
-
 class JourneyUiState {
   const JourneyUiState({
     this.route,

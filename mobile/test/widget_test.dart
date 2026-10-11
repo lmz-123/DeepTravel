@@ -167,23 +167,50 @@ void main() {
     expect(repository.requestedCity, 'city-19');
   });
 
-  testWidgets('all backend routes remain selectable through the city index',
+  testWidgets('all backend routes remain selectable through the city map',
       (tester) async {
     final repository = _TwoRouteRepository();
     await _pumpApp(tester, repository: repository);
     expect(find.text('旧港码头'), findsNothing);
     expect(find.text('山海栈道'), findsNothing);
-    appRouter.go('/?tab=atlas');
+    final map = find.bySemanticsLabel(RegExp('城市地图，查看景点与介绍'));
+    await Scrollable.ensureVisible(tester.element(map), alignment: .35);
     await tester.pumpAndSettle();
-    expect(find.text('收录 2 条路线'), findsOneWidget);
+    await tester.tap(map);
+    await tester.pumpAndSettle();
     final second =
-        find.byKey(const ValueKey('atlas-route-route-mountain-coast'));
-    await tester.ensureVisible(second);
-    await tester
-        .tap(find.descendant(of: second, matching: find.text('山海之间的故事')));
+        find.byKey(const ValueKey('city-map-point-route-mountain-coast'));
+    await Scrollable.ensureVisible(tester.element(second), alignment: .35);
+    await tester.pumpAndSettle();
+    await tester.tap(second);
+    await tester.pumpAndSettle();
+    final open = find.byKey(const ValueKey('city-map-open'));
+    await Scrollable.ensureVisible(tester.element(open), alignment: .35);
+    await tester.pumpAndSettle();
+    await tester.tap(open);
     await tester.pumpAndSettle();
     expect(repository.requestedRouteSlug, 'mountain-coast');
     expect(find.text('山海之间的故事'), findsWidgets);
+    await tester.tap(find.text('见闻'));
+    await tester.pumpAndSettle();
+    expect(appRouter.routeInformationProvider.value.uri.queryParameters['tab'],
+        'community');
+    expect(find.text('城市索引'), findsNothing);
+  });
+
+  testWidgets('retired tab links resolve to current pages', (tester) async {
+    await _pumpApp(tester);
+    appRouter.go('/?tab=atlas');
+    await tester.pumpAndSettle();
+    expect(appRouter.routeInformationProvider.value.uri.toString(), '/');
+    expect(find.text('城市索引'), findsNothing);
+    appRouter.go('/?tab=shelf');
+    await tester.pumpAndSettle();
+    expect(appRouter.routeInformationProvider.value.uri.path, '/favorites');
+    expect(find.text('我的收藏'), findsOneWidget);
+    await tester.tap(find.text('我的'));
+    await tester.pumpAndSettle();
+    expect(appRouter.routeInformationProvider.value.uri.path, '/profile');
   });
 
   testWidgets('empty backend catalogue never inserts a fallback route',

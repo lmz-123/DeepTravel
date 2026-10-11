@@ -6,13 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/router/route_back.dart';
 import '../../../core/widgets/discovery_placeholder.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
-import '../domain/community_models.dart';
-import '../../../core/router/travel_destinations.dart';
-import 'community/notes_controller.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
 import 'companion_walk_settings.dart';
@@ -30,8 +26,6 @@ import 'widgets/traveler_bottom_navigation.dart';
 
 part 'discovery_journal.dart';
 part 'discovery_journal_collage.dart';
-part 'discovery_atlas.dart';
-part 'discovery_shelf.dart';
 part 'discovery_companion.dart';
 part 'discovery_companion_distance.dart';
 
@@ -99,9 +93,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
   }
 
   TravelerSection _parseTab(String? tab) => switch (tab) {
-        'atlas' => TravelerSection.atlas,
         'community' => TravelerSection.community,
-        'shelf' => TravelerSection.shelf,
         'companion' => TravelerSection.companion,
         _ => TravelerSection.journal,
       };
@@ -322,7 +314,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
 
   Future<void> _refresh() async {
     await ref.read(discoveryControllerProvider.notifier).refreshDiscovery();
-    ref.invalidate(_shelfCatalogProvider);
   }
 
   @override
@@ -420,12 +411,7 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                         }
                       },
                       child: IndexedStack(
-                        index: switch (_section) {
-                          TravelerSection.atlas => 1,
-                          TravelerSection.shelf => 2,
-                          TravelerSection.companion => 3,
-                          _ => 0,
-                        },
+                        index: _section == TravelerSection.companion ? 1 : 0,
                         children: [
                           IndexedStack(index: _cityMapOpen ? 1 : 0, children: [
                             _DiscoveryJournal(
@@ -470,37 +456,6 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                                   setState(() => _cityMapOpen = false),
                             ),
                           ]),
-                          _DiscoveryAtlas(
-                            key: ValueKey('atlas-${state.city?.slug}'),
-                            state: state,
-                            saved: saved,
-                            busyFavorites: _busyFavorites,
-                            onFavorite: _toggleFavorite,
-                            onOpen: _openRoute,
-                            onCity: () => _chooseCity(state),
-                            onRefresh: _refresh,
-                          ),
-                          _DiscoveryShelf(
-                            favoritesLoading: favoriteState?.isLoading == true,
-                            favoritesError: favoriteState?.hasError == true,
-                            onRetryFavorites: () {
-                              if (userId != null) {
-                                ref.invalidate(
-                                    travelerFavoritesProvider(userId));
-                              }
-                            },
-                            favorites: favorites
-                                .where((f) => f.kind == 'route')
-                                .toList(),
-                            state: state,
-                            visible: _section == TravelerSection.shelf,
-                            busyFavorites: _busyFavorites,
-                            onRemove: _toggleFavoriteId,
-                            onOpen: _openRoute,
-                            onCity: () => _chooseCity(state),
-                            onBrowse: () => setState(
-                                () => _section = TravelerSection.journal),
-                          ),
                           companion,
                         ],
                       ),

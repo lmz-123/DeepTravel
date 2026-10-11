@@ -1,41 +1,26 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/router/travel_destinations.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../active_tour_controller.dart';
 import 'discovery_art.dart';
 
-// Legacy destinations stay available to existing journey and footprint screens.
-enum TravelerSection {
-  community,
-  discovery,
-  journey,
-  footprints,
-  journal,
-  atlas,
-  companion,
-  shelf,
-}
+enum TravelerSection { journal, community, companion }
 
-class TravelerBottomNavigation extends ConsumerWidget {
+class TravelerBottomNavigation extends StatelessWidget {
   const TravelerBottomNavigation({
     required this.active,
     super.key,
-    this.journeyId,
     this.onSelected,
     this.editorial = false,
   });
-  final TravelerSection active;
-  final String? journeyId;
+  final TravelerSection? active;
   final bool editorial;
   final ValueChanged<TravelerSection>? onSelected;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final horizontal = MediaQuery.sizeOf(context).width <= 360 ? 20.0 : 23.0;
     final entries = [
       (TravelerSection.journal, DiscoveryMark.book, '发现'),
@@ -77,9 +62,7 @@ class TravelerBottomNavigation extends ConsumerWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: entries.map((entry) {
-                      final selected = active == entry.$1 ||
-                          active == TravelerSection.discovery &&
-                              entry.$1 == TravelerSection.journal;
+                      final selected = active == entry.$1;
                       final color = selected
                           ? AppColors.terracotta
                           : const Color(0xff87806f);
@@ -88,7 +71,7 @@ class TravelerBottomNavigation extends ConsumerWidget {
                           label: entry.$3,
                           selected: selected,
                           tint: true,
-                          onTap: () => _select(context, ref, entry.$1),
+                          onTap: () => _select(context, entry.$1),
                           child: SizedBox(
                             height: 56,
                             child: Stack(
@@ -153,18 +136,9 @@ class TravelerBottomNavigation extends ConsumerWidget {
     );
   }
 
-  void _select(BuildContext context, WidgetRef ref, TravelerSection section) {
+  void _select(BuildContext context, TravelerSection section) {
     if (onSelected != null) {
       onSelected!(section);
-      return;
-    }
-    if (section == TravelerSection.journey) {
-      context.go(companionLocation(
-          ref.read(activeTourControllerProvider).route?.slug));
-      return;
-    }
-    if (section == TravelerSection.footprints) {
-      context.go('/footprints');
       return;
     }
     context.go(

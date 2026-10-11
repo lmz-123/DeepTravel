@@ -51,67 +51,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'city index searches real metadata and restores selection after detail',
-    (tester) async {
-      await _pump(tester, tab: 'atlas');
-      expect(find.text('城市索引'), findsOneWidget);
-      expect(find.text('收录 37 条路线'), findsOneWidget);
-      await tester.enterText(find.byType(TextField), '测试路线 36');
-      await tester.pumpAndSettle();
-      expect(find.text('找到 1 条路线'), findsOneWidget);
-      final row = find.byKey(const ValueKey('atlas-route-route-36'));
-      await tester.ensureVisible(row);
-      await tester.tap(
-        find.descendant(of: row, matching: find.text('测试路线 36')),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('detail:route-36'), findsOneWidget);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-      expect(find.widgetWithText(TextField, '测试路线 36'), findsOneWidget);
-      expect(find.text('找到 1 条路线'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'long route catalogue expands in bounded pages and filter draft can cancel',
-    (tester) async {
-      await _pump(tester, tab: 'atlas');
-      final list = find.byType(CustomScrollView);
-      await tester.scrollUntilVisible(
-        find.text('再看 17 条路线'),
-        600,
-        scrollable:
-            find.descendant(of: list, matching: find.byType(Scrollable)).first,
-      );
-      await tester.tap(find.text('再看 17 条路线'));
-      await tester.pumpAndSettle();
-      expect(find.text('再看 17 条路线'), findsNothing);
-      await tester.tap(find.text('区域 / 时长'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('45 分钟内'));
-      await tester.tap(find.byTooltip('关闭筛选'));
-      await tester.pumpAndSettle();
-      await tester.fling(list, const Offset(0, 6000), 12000);
-      await tester.pumpAndSettle();
-      expect(find.text('收录 37 条路线'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets('empty shelf is a deliberate state and directs back to journal', (
-    tester,
-  ) async {
-    await _pump(tester, tab: 'shelf');
-    expect(find.text('下一次想去哪里？'), findsOneWidget);
-    await tester.tap(find.text('去发现'));
-    await tester.pumpAndSettle();
-    expect(find.text('不赶路，'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('journal includes all four Shenzhen routes with featured first', (
     tester,
   ) async {

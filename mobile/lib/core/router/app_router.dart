@@ -6,10 +6,10 @@ import '../../features/experience/presentation/community/note_compose_page.dart'
 import '../../features/experience/domain/community_models.dart';
 
 import '../../features/experience/presentation/discovery_page.dart';
+import '../../features/experience/presentation/favorites_page.dart';
 import '../../features/experience/presentation/footprint_detail_page.dart';
 import '../../features/experience/presentation/footprints_page.dart';
 import '../../features/experience/presentation/journey_redirect_page.dart';
-import '../../features/experience/presentation/recap_page.dart';
 import '../../features/experience/presentation/route_detail_page.dart';
 import '../../features/experience/presentation/settings_page.dart';
 import '../../features/experience/presentation/home_story_page.dart';
@@ -46,6 +46,11 @@ final appRouter = GoRouter(
                 int.tryParse(state.uri.queryParameters['photo'] ?? '') ?? 0)),
     GoRoute(
       path: '/',
+      redirect: (_, state) => switch (state.uri.queryParameters['tab']) {
+        'atlas' => '/',
+        'shelf' => '/favorites',
+        _ => null,
+      },
       builder: (context, state) => DiscoveryPage(
         initialTab: state.uri.queryParameters['tab'],
         initialCompanionFragmentId: state.uri.queryParameters['fragment'],
@@ -65,8 +70,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/recap/:id',
-      builder: (context, state) =>
-          RecapPage(journeyId: state.pathParameters['id']!),
+      redirect: (_, __) => '/footprints',
     ),
     GoRoute(
       path: '/footprints',

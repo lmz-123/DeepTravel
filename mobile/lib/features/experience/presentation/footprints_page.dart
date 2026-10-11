@@ -18,7 +18,7 @@ class FootprintsPage extends ConsumerWidget {
       fallbackLocation: '/',
       child: Scaffold(
         bottomNavigationBar: const TravelerBottomNavigation(
-          active: TravelerSection.footprints,
+          active: null,
         ),
         appBar: AppBar(
           title: const Text('我的足迹'),

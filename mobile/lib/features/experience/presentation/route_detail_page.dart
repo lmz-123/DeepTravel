@@ -398,7 +398,7 @@ class _RouteDetailState extends ConsumerState<_RouteDetail> {
                       } else if (section == TravelerSection.journal) {
                         popOrGo(context, '/');
                       } else {
-                        context.go('/?tab=atlas');
+                        context.go('/?tab=community');
                       }
                     }),
               ),

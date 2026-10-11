@@ -553,8 +553,6 @@ class _DiscoveryJournalState extends State<_DiscoveryJournal>
 String _routeMetadata(RouteExperience route) => !route.isPublished
     ? '筹备中 · 可看构想'
     : '${route.durationMinutes} 分钟 · ${route.distanceKm.toStringAsFixed(1)} km';
-String _routeFormat(RouteExperience route) =>
-    route.audioTour != null ? '声音导览' : '文字漫游';
 
 class _JournalCopy {
   const _JournalCopy(

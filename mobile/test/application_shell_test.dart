@@ -20,6 +20,7 @@ import 'package:jiandi/features/experience/domain/fragment_models.dart';
 import 'package:jiandi/features/experience/domain/tour_runtime.dart';
 import 'package:jiandi/features/experience/presentation/active_tour_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
+import 'package:jiandi/features/experience/presentation/favorites_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 import 'package:jiandi/features/experience/presentation/profile_page.dart';
 

@@ -50,7 +50,7 @@ class SettingsPage extends ConsumerWidget {
       fallbackLocation: '/',
       child: Scaffold(
         bottomNavigationBar: const TravelerBottomNavigation(
-          active: TravelerSection.discovery,
+          active: TravelerSection.journal,
         ),
         appBar: AppBar(
           title: const Text('设置'),

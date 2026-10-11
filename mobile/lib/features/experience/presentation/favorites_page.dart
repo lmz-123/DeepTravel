@@ -1,18 +1,31 @@
-part of 'discovery_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class _ShelfEntry {
-  const _ShelfEntry(this.route, this.city);
+import '../../../core/router/route_back.dart';
+import '../../../core/router/travel_destinations.dart';
+import '../../../core/theme/app_theme.dart';
+import '../domain/models.dart';
+import '../domain/city_story.dart';
+import '../domain/community_models.dart';
+import 'community/notes_controller.dart';
+import 'community/notes_widgets.dart';
+import 'experience_providers.dart';
+import 'widgets/discovery_art.dart';
+
+class _FavoritePlace {
+  const _FavoritePlace(this.route, this.city);
   final RouteExperience route;
   final CityExperience city;
 }
 
-class _ShelfCatalog {
-  const _ShelfCatalog(this.entries, this.failedCities);
-  final List<_ShelfEntry> entries;
+class _FavoriteCatalog {
+  const _FavoriteCatalog(this.entries, this.failedCities);
+  final List<_FavoritePlace> entries;
   final int failedCities;
 }
 
-final _shelfCatalogProvider = FutureProvider.autoDispose<_ShelfCatalog>((
+final _favoriteCatalogProvider = FutureProvider.autoDispose<_FavoriteCatalog>((
   ref,
 ) async {
   final repository = ref.watch(experienceRepositoryProvider);
@@ -22,41 +35,39 @@ final _shelfCatalogProvider = FutureProvider.autoDispose<_ShelfCatalog>((
     cities.map((city) async {
       try {
         final catalog = await repository.discoveryForCity(city.slug);
-        return catalog.routes.map((route) => _ShelfEntry(route, city)).toList();
+        return catalog.routes
+            .map((route) => _FavoritePlace(route, city))
+            .toList();
       } catch (_) {
         failures++;
-        return <_ShelfEntry>[];
+        return <_FavoritePlace>[];
       }
     }),
   );
-  return _ShelfCatalog(groups.expand((g) => g).toList(), failures);
+  return _FavoriteCatalog(groups.expand((g) => g).toList(), failures);
 });
 
-class _DiscoveryShelf extends ConsumerStatefulWidget {
-  const _DiscoveryShelf(
+class _FavoritesContent extends ConsumerStatefulWidget {
+  const _FavoritesContent(
       {required this.favorites,
       required this.favoritesLoading,
       required this.favoritesError,
       required this.onRetryFavorites,
-      required this.state,
-      required this.visible,
       required this.busyFavorites,
       required this.onRemove,
       required this.onOpen,
-      required this.onCity,
       required this.onBrowse});
   final List<TravelerFavorite> favorites;
-  final bool favoritesLoading, favoritesError, visible;
-  final VoidCallback onRetryFavorites, onCity, onBrowse;
-  final DiscoveryState state;
+  final bool favoritesLoading, favoritesError;
+  final VoidCallback onRetryFavorites, onBrowse;
   final Set<String> busyFavorites;
   final ValueChanged<String> onRemove;
   final ValueChanged<RouteExperience> onOpen;
   @override
-  ConsumerState<_DiscoveryShelf> createState() => _DiscoveryShelfState();
+  ConsumerState<_FavoritesContent> createState() => _FavoritesContentState();
 }
 
-class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
+class _FavoritesContentState extends ConsumerState<_FavoritesContent> {
   bool _notes = false;
   final _busy = <String>{};
   Future<void> _removeNote(CommunityPost post) async {
@@ -97,17 +108,13 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = widget.visible && widget.favorites.isNotEmpty
-        ? ref.watch(_shelfCatalogProvider)
+    final catalog = widget.favorites.isNotEmpty
+        ? ref.watch(_favoriteCatalogProvider)
         : null;
-    final saved = widget.visible
-        ? ref.watch(savedNotesProvider)
-        : const AsyncValue<CommunityPage<CommunityPost>>.loading();
-    final entries = <String, _ShelfEntry>{
-      for (final e in catalog?.value?.entries ?? <_ShelfEntry>[]) e.route.id: e,
-      if (widget.state.city != null)
-        for (final r in widget.state.catalog.routes)
-          r.id: _ShelfEntry(r, widget.state.city!)
+    final saved = ref.watch(savedNotesProvider);
+    final entries = <String, _FavoritePlace>{
+      for (final e in catalog?.value?.entries ?? <_FavoritePlace>[])
+        e.route.id: e,
     };
     return SingleChildScrollView(
         child: Padding(
@@ -264,8 +271,8 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
                   _empty(false),
                 if (catalog?.hasError == true ||
                     (catalog?.value?.failedCities ?? 0) > 0)
-                  NoteFailure(
-                      '部分地点暂未载入', () => ref.invalidate(_shelfCatalogProvider)),
+                  NoteFailure('部分地点暂未载入',
+                      () => ref.invalidate(_favoriteCatalogProvider)),
                 for (final favorite in widget.favorites)
                   _place(favorite, entries[favorite.targetId],
                       loading: catalog?.isLoading == true,
@@ -291,7 +298,7 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
                     ? () => context.go('/?tab=community')
                     : widget.onBrowse)
           ])));
-  Widget _place(TravelerFavorite favorite, _ShelfEntry? entry,
+  Widget _place(TravelerFavorite favorite, _FavoritePlace? entry,
           {required bool loading, required bool failed}) =>
       Padding(
           padding: const EdgeInsets.only(bottom: 28),
@@ -400,7 +407,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       child: Scaffold(
         backgroundColor: AppColors.paper,
         body: SafeArea(
-          child: _DiscoveryShelf(
+          child: _FavoritesContent(
             favorites: (favorites.value ?? const <TravelerFavorite>[])
                 .where((f) => f.kind == 'route')
                 .toList(),
@@ -409,18 +416,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
             onRetryFavorites: () {
               if (user != null) ref.invalidate(travelerFavoritesProvider(user));
             },
-            state: const DiscoveryState(
-              cities: [],
-              city: null,
-              catalog: CityDiscoveryCatalog(routes: []),
-              cards: [],
-              revision: 0,
-            ),
-            visible: true,
             busyFavorites: _busy,
             onRemove: _remove,
             onOpen: (route) => context.push('/route/${route.slug}'),
-            onCity: () => context.go('/'),
             onBrowse: () => context.go('/'),
           ),
         ),
