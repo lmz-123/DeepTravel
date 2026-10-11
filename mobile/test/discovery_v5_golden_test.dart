@@ -10,7 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
 import 'package:jiandi/features/experience/presentation/city_atlas.dart';
-import 'package:jiandi/features/experience/presentation/widgets/traveler_bottom_navigation.dart';
 import 'fixtures/city_atlas/approved_routes.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/domain/city_story.dart';
@@ -26,6 +25,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final pictures = <String, Uint8List>{};
   setUpAll(() async {
+    await (FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+        .load();
     for (final (family, file) in [
       ('Noto Serif SC', 'NotoSerifSC.ttf'),
       ('Noto Sans SC', 'NotoSansSC.ttf'),
@@ -76,14 +78,6 @@ void main() {
                           onFavorite: (_) {},
                           onOpen: (_) {},
                           onBack: () {}),
-                      Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: TravelerBottomNavigation(
-                              editorial: true,
-                              active: TravelerSection.journal,
-                              onSelected: (_) {})),
                     ])))
       ]);
       addTearDown(router.dispose);
@@ -115,6 +109,13 @@ void main() {
         expect(tester.takeException(), isNull);
         await expectLater(find.byKey(const ValueKey('golden-screen')),
             matchesGoldenFile('goldens/v6-$page-390.png'));
+        if (page == 'map') {
+          await tester.tap(find.text(routes.first.title).first);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await expectLater(find.byKey(const ValueKey('golden-screen')),
+              matchesGoldenFile('goldens/explore-selected-real-390.png'));
+        }
       }, createHttpClient: (_) => _FixtureClient(pictures));
     });
   }

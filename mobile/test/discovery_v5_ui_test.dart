@@ -8,6 +8,7 @@ import 'package:jiandi/features/experience/presentation/active_tour_controller.d
 import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/discovery_page.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
+import 'package:jiandi/features/experience/presentation/widgets/traveler_bottom_navigation.dart';
 
 void main() {
   for (final size in [const Size(390, 844), const Size(360, 800)]) {
@@ -38,14 +39,16 @@ void main() {
     await _pump(tester, controller: _JournalDiscovery(_shenzhenRoutes));
     await tester.tap(find.byTooltip('下一期随刊'));
     await tester.pumpAndSettle();
-    final entry = find.bySemanticsLabel(RegExp('城市地图，查看景点与介绍'));
+    final entry = find.bySemanticsLabel(RegExp('全部景点，查看景点与介绍'));
     await Scrollable.ensureVisible(tester.element(entry), alignment: .35);
     await tester.pumpAndSettle();
     await tester.tap(entry);
     await tester.pumpAndSettle();
-    expect(find.text('循着好奇，'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel(RegExp('返回发现')));
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(TravelerBottomNavigation), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('atlas-back')));
     await tester.pumpAndSettle();
+    expect(find.byType(TravelerBottomNavigation), findsOneWidget);
     expect(find.byKey(const ValueKey('route-card-shenzhen-mixc-world')),
         findsOneWidget);
     expect(tester.takeException(), isNull);

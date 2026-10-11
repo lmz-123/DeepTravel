@@ -305,7 +305,7 @@ void main() {
         if (screen == 'place') {
           expect(find.text('游玩准备'), findsOneWidget);
           expect(find.byType(Image), findsNothing);
-          await tester.tap(find.text('开放与交通'));
+          await tester.tap(find.text('开放与入园须知'));
           await tester.pumpAndSettle();
           expect(find.text('接驳班车'), findsOneWidget);
           expect(find.text('信息来源'), findsOneWidget);

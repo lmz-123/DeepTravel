@@ -1,0 +1,158 @@
+[
+  {
+    "title": "世界之窗",
+    "route_id": "6a811349-073c-5161-b8d9-02b5cedcf9a1",
+    "preparation": {
+      "enabled": true,
+      "notices": "购票需在微信完成。打开中旅官方页面，在“预订方式”中选择票种并查看小程序码；也可在微信搜索“深圳世界之窗”官方公众号购票。票价、适用日期及退改规则以官方购票渠道实际展示为准。",
+      "admission": "ticket",
+      "transport": "",
+      "source_url": "https://www.ctgii.com/scenic/theme_park/62",
+      "extra_items": [
+        {
+          "url": "",
+          "body": "页面时长与步行距离为游览参考估计。请按体力与当日开放范围调整；不是实测导航路线。",
+          "title": "游览安排"
+        }
+      ],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": "2026-10-11",
+      "channel_name": "中旅官方购票指引 · 微信",
+      "purchase_url": "https://www.ctgii.com/scenic/theme_park/62",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "深圳欢乐谷",
+    "route_id": "b1698510-22ec-5fdc-b36f-4831915d77db",
+    "preparation": {
+      "enabled": true,
+      "notices": "在官方票务页选择日场票、夜场票或年卡。网页若显示暂无信息，请通过深圳欢乐谷官方公众号查看当日可售票种。",
+      "admission": "ticket",
+      "transport": "",
+      "source_url": "https://sz.happyvalley.cn/frmticket.aspx",
+      "extra_items": [
+        {
+          "url": "",
+          "body": "页面时长与步行距离为游览参考估计。请按体力与当日开放范围调整；不是实测导航路线。",
+          "title": "游览安排"
+        }
+      ],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": "2026-10-11",
+      "channel_name": "深圳欢乐谷官方票务",
+      "purchase_url": "https://sz.happyvalley.cn/frmticket.aspx",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "仙湖植物园",
+    "route_id": "27e7d67e-a3bb-5943-8d50-0a382a520e9b",
+    "preparation": {
+      "enabled": true,
+      "notices": "通过“深圳市仙湖植物园”或“美丽深圳”官方微信公众号购票。官方说明：其他平台网络购票无法入园。",
+      "admission": "ticket",
+      "transport": "",
+      "source_url": "https://cgj.sz.gov.cn/xsmh/xhzwy/wxsp/",
+      "extra_items": [
+        {
+          "url": "",
+          "body": "页面时长与步行距离为游览参考估计。请按体力与当日开放范围调整；不是实测导航路线。",
+          "title": "游览安排"
+        }
+      ],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": "2026-10-11",
+      "channel_name": "仙湖植物园官方购票指引 · 微信",
+      "purchase_url": "https://cgj.sz.gov.cn/xsmh/xhzwy/wxsp/",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "深圳野生动物园",
+    "route_id": "b48b8e37-0276-5e07-b676-2475a841010a",
+    "preparation": {
+      "enabled": true,
+      "notices": "官方订购页提供微信与支付宝购票二维码；按页面指引进入门票预订，核对游玩日期与适用人群。",
+      "admission": "ticket",
+      "transport": "",
+      "source_url": "https://www.szzoo.net/channels/3676.html",
+      "extra_items": [
+        {
+          "url": "",
+          "body": "页面时长与步行距离为游览参考估计。请按体力与当日开放范围调整；不是实测导航路线。",
+          "title": "游览安排"
+        }
+      ],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": "2026-10-11",
+      "channel_name": "深圳野生动物园官方购票指引",
+      "purchase_url": "https://www.szzoo.net/channels/3676.html",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "锦绣中华·民俗村",
+    "route_id": "e6219bdb-4384-55cf-bb85-e1347307ca4f",
+    "preparation": {
+      "enabled": true,
+      "notices": "在官网“订票”处点击“即刻购票”，按指引进入锦绣中华官方购票小程序。",
+      "admission": "ticket",
+      "transport": "",
+      "source_url": "https://www.szjxzh.com.cn/",
+      "extra_items": [
+        {
+          "url": "",
+          "body": "页面时长与步行距离为游览参考估计。请按体力与当日开放范围调整；不是实测导航路线。",
+          "title": "游览安排"
+        }
+      ],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": "2026-10-11",
+      "channel_name": "锦绣中华官方购票指引 · 小程序",
+      "purchase_url": "https://www.szjxzh.com.cn/",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  },
+  {
+    "title": "东部华侨城",
+    "route_id": "aab06172-339a-592a-b724-e2401c366a96",
+    "preparation": {
+      "enabled": true,
+      "notices": "此入口为去哪儿旅行票务平台，当前可查看森林小火车等项目票。请核对具体项目、卖家、游玩日期及退改规则；电子导览产品不含门票。",
+      "admission": "ticket",
+      "transport": "",
+      "source_url": "https://touch.piao.qunar.com/ticket/detail_2519122776.html",
+      "extra_items": [
+        {
+          "url": "",
+          "body": "页面时长与步行距离为游览参考估计。请按体力与当日开放范围调整；不是实测导航路线。",
+          "title": "游览安排"
+        }
+      ],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": "2026-10-11",
+      "channel_name": "去哪儿旅行 · 景区项目票",
+      "purchase_url": "https://touch.piao.qunar.com/ticket/detail_2519122776.html",
+      "opening_hours": "",
+      "transport_url": ""
+    }
+  }
+]

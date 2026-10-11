@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
@@ -51,93 +52,103 @@ void main() {
       expect(cityAtlasCoordinate(route), isNull);
     }
   });
-  for (final width in [320.0, 360.0, 390.0]) {
-    testWidgets(
-        'map selection, filtering, zoom and return preserve context at $width',
+
+  for (final city in [
+    'shenzhen',
+    'shanghai',
+    'guangzhou',
+    'zhuhai',
+    'shangqiu',
+    'city-new'
+  ]) {
+    testWidgets('$city list, selection, pinch and pan share state',
         (tester) async {
-      tester.view.physicalSize = Size(width, 900);
+      tester.view.physicalSize = const Size(390, 1100);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final routes = [
-        place('海边景点'),
-        place('街巷景点', theme: '老街', lat: 22.5381, lon: 113.9227),
-        place('未发布', status: 'draft')
-      ];
-      final favorites = <String>[];
-      await tester.pumpWidget(MaterialApp(
-          theme: AppTheme.light,
-          home: Builder(
-              builder: (context) => Scaffold(
-                      body: CityAtlas(
-                    citySlug: 'shenzhen',
-                    cityName: '深圳',
-                    routes: routes,
-                    saved: const {},
-                    busyFavorites: const {},
-                    onFavorite: (route) => favorites.add(route.id),
-                    onBack: () {},
-                    onOpen: (route) => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                            builder: (_) => Scaffold(
-                                appBar: AppBar(title: Text(route.title))))),
-                  )))));
+      await tester.pumpWidget(ProviderScope(
+          child: MaterialApp(
+              theme: AppTheme.light,
+              home: Scaffold(
+                  body: CityAtlas(
+                      citySlug: city,
+                      cityName: city,
+                      routes: [
+                        place('海边景点'),
+                        place('街巷景点', theme: '老街', lat: 22.5381, lon: 113.9227),
+                        place('未发布', status: 'draft')
+                      ],
+                      saved: const {},
+                      busyFavorites: const {},
+                      onFavorite: (_) {},
+                      onOpen: (_) {},
+                      onBack: () {})))));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('city-map-point-未发布')), findsNothing);
-      final town = find.byKey(const ValueKey('city-map-point-街巷景点'));
-      await tester.tap(town);
+      expect(find.byKey(const ValueKey('place-row-海边景点')), findsOneWidget);
+      expect(find.byKey(const ValueKey('city-map-canvas')), findsNothing);
+      await tester.tap(find.text('街巷景点'));
       await tester.pumpAndSettle();
-      final sheet = find.byKey(const ValueKey('city-map-place-sheet'));
-      expect(find.descendant(of: sheet, matching: find.text('街巷景点')),
-          findsOneWidget);
-      await tester.tap(find.bySemanticsLabel(RegExp('放大地图')));
+      final marker = find.byKey(const ValueKey('city-map-point-街巷景点'));
+      final before = tester.getCenter(marker);
+      final canvas = find.byKey(const ValueKey('city-map-canvas'));
+      final center = tester.getCenter(canvas);
+      final a = await tester.createGesture(pointer: 1),
+          b = await tester.createGesture(pointer: 2);
+      await a.down(center - const Offset(25, 0));
+      await b.down(center + const Offset(25, 0));
+      await a.moveTo(center - const Offset(70, 0));
+      await b.moveTo(center + const Offset(70, 0));
+      await tester.pump();
+      await a.up();
+      await b.up();
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const ValueKey('city-map-open')));
+      await tester.dragFrom(center, const Offset(30, 20));
       await tester.pumpAndSettle();
-      final location = tester.getCenter(town);
-      await tester.tap(find.byKey(const ValueKey('city-map-open')));
+      expect(tester.getCenter(marker), isNot(before));
+      final relativeBefore =
+          tester.getCenter(marker) - tester.getTopLeft(canvas);
+      await tester.dragFrom(tester.getCenter(canvas), const Offset(0, 50));
       await tester.pumpAndSettle();
-      await tester.pageBack();
+      final relativeAfter =
+          tester.getCenter(marker) - tester.getTopLeft(canvas);
+      expect(relativeAfter.dy, greaterThan(relativeBefore.dy + 20));
+
+      expect(
+          find.byKey(const ValueKey('city-map-place-sheet')), findsOneWidget);
+      expect(find.text('随行'), findsNothing);
+      await tester.tap(find.byTooltip('列表'));
       await tester.pumpAndSettle();
-      expect(tester.getCenter(town), location);
-      expect(find.descendant(of: sheet, matching: find.text('街巷景点')),
-          findsOneWidget);
-      await tester.tap(find.byTooltip('收藏街巷景点'));
+      await tester.enterText(find.byType(TextField), '海边景点');
       await tester.pumpAndSettle();
-      expect(favorites, ['街巷景点']);
-      await tester.tap(find.bySemanticsLabel(RegExp('查看全城')));
+      expect(find.text('街巷景点'), findsNothing);
+      await tester.tap(find.byTooltip('地图'));
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel(RegExp('海边主题')));
-      await tester.pumpAndSettle();
-      expect(town, findsNothing);
-      expect(find.descendant(of: sheet, matching: find.text('海边景点')),
-          findsOneWidget);
+      expect(find.byKey(const ValueKey('city-map-point-街巷景点')), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
-  testWidgets('missing coordinates remain readable without invented markers',
+  testWidgets('long lists build lazily and paginate without losing filters',
       (tester) async {
-    String? opened;
-    await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.light,
-        home: Scaffold(
-            body: CityAtlas(
-          citySlug: 'other',
-          cityName: '其他城市',
-          routes: [place('无坐标', lat: null, lon: null)],
-          saved: const {},
-          busyFavorites: const {},
-          onFavorite: (_) {},
-          onBack: () {},
-          onOpen: (route) => opened = route.id,
-        ))));
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+                body: CityAtlas(
+                    citySlug: 'shenzhen',
+                    cityName: '深圳',
+                    routes: List.generate(65, (i) => place('景点$i')),
+                    saved: const {},
+                    busyFavorites: const {},
+                    onFavorite: (_) {},
+                    onOpen: (_) {},
+                    onBack: () {})))));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('city-map-point-无坐标')), findsNothing);
-    expect(find.text('以下景点暂无地图位置，仍可查看介绍'), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const ValueKey('city-map-open')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('city-map-open')));
-    expect(opened, '无坐标');
+    expect(find.byKey(const ValueKey('place-row-景点64')), findsNothing);
+    await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('place-row-景点64')), 600,
+        scrollable: find.byType(Scrollable).first, maxScrolls: 30);
+    expect(find.byKey(const ValueKey('place-row-景点64')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

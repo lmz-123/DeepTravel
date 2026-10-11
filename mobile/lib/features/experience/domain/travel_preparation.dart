@@ -1,3 +1,21 @@
+class TicketOption {
+  const TicketOption(this.data);
+  final Map<String, dynamic> data;
+  String text(String key) =>
+      data[key] is String ? (data[key] as String).trim() : '';
+  String get title => text('title');
+  String get price {
+    final value = text('price');
+    if (!RegExp(r'^\d{1,6}(?:\.\d{1,2})?$').hasMatch(value)) return '';
+    // Extracted prices age out; the official channel remains available.
+    final checked = DateTime.tryParse(text('checked_at'));
+    if (checked == null || DateTime.now().difference(checked).inDays > 7) {
+      return '';
+    }
+    return value;
+  }
+}
+
 class PreparationItem {
   const PreparationItem(this.title, this.body, this.url);
   final String title, body, url;
@@ -19,6 +37,16 @@ class TravelPreparation {
       enabled &&
       ['ticket', 'reservation'].contains(admission) &&
       purchaseUrl.isNotEmpty;
+  List<TicketOption> get tickets => canBook
+      ? [
+          for (final item
+              in data['tickets'] is List ? data['tickets'] as List : const [])
+            if (item is Map &&
+                item['title'] is String &&
+                (item['title'] as String).trim().isNotEmpty)
+              TicketOption(Map<String, dynamic>.from(item)),
+        ]
+      : [];
   bool get external => text('launch_mode') == 'external';
   String get action => admission == 'reservation' ? '预约参观' : '前往官方购票';
   List<PreparationItem> get items => [

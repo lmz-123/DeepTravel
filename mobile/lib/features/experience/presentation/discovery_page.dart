@@ -11,7 +11,6 @@ import '../domain/city_story.dart';
 import '../domain/models.dart';
 import '../domain/tour_runtime.dart';
 import 'active_tour_controller.dart';
-import 'companion_walk_settings.dart';
 import 'companion_distance_controller.dart';
 import 'companion_point_picker.dart';
 import 'discovery_controller.dart';
@@ -462,21 +461,22 @@ class _DiscoveryPageState extends ConsumerState<DiscoveryPage> {
                     ),
                   ),
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: TravelerBottomNavigation(
-              editorial: _section == TravelerSection.journal,
-              active: _section,
-              onSelected: (section) {
-                FocusManager.instance.primaryFocus?.unfocus();
-                context.go(section == TravelerSection.journal
-                    ? '/'
-                    : '/?tab=${section.name}');
-              },
+          if (!_cityMapOpen || _section != TravelerSection.journal)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: TravelerBottomNavigation(
+                editorial: _section == TravelerSection.journal,
+                active: _section,
+                onSelected: (section) {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  context.go(section == TravelerSection.journal
+                      ? '/'
+                      : '/?tab=${section.name}');
+                },
+              ),
             ),
-          ),
           if (state?.isLocating == true)
             const Positioned(
               top: 0,

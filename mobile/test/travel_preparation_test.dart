@@ -104,11 +104,16 @@ void main() {
       expect(await other.plans(), isEmpty);
       final file = File('${dir.path}/ticket.pdf');
       await file.writeAsString('%PDF-1.4\nlocal ticket');
-      await first.importReceipt('ocean', '我的门票.pdf', file);
-      final receipt = (await first.receipts('ocean')).single;
-      expect(receipt.kind, 'pdf');
-      expect(await first.file(receipt).exists(), isTrue);
-      expect(await other.receipts('ocean'), isEmpty);
+      final legacy = File('${first.root.path}/legacy.pdf');
+      await legacy.writeAsString('%PDF-1.4 old ticket');
+      await first.database.insert('receipts', {
+        'id': 'old',
+        'route_id': 'ocean',
+        'name': 'old.pdf',
+        'file_name': 'legacy.pdf',
+        'kind': 'pdf',
+        'added_at': '2026-10-01'
+      });
       // Recreate the original v1 schema with real saved tickets before upgrading.
       await first.database.execute('DROP TABLE preparation_tasks');
       await first.database.execute('DROP TABLE guide_imports');
@@ -116,12 +121,12 @@ void main() {
       await first.close();
       final reopened = await TravelPlanStore.open(dir, 'api|one',
           factory: databaseFactoryFfi);
-      expect((await reopened.receipts('ocean')).length, 1);
+      expect((await reopened.database.query('receipts')).length, 1);
       expect(await reopened.tasks('ocean'), isEmpty);
       expect((await reopened.plan('ocean'))!.date, '2026-10-17');
       await reopened.removePlan('ocean');
       expect(await reopened.plans(), isEmpty);
-      expect(await reopened.file(receipt).exists(), isFalse);
+      expect(await legacy.exists(), isFalse);
       await reopened.close();
     } finally {
       await other.close();
@@ -184,28 +189,6 @@ void main() {
     }
   });
 
-  test('receipt importer rejects executable and oversized files', () async {
-    expect(receiptKind(Uint8List.fromList('MZfake.pdf'.codeUnits)), isNull);
-    final dir = await Directory.systemTemp.createTemp('travel-limits-');
-    final store =
-        await TravelPlanStore.open(dir, 'api|one', factory: databaseFactoryFfi);
-    try {
-      await store.add(sample());
-      final file = File('${dir.path}/fake.pdf');
-      await file.writeAsString('not a PDF');
-      await expectLater(store.importReceipt('ocean', 'fake.pdf', file),
-          throwsFormatException);
-      final large = await file.open(mode: FileMode.write);
-      await large.truncate(TravelPlanStore.maxReceiptBytes + 1);
-      await large.close();
-      await expectLater(store.importReceipt('ocean', 'huge.pdf', file),
-          throwsFormatException);
-      expect(await store.receipts('ocean'), isEmpty);
-    } finally {
-      await store.close();
-      await dir.delete(recursive: true);
-    }
-  });
   for (final width in [320, 390]) {
     testWidgets('official preparation $width has no prices and no overflow',
         (tester) async {
@@ -224,13 +207,13 @@ void main() {
                   key: const ValueKey('preparation'),
                   child: PreparationBody(route: sample())))));
       await tester.pumpAndSettle();
-      expect(find.text('前往官方购票'), findsOneWidget);
+      expect(find.text('查看票种'), findsOneWidget);
       expect(find.textContaining('¥'), findsNothing);
       expect(find.text('接驳班车'), findsNothing);
       expect(tester.takeException(), isNull);
       await expectLater(find.byKey(const ValueKey('preparation')),
           matchesGoldenFile('goldens/travel-preparation-$width.png'));
-      await tester.tap(find.text('入园须知'));
+      await tester.tap(find.text('开放与入园须知'));
       await tester.pumpAndSettle();
       expect(find.text('请携带购票时使用的有效证件。'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -289,7 +272,7 @@ void main() {
         matchesGoldenFile('goldens/guide-wallet-390.png'));
   });
 
-  testWidgets('wallet displays manually added receipts, never issued status',
+  testWidgets('wallet no longer exposes receipt upload or issued status',
       (tester) async {
     tester.view.physicalSize = const Size(390, 1100);
     tester.view.devicePixelRatio = 1;
@@ -306,15 +289,6 @@ void main() {
                     'image': '',
                     'visit_date': '2026-10-17'
                   })),
-          travelReceiptsProvider('ocean').overrideWith((ref) async => [
-                TravelReceipt.fromMap({
-                  'id': 'receipt',
-                  'route_id': 'ocean',
-                  'name': '海洋王国门票.pdf',
-                  'file_name': 'receipt.pdf',
-                  'kind': 'pdf'
-                })
-              ]),
           offlineAwareRouteProvider('ocean')
               .overrideWith((ref) async => sample())
         ],
@@ -328,10 +302,6 @@ void main() {
     expect(tester.takeException(), isNull);
     await expectLater(find.byKey(const ValueKey('wallet')),
         matchesGoldenFile('goldens/travel-wallet-390.png'));
-    await tester.ensureVisible(find.text('我的票据'));
-    await tester.tap(find.text('我的票据'));
-    await tester.pumpAndSettle();
-    expect(find.text('本人添加'), findsOneWidget);
-    expect(find.text('海洋王国门票.pdf'), findsOneWidget);
+    expect(find.text('我的票据'), findsNothing);
   });
 }

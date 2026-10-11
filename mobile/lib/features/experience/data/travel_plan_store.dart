@@ -1,10 +1,9 @@
 import 'dart:io';
+import 'package:uuid/uuid.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
-import 'package:uuid/uuid.dart';
 import '../domain/models.dart';
 import '../domain/community_models.dart';
 
@@ -20,22 +19,11 @@ class TravelPlan {
   final String? date;
 }
 
-class TravelReceipt {
-  TravelReceipt.fromMap(Map<String, Object?> row)
-      : id = row['id'] as String,
-        routeId = row['route_id'] as String,
-        name = row['name'] as String,
-        fileName = row['file_name'] as String,
-        kind = row['kind'] as String;
-  final String id, routeId, name, fileName, kind;
-}
-
 /// Private, account- and API-scoped local trip wallet. No OSS/public media upload.
 class TravelPlanStore {
   TravelPlanStore(this.root, this.database);
   final Directory root;
   final Database database;
-  static const maxReceiptBytes = 15 * 1024 * 1024;
   static Future<TravelPlanStore> open(Directory support, String scope,
       {DatabaseFactory? factory}) async {
     final key = sha256.convert(utf8.encode(scope)).toString();
@@ -173,89 +161,18 @@ class TravelPlanStore {
         whereArgs: [id]);
   }
 
-  Future<List<TravelReceipt>> receipts(String id) async =>
-      (await database.query('receipts',
-              where: 'route_id = ?', whereArgs: [id], orderBy: 'added_at DESC'))
-          .map(TravelReceipt.fromMap)
-          .toList();
-  File file(TravelReceipt receipt) {
-    if (path.basename(receipt.fileName) != receipt.fileName) {
-      throw const FormatException('Invalid receipt path');
-    }
-    return File(path.join(root.path, receipt.fileName));
-  }
-
-  Future<void> importReceipt(String routeId, String name, File source) async {
-    if (await source.length() > maxReceiptBytes) {
-      throw const FormatException('票据不能超过 15 MB');
-    }
-    final bytes = await source.readAsBytes();
-    if (bytes.length > maxReceiptBytes) {
-      throw const FormatException('票据不能超过 15 MB');
-    }
-    final kind = receiptKind(bytes);
-    if (kind == null) {
-      throw const FormatException('请选择 JPG、PNG、WebP 图片或 PDF 文件');
-    }
-    final id = const Uuid().v4();
-    final filename = '$id.$kind';
-    final target = File(path.join(root.path, filename));
-    await target.writeAsBytes(bytes, flush: true);
-    try {
-      await database.transaction((tx) async {
-        final count = Sqflite.firstIntValue(await tx.rawQuery(
-                'SELECT COUNT(*) FROM receipts WHERE route_id = ?',
-                [routeId])) ??
-            0;
-        if (count >= 20) throw const FormatException('每个景点最多保存 20 份票据');
-        await tx.insert('receipts', {
-          'id': id,
-          'route_id': routeId,
-          'name': path
-              .basename(name)
-              .substring(0, path.basename(name).length.clamp(0, 120)),
-          'file_name': filename,
-          'kind': kind,
-          'added_at': DateTime.now().toIso8601String()
-        });
-      });
-    } catch (_) {
-      if (await target.exists()) await target.delete();
-      rethrow;
-    }
-  }
-
-  Future<void> removeReceipt(TravelReceipt receipt) async {
-    final rows = await database.query('receipts',
-        where: 'id = ? AND file_name = ?',
-        whereArgs: [receipt.id, receipt.fileName]);
-    if (rows.isEmpty) return;
-    final target = file(receipt);
-    if (await target.exists()) await target.delete();
-    await database.delete('receipts', where: 'id = ?', whereArgs: [receipt.id]);
-  }
-
   Future<void> removePlan(String id) async {
-    for (final receipt in await receipts(id)) {
-      await removeReceipt(receipt);
+    // Preserve legacy files until the owner explicitly removes their trip.
+    for (final row in await database
+        .query('receipts', where: 'route_id = ?', whereArgs: [id])) {
+      final name = row['file_name'] as String;
+      if (path.basename(name) == name) {
+        final file = File(path.join(root.path, name));
+        if (await file.exists()) await file.delete();
+      }
     }
     await database.delete('plans', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> close() => database.close();
-}
-
-String? receiptKind(Uint8List b) {
-  bool starts(List<int> prefix) =>
-      b.length >= prefix.length &&
-      List.generate(prefix.length, (i) => b[i] == prefix[i]).every((v) => v);
-  if (starts([0x25, 0x50, 0x44, 0x46, 0x2d])) return 'pdf';
-  if (starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'png';
-  if (starts([0xff, 0xd8, 0xff])) return 'jpg';
-  if (b.length >= 12 &&
-      String.fromCharCodes(b.take(4)) == 'RIFF' &&
-      String.fromCharCodes(b.skip(8).take(4)) == 'WEBP') {
-    return 'webp';
-  }
-  return null;
 }

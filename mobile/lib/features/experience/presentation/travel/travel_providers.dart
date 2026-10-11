@@ -27,13 +27,8 @@ final travelPlansProvider = FutureProvider<List<TravelPlan>>((ref) async =>
     await (await ref.watch(travelStoreProvider.future))?.plans() ?? []);
 final travelPlanProvider = FutureProvider.family<TravelPlan?, String>(
     (ref, id) async => (await ref.watch(travelStoreProvider.future))?.plan(id));
-final travelReceiptsProvider =
-    FutureProvider.family<List<TravelReceipt>, String>((ref, id) async =>
-        await (await ref.watch(travelStoreProvider.future))?.receipts(id) ??
-        []);
 
 void refreshTravel(WidgetRef ref, String id) {
   ref.invalidate(travelPlansProvider);
   ref.invalidate(travelPlanProvider(id));
-  ref.invalidate(travelReceiptsProvider(id));
 }

@@ -274,31 +274,15 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('preparing and cancelling never starts GPS or a journey',
+  testWidgets('companion shows routes without duplicate walk settings',
       (tester) async {
     final harness = _CompanionHarness();
     await _pump(tester, harness: harness);
-    await _reveal(
-        tester, find.byKey(const ValueKey('companion-walk-settings-entry')));
-    await tester
-        .tap(find.byKey(const ValueKey('companion-walk-settings-entry')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(find.byKey(const ValueKey('companion-walk-settings-sheet')),
-        findsOneWidget);
-    expect(harness.journey.startCalls, 0);
-    expect(harness.tour.startCalls, 0);
-    expect(find.byTooltip('关闭行走设置').hitTestable(), findsOneWidget);
-    await tester.tap(find.byTooltip('关闭行走设置'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump();
-    expect(harness.journey.startCalls, 0);
-    expect(harness.tour.startCalls, 0);
-    expect(harness.discovery.coldStartCalls, 0);
-    expect(find.byKey(const ValueKey('companion-walk-settings-sheet')),
+    expect(find.byKey(const ValueKey('companion-walk-settings-entry')),
         findsNothing);
+    await _reveal(
+        tester, find.byKey(const ValueKey('companion-route-route-1')));
+    expect(harness.tour.startCalls, 0);
     expect(tester.takeException(), isNull);
   });
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/core/theme/app_theme.dart';
@@ -18,6 +19,9 @@ void main() {
     'shangqiu': ('商丘', 9),
   };
   setUpAll(() async {
+    await (FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+        .load();
     for (final entry in {
       'Noto Serif SC': 'NotoSerifSC.ttf',
       'Noto Sans SC': 'NotoSansSC.ttf',
@@ -72,7 +76,8 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpWidget(ProviderScope(
+          child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: Scaffold(
@@ -91,7 +96,8 @@ void main() {
                 onBack: () {},
               )),
         )),
-      ));
+      )));
+      await tester.tap(find.byTooltip('地图'));
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });

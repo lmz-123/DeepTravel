@@ -76,8 +76,9 @@ class TravelTicketCard extends StatelessWidget {
       required this.subtitle,
       required this.action,
       required this.onTap,
+      this.price = '',
       this.footnote = '日期、票种与入园要求'});
-  final String title, subtitle, action, footnote;
+  final String title, subtitle, action, footnote, price;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => ClipPath(
@@ -91,9 +92,28 @@ class TravelTicketCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 7),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title,
-                style: noteSerif(18, weight: FontWeight.w500, height: 1.6)),
-            Text(subtitle, style: noteSans(11, color: noteQuiet)),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(title,
+                        style: noteSerif(22,
+                            weight: FontWeight.w500, height: 1.6)),
+                    Text(subtitle, style: noteSans(11, color: noteQuiet))
+                  ])),
+              if (price.isNotEmpty)
+                Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 4),
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text('参考', style: noteSans(10, color: noteQuiet)),
+                          const SizedBox(width: 4),
+                          Text('¥$price', style: noteItalic(30, color: noteInk))
+                        ]))
+            ]),
             const SizedBox(height: 16),
             const SizedBox(
                 height: 1,
@@ -113,9 +133,10 @@ class TravelTicketCard extends StatelessWidget {
 
 /// Both compact fact entries retain all CMS-configured fields in a sheet.
 Future<void> showPreparationFacts(BuildContext context, TravelPreparation prep,
-    {bool notices = false}) async {
+    {bool notices = false, bool all = false}) async {
   final items = prep.items
-      .where((item) => notices ? item.title == '入园须知' : item.title != '入园须知')
+      .where((item) =>
+          all || (notices ? item.title == '入园须知' : item.title != '入园须知'))
       .toList();
   await showModalBottomSheet<void>(
       context: context,
@@ -132,7 +153,12 @@ Future<void> showPreparationFacts(BuildContext context, TravelPreparation prep,
                   children: [
                     Row(children: [
                       Expanded(
-                          child: Text(notices ? '入园须知' : '开放与交通',
+                          child: Text(
+                              all
+                                  ? '开放与入园须知'
+                                  : notices
+                                      ? '入园须知'
+                                      : '开放与交通',
                               style: noteSerif(23))),
                       IconButton(
                           tooltip: '关闭',

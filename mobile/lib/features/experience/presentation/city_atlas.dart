@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'community/notes_controller.dart';
+import '../domain/community_models.dart';
 
 import '../domain/models.dart';
 import 'city_atlas_geometry.dart';
@@ -76,7 +79,7 @@ class CityMapEntry extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => DiscoveryTouch(
-        label: '城市地图，查看景点与介绍',
+        label: '全部景点，查看景点与介绍',
         onTap: onTap,
         child: Container(
             height: 118,
@@ -135,7 +138,7 @@ class CityMapEntry extends StatelessWidget {
                                 letterSpacing: .7,
                                 color: _muted)),
                         const SizedBox(height: 10),
-                        Text('城市地图',
+                        Text('全部景点',
                             style: discoverySerif(25,
                                 weight: FontWeight.w500, color: _ink)),
                         const SizedBox(height: 7),
@@ -146,7 +149,7 @@ class CityMapEntry extends StatelessWidget {
       );
 }
 
-class CityAtlas extends StatefulWidget {
+class CityAtlas extends ConsumerStatefulWidget {
   const CityAtlas(
       {required this.citySlug,
       required this.cityName,
@@ -169,10 +172,10 @@ class CityAtlas extends StatefulWidget {
   final CityMapUpdates? mapUpdates;
   final Object? revision;
   @override
-  State<CityAtlas> createState() => _CityAtlasState();
+  ConsumerState<CityAtlas> createState() => _CityAtlasState();
 }
 
-class _CityAtlasState extends State<CityAtlas>
+class _CityAtlasState extends ConsumerState<CityAtlas>
     with SingleTickerProviderStateMixin {
   late final AnimationController _arrival = AnimationController(
       vsync: this, value: 1, duration: const Duration(milliseconds: 420));
@@ -180,345 +183,589 @@ class _CityAtlasState extends State<CityAtlas>
   @override
   void dispose() {
     _arrival.dispose();
+    _scroll.dispose();
+    _search.dispose();
     super.dispose();
   }
 
-  String _filter = '全部';
-  String? _selected;
+  String _filter = '全部', _region = '全部区域', _query = '';
+  String? _selected, _focus;
+  int? _geometrySignature;
+  bool _mapMode = false, _nearest = false;
+  int _pageSize = 20;
+  final _scroll = ScrollController();
+  final _search = TextEditingController();
   double _zoom = 1, _startZoom = 1;
   Offset _pan = Offset.zero, _startPan = Offset.zero, _startFocal = Offset.zero;
   List<RouteExperience> get _routes =>
-      widget.routes.where((route) => route.isPublished).toList();
-  List<RouteExperience> get _visible => _routes
-      .where((route) => _filter == '全部' || cityAtlasCategory(route) == _filter)
-      .toList();
+      widget.routes.where((r) => r.isPublished).toList();
+  double? _distance(RouteExperience r) {
+    final point = cityAtlasCoordinate(r);
+    if (point == null) return null;
+    return noteDistance(
+        CommunityPlace(
+            fragmentId: r.id,
+            name: r.title,
+            routeSlug: r.slug,
+            routeTitle: r.title,
+            citySlug: widget.citySlug,
+            cityName: widget.cityName,
+            latitude: point.dy,
+            longitude: point.dx),
+        ref.read(notesLocationProvider).value);
+  }
+
+  List<RouteExperience> get _visible {
+    final result = _routes
+        .where((r) =>
+            (_filter == '全部' || cityAtlasCategory(r) == _filter) &&
+            (_region == '全部区域' || r.district == _region) &&
+            ('${r.title} ${r.district} ${r.subtitle}'
+                .toLowerCase()
+                .contains(_query.toLowerCase())))
+        .toList();
+    if (_nearest) {
+      result.sort((a, b) => (_distance(a) ?? double.infinity)
+          .compareTo(_distance(b) ?? double.infinity));
+    }
+    return result;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      if (!_mapMode &&
+          _scroll.position.extentAfter < 500 &&
+          _pageSize < _visible.length) {
+        setState(() => _pageSize += 20);
+      }
+    });
+  }
+
+  void _filterChanged(VoidCallback change) => setState(() {
+        change();
+        _pageSize = 20;
+        if (!_visible.any((r) => r.id == _selected)) _selected = null;
+        _zoom = 1;
+        _pan = Offset.zero;
+      });
   @override
   void didUpdateWidget(CityAtlas oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.visible &&
-        widget.visible &&
-        !MediaQuery.disableAnimationsOf(context)) {
-      _arrival.forward(from: 0);
+    if (!oldWidget.visible && widget.visible) {
+      _mapMode = false;
+      if (!MediaQuery.disableAnimationsOf(context)) _arrival.forward(from: 0);
     }
     if (oldWidget.citySlug != widget.citySlug) {
       _filter = '全部';
+      _region = '全部区域';
+      _query = '';
+      _search.clear();
       _selected = null;
+      _focus = null;
+      _mapMode = false;
+      _pageSize = 20;
       _zoom = 1;
       _pan = Offset.zero;
-    }
-    if (_filter != '全部' &&
-        !_routes.any((route) => cityAtlasCategory(route) == _filter)) {
-      _filter = '全部';
     }
   }
 
   void _changeZoom(double next, Size size) {
-    final value = next.clamp(1.0, 5.0);
+    final value = next.clamp(1.0, 24.0);
     setState(() {
-      _pan = (size.center(Offset.zero) -
-          (size.center(Offset.zero) - _pan) * (value / _zoom));
+      _pan = size.center(Offset.zero) -
+          (size.center(Offset.zero) - _pan) * (value / _zoom);
       _zoom = value;
     });
   }
 
+  void _select(RouteExperience r) {
+    setState(() {
+      _selected = r.id;
+      _focus = r.id;
+      _mapMode = true;
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  Future<void> _regions() async {
+    final result = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: _paper,
+        builder: (c) => SafeArea(
+                child: ListView(shrinkWrap: true, children: [
+              for (final region in [
+                '全部区域',
+                ..._routes
+                    .map((r) => r.district)
+                    .where((s) => s.isNotEmpty)
+                    .toSet()
+              ])
+                ListTile(
+                    title: Text(region, style: discoverySerif(18)),
+                    trailing: region == _region
+                        ? const Icon(Icons.check, color: _rust, size: 18)
+                        : null,
+                    onTap: () => Navigator.pop(c, region))
+            ])));
+    if (result != null && mounted) _filterChanged(() => _region = result);
+  }
+
+  String _admission(RouteExperience r) =>
+      switch (r.travelPreparation.admission) {
+        'ticket' => '需购票',
+        'free' => '免费开放',
+        'reservation' => '需预约',
+        _ => '',
+      };
   @override
   Widget build(BuildContext context) {
+    ref.watch(notesLocationProvider);
     final visible = _visible;
-    final selected =
-        visible.where((route) => route.id == _selected).firstOrNull ??
-            visible.firstOrNull;
+    final selected = visible.where((r) => r.id == _selected).firstOrNull;
     final categories = [
       '全部',
       ...{'街巷', '海边', '山野', '建筑', '公园', '其他'}
           .where(_routes.map(cityAtlasCategory).toSet().contains)
     ];
-    final side = MediaQuery.sizeOf(context).width <= 360 ? 19.0 : 23.0;
+    final side = MediaQuery.sizeOf(context).width < 350 ? 19.0 : 23.0;
     return FadeTransition(
         opacity: _arrival.drive(CurveTween(curve: Curves.easeOutQuart)),
-        child: SingleChildScrollView(
-            key: const PageStorageKey('city-map-scroll'),
-            padding: const EdgeInsets.only(bottom: 110),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Padding(
+        child: CustomScrollView(
+            controller: _scroll,
+            // ignore: deprecated_member_use
+            cacheExtent: 400,
+            slivers: [
+              SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: side),
-                  child: SizedBox(
-                      height: 51,
-                      child: Row(children: [
-                        DiscoveryTouch(
-                            label: '返回发现',
-                            onTap: widget.onBack,
-                            child: SizedBox(
-                                height: 44,
-                                child: Row(children: [
-                                  const DiscoveryIcon(DiscoveryMark.arrowLeft,
-                                      size: 17, color: _muted),
-                                  const SizedBox(width: 7),
-                                  Text('发现',
-                                      style: discoverySans(11, color: _muted)),
-                                ]))),
-                        const Spacer(),
-                        Text(
-                            widget.citySlug == 'shenzhen'
-                                ? 'CITY ATLAS / SZ'
-                                : 'CITY ATLAS',
-                            style: const TextStyle(
-                                fontFamily: 'Georgia',
-                                fontStyle: FontStyle.italic,
-                                fontSize: 12,
-                                color: _muted)),
-                      ]))),
-              Padding(
-                padding: EdgeInsets.fromLTRB(side, 5, side, 0),
-                child: SizedBox(
-                    width: double.infinity,
-                    child: Stack(children: [
-                      Column(
+                  sliver: SliverToBoxAdapter(
+                      child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('循着好奇，',
-                                style: discoverySerif(39,
-                                    color: _ink,
-                                    height: 1.22,
-                                    weight: FontWeight.w600,
-                                    spacing: -2.3)),
-                            Padding(
-                                padding: const EdgeInsets.only(left: 35),
-                                child: Text('走进城市',
-                                    style: discoverySerif(39,
-                                        color: _rust,
-                                        height: 1.22,
-                                        weight: FontWeight.w600,
-                                        spacing: -2.3))),
-                          ]),
-                      Positioned(
-                          top: 10,
-                          right: 0,
-                          child: Text.rich(TextSpan(children: [
-                            TextSpan(
-                                text: visible.length.toString().padLeft(2, '0'),
-                                style: const TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontStyle: FontStyle.italic,
-                                    fontSize: 23,
-                                    color: _rust)),
-                            TextSpan(
-                                text: ' 处发现',
-                                style: discoverySans(11, color: _muted)),
-                          ]))),
-                    ])),
-              ),
-              Container(
-                  height: 59,
-                  margin: EdgeInsets.fromLTRB(side, 0, side, 0),
-                  decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: _line))),
-                  child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(children: [
-                        for (final category in categories)
+                        SizedBox(
+                            height: 65,
+                            child: Row(children: [
+                              TextButton.icon(
+                                  key: const ValueKey('atlas-back'),
+                                  style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero),
+                                  onPressed: widget.onBack,
+                                  icon: const Icon(Icons.arrow_back, size: 17),
+                                  label: Text('发现',
+                                      style: discoverySans(12, color: _muted))),
+                            ])),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Expanded(
+                              child: Text('全部景点',
+                                  style: discoverySerif(32,
+                                      weight: FontWeight.w500))),
+                          Text(widget.cityName,
+                              style: discoverySans(12, color: _muted))
+                        ]),
+                        const SizedBox(height: 16),
+                        TextField(
+                            controller: _search,
+                            onChanged: (s) => _filterChanged(() => _query = s),
+                            style: discoverySans(14),
+                            decoration: InputDecoration(
+                                hintText: '搜索景点或区域',
+                                hintStyle: discoverySans(14, color: _muted),
+                                prefixIcon: const Icon(Icons.search, size: 18),
+                                suffixIcon: IconButton(
+                                    tooltip: '清空搜索',
+                                    icon: const Icon(Icons.close, size: 16),
+                                    onPressed: () {
+                                      _search.clear();
+                                      _filterChanged(() => _query = '');
+                                    }),
+                                filled: false,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                prefixIconConstraints:
+                                    const BoxConstraints(minWidth: 28),
+                                enabledBorder: const UnderlineInputBorder(
+                                    borderSide: BorderSide(color: _ink)),
+                                focusedBorder: const UnderlineInputBorder(
+                                    borderSide: BorderSide(color: _ink)))),
+                        const SizedBox(height: 12),
+                        Container(
+                            width: double.infinity,
+                            decoration: const BoxDecoration(
+                                border:
+                                    Border(bottom: BorderSide(color: _line))),
+                            child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(children: [
+                                  for (final category in categories)
+                                    Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 18),
+                                        child: InkWell(
+                                            onTap: () => _filterChanged(
+                                                () => _filter = category),
+                                            child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    vertical: 18),
+                                                decoration: BoxDecoration(
+                                                    border: Border(
+                                                        bottom: BorderSide(
+                                                            color: _filter == category
+                                                                ? _rust
+                                                                : Colors
+                                                                    .transparent))),
+                                                child: Text(category,
+                                                    style: discoverySans(12, color: _filter == category ? _rust : _muted)))))
+                                ]))),
+                        Row(children: [
+                          TextButton(
+                              style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(64, 44)),
+                              onPressed: _regions,
+                              child: Text('$_region ⌄',
+                                  style: discoverySans(11, color: _ink))),
+                          TextButton(
+                              onPressed: () async {
+                                if (!_nearest &&
+                                    ref.read(notesLocationProvider).value ==
+                                        null) {
+                                  await ref
+                                      .read(notesLocationProvider.notifier)
+                                      .locate();
+                                }
+                                if (mounted) {
+                                  _filterChanged(() => _nearest = !_nearest);
+                                }
+                              },
+                              child: Text(_nearest ? '距离最近 ⌄' : '推荐 ⌄',
+                                  style: discoverySans(11, color: _ink))),
+                          const Spacer(),
+                          _viewButton(true, Icons.map_outlined, '地图'),
+                          _viewButton(false, Icons.view_list_outlined, '列表')
+                        ]),
+                        if (!_mapMode)
                           Padding(
-                              padding: const EdgeInsets.only(right: 15),
-                              child: DiscoveryTouch(
-                                label: '$category主题',
-                                selected: _filter == category,
-                                onTap: () => setState(() {
-                                  _filter = category;
-                                  _selected = null;
-                                }),
-                                child: SizedBox(
-                                    width: 58,
-                                    height: 48,
-                                    child: Center(
-                                        child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 9, vertical: 3),
-                                      decoration: _filter == category
-                                          ? BoxDecoration(
-                                              border: Border.all(
-                                                  color: _rust, width: .8),
-                                              borderRadius:
-                                                  BorderRadius.circular(50))
-                                          : null,
-                                      child: Text(category,
-                                          style: discoverySerif(16,
-                                              color: _filter == category
-                                                  ? _rust
-                                                  : _ink)),
-                                    ))),
-                              )),
+                              padding: const EdgeInsets.only(top: 14),
+                              child: Text('${visible.length} 处景点',
+                                  style: discoverySans(11, color: _muted))),
                       ]))),
-              CityMapGeometryView(
-                  city: widget.citySlug,
-                  updates: widget.mapUpdates,
-                  revision: (widget.revision, widget.visible),
-                  builder: (districts) =>
-                      _map(districts, visible, selected?.id)),
-              if (selected != null)
-                _sheet(selected)
+              if (_mapMode)
+                SliverToBoxAdapter(
+                    child: Column(children: [
+                  CityMapGeometryView(
+                      city: widget.citySlug,
+                      updates: widget.mapUpdates,
+                      revision: (widget.revision, widget.visible),
+                      builder: (districts) =>
+                          _map(districts, visible, selected?.id)),
+                  Padding(
+                      padding: EdgeInsets.fromLTRB(side, 15, side, 15),
+                      child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('${visible.length} 处景点',
+                              style: discoverySans(11, color: _muted)))),
+                  if (selected != null) _sheet(selected),
+                  Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Text('底图：DataV 地理数据',
+                          style: discoverySans(9, color: _muted))),
+                ]))
               else
-                Padding(
-                    padding: EdgeInsets.all(side),
-                    child: Text(
-                        _routes.isEmpty ? '这座城市的景点正在准备中。' : '这个主题还没有景点，换一个看看。',
-                        style: discoverySans(13, color: _muted))),
-              if (visible.any((route) => cityAtlasCoordinate(route) == null))
-                Padding(
-                    padding: EdgeInsets.fromLTRB(side, 12, side, 0),
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('以下景点暂无地图位置，仍可查看介绍',
-                              style: discoverySans(11, color: _muted)),
-                          Wrap(spacing: 12, children: [
-                            for (final route in visible.where(
-                                (route) => cityAtlasCoordinate(route) == null))
-                              TextButton(
-                                  onPressed: () =>
-                                      setState(() => _selected = route.id),
-                                  child: Text(route.title))
-                          ]),
-                        ])),
-              Padding(
-                  padding: EdgeInsets.fromLTRB(side, 8, side, 0),
-                  child: Text('底图：DataV 地理数据 · 地点：见地内容库 · 非导航地图',
-                      style: discoverySans(9, color: _muted))),
-            ])));
+                SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: side),
+                    sliver: SliverList.builder(
+                        itemCount: math.min(_pageSize, visible.length),
+                        itemBuilder: (context, i) => _listRow(visible[i]))),
+              if (visible.isEmpty)
+                SliverToBoxAdapter(
+                    child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Center(
+                            child:
+                                Text('没有符合条件的景点', style: discoverySerif(18))))),
+              const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            ]));
   }
 
-  bool _labelBelow(RouteExperience route) =>
-      ['海边', '建筑'].contains(cityAtlasCategory(route));
+  Widget _viewButton(bool map, IconData icon, String label) => Tooltip(
+      message: label,
+      child: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: InkWell(
+              onTap: () => setState(() => _mapMode = map),
+              child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                      border: Border(
+                          bottom: BorderSide(
+                              color: _mapMode == map
+                                  ? _rust
+                                  : Colors.transparent))),
+                  child: Row(children: [
+                    Icon(icon,
+                        size: 15, color: _mapMode == map ? _rust : _muted),
+                    const SizedBox(width: 4),
+                    Text(label,
+                        style: discoverySerif(13,
+                            color: _mapMode == map ? _rust : _muted))
+                  ])))));
+  Widget _listRow(RouteExperience r) => Container(
+      key: ValueKey('place-row-${r.id}'),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+          border: Border(
+              bottom: const BorderSide(color: _line),
+              left: BorderSide(
+                  color: _selected == r.id ? _rust : Colors.transparent,
+                  width: 2))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        GestureDetector(
+            onTap: () => _select(r),
+            child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.only(topRight: Radius.circular(20)),
+                child: SizedBox(
+                    width: MediaQuery.sizeOf(context).width < 360 ? 75 : 85,
+                    height: 114,
+                    child: _image(r)))),
+        const SizedBox(width: 16),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          InkWell(
+              onTap: () => _select(r),
+              child: SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            [r.district, cityAtlasCategory(r)]
+                                .where((s) => s.isNotEmpty)
+                                .join(' · '),
+                            style: discoverySans(11, color: _muted)),
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            child: Text(r.title,
+                                style: discoverySerif(
+                                    MediaQuery.sizeOf(context).width < 360
+                                        ? 18
+                                        : 20,
+                                    weight: FontWeight.w500))),
+                        Row(children: [
+                          Expanded(
+                              child: Text(noteDistanceLabel(_distance(r)),
+                                  style: discoverySans(10, color: _muted))),
+                          Text(_admission(r),
+                              style: discoverySans(10, color: _muted))
+                        ]),
+                      ]))),
+          Row(children: [
+            TextButton.icon(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                onPressed: () => _select(r),
+                icon: const Icon(Icons.location_on_outlined,
+                    size: 14, color: _rust),
+                label: Text('地图查看', style: discoverySans(11, color: _rust))),
+            const Spacer(),
+            TextButton(
+                onPressed: () => widget.onOpen(r),
+                child: Text('详情 ↗', style: discoverySans(11, color: _muted)))
+          ])
+        ]))
+      ]));
+  Widget _image(RouteExperience r) =>
+      ScenicThumbnail(url: r.heroImage, label: r.title);
 
   Widget _map(List<CityAtlasDistrict> districts, List<RouteExperience> visible,
       String? selected) {
     final coordinates =
         _routes.map(cityAtlasCoordinate).whereType<Offset>().toList();
     return LayoutBuilder(builder: (context, constraints) {
-      final size =
-          Size(constraints.maxWidth, constraints.maxWidth <= 370 ? 317 : 291);
+      final size = Size(constraints.maxWidth, 370);
+      final signature = Object.hashAll(
+          districts.map((d) => Object.hash(d.name, d.polygons.length)));
+      if (_geometrySignature != signature) {
+        _geometrySignature = signature;
+        _focus ??= selected;
+      }
       final projection = _Projection(districts, coordinates, size);
-      final markers =
-          <({RouteExperience route, Offset anchor, Offset point})>[];
+      if (_focus != null) {
+        final route = visible.where((r) => r.id == _focus).firstOrNull;
+        final point = route == null ? null : cityAtlasCoordinate(route);
+        if (point != null) {
+          _zoom = 3;
+          _pan = size.center(Offset.zero) - projection.project(point) * _zoom;
+        }
+        _focus = null;
+      }
+      final groups = <List<({RouteExperience route, Offset point})>>[];
       for (final route in visible) {
         final coordinate = cityAtlasCoordinate(route);
         if (coordinate == null) continue;
-        final anchor = projection.project(coordinate) * _zoom + _pan;
-        // Screen-space displacement preserves geographic anchors while separating
-        // neighboring labels and their 44 px touch targets at every zoom level.
-        final offset = switch (cityAtlasCategory(route)) {
-          '海边' => const Offset(10, 17),
-          '街巷' => const Offset(-12, -29),
-          '建筑' => const Offset(12, 30),
-          _ => const Offset(-3, -21),
-        };
-        var point = anchor + offset;
-        Rect touch(Offset p) =>
-            Rect.fromCenter(center: p, width: 44, height: 44);
-        Rect label(RouteExperience r, Offset p) => Rect.fromCenter(
-            center: p + Offset(0, _labelBelow(r) ? 34 : -26),
-            width: (r.title.characters.length * 11.0 + 12).clamp(44.0, 132.0),
-            height: 26);
-        for (var attempt = 0; attempt < 24; attempt++) {
-          if (!markers.any((m) =>
-              touch(point).overlaps(touch(m.point)) ||
-              label(route, point).overlaps(label(m.route, m.point)) ||
-              label(route, point).overlaps(touch(m.point)) ||
-              touch(point).overlaps(label(m.route, m.point)))) {
-            break;
-          }
-          final angle = attempt * 2.4;
-          final radius = 35 + (attempt ~/ 6) * 20;
-          point = anchor +
-              Offset(math.cos(angle) * radius, math.sin(angle) * radius);
+        final point = projection.project(coordinate) * _zoom + _pan;
+        if (!Rect.fromLTWH(-60, -60, size.width + 120, size.height + 120)
+            .contains(point)) {
+          continue;
         }
-        markers.add((route: route, anchor: anchor, point: point));
+        final group = groups
+            .where((g) =>
+                (g.first.point - point).distance < 48 &&
+                g.first.route.id != selected &&
+                route.id != selected)
+            .firstOrNull;
+        if (group == null) {
+          groups.add([(route: route, point: point)]);
+        } else {
+          group.add((route: route, point: point));
+        }
       }
+      groups.sort((a, b) => (a.first.route.id == selected ? 1 : 0)
+          .compareTo(b.first.route.id == selected ? 1 : 0));
       return SizedBox.fromSize(
           size: size,
           child: ClipRect(
-              child: ColoredBox(
-                  color: const Color(0xffe9e9df),
-                  child: Stack(children: [
-                    Positioned.fill(
-                        child: GestureDetector(
-                      key: const ValueKey('city-map-canvas'),
-                      behavior: HitTestBehavior.opaque,
-                      onScaleStart: (details) {
-                        _startZoom = _zoom;
-                        _startPan = _pan;
-                        _startFocal = details.localFocalPoint;
-                      },
-                      onScaleUpdate: (details) => setState(() {
-                        _zoom = (_startZoom * details.scale).clamp(1.0, 5.0);
-                        _pan = details.localFocalPoint -
+              child: GestureDetector(
+                  key: const ValueKey('city-map-canvas'),
+                  behavior: HitTestBehavior.opaque,
+                  onScaleStart: (d) {
+                    _startZoom = _zoom;
+                    _startPan = _pan;
+                    _startFocal = d.localFocalPoint;
+                  },
+                  onScaleUpdate: (d) => setState(() {
+                        _zoom = (_startZoom * d.scale).clamp(1.0, 24.0);
+                        _pan = d.localFocalPoint -
                             (_startFocal - _startPan) * (_zoom / _startZoom);
                       }),
-                      child: CustomPaint(
-                          painter: _AtlasPainter(
-                              cityLabel: widget.citySlug.startsWith('city-')
-                                  ? widget.cityName
-                                  : widget.citySlug.toUpperCase(),
-                              districts: districts,
-                              coordinates: coordinates,
-                              zoom: _zoom,
-                              pan: _pan)),
-                    )),
-                    Positioned.fill(
-                        child: IgnorePointer(
+                  child: ColoredBox(
+                      color: const Color(0xffe9e9df),
+                      child: Stack(children: [
+                        Positioned.fill(
                             child: CustomPaint(
-                                painter: _Leaders(markers
-                                    .map((m) => (m.anchor, m.point))
-                                    .toList())))),
-                    for (final marker in markers)
-                      _marker(marker.route, marker.point,
-                          marker.route.id == selected),
-                    Positioned(
-                        left: 22,
-                        top: 15,
-                        child: Text('N ↑',
-                            style: discoverySans(12, color: _muted))),
-                    Positioned(
-                        left: 23,
-                        bottom: 16,
-                        child: IgnorePointer(
-                            child: Text(
-                                coordinates.isEmpty
-                                    ? '景点位置正在完善'
-                                    : '拖动地图 · 点一处，慢慢看',
-                                style: discoverySans(11,
-                                    color: const Color(0xff7f8477))))),
-                    Positioned(
-                        right: 17,
-                        bottom: 20,
-                        child: Container(
-                            decoration: BoxDecoration(
+                                painter: _AtlasPainter(
+                                    cityLabel: widget.cityName,
+                                    districts: districts,
+                                    coordinates: coordinates,
+                                    zoom: _zoom,
+                                    pan: _pan))),
+                        for (final group in groups)
+                          if (group.length == 1)
+                            _marker(group.first.route, group.first.point,
+                                group.first.route.id == selected)
+                          else
+                            Positioned(
+                                left: group.first.point.dx - 24,
+                                top: group.first.point.dy - 24,
+                                child: Semantics(
+                                    label: '${group.length} 处景点，放大查看',
+                                    button: true,
+                                    child: GestureDetector(
+                                        onTap: () {
+                                          if (_zoom >= 24) {
+                                            _showGroup(group
+                                                .map((m) => m.route)
+                                                .toList());
+                                            return;
+                                          }
+                                          setState(() {
+                                            final next =
+                                                (_zoom * 2).clamp(1.0, 24.0);
+                                            _pan = size.center(Offset.zero) -
+                                                (group.first.point - _pan) *
+                                                    (next / _zoom);
+                                            _zoom = next;
+                                          });
+                                        },
+                                        child: SizedBox(
+                                            width: 48,
+                                            height: 48,
+                                            child: Stack(
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  Transform.rotate(
+                                                      angle: -.22,
+                                                      child: Container(
+                                                          width: 33,
+                                                          height: 36,
+                                                          decoration: BoxDecoration(
+                                                              color: const Color(
+                                                                  0xffd8dbc7),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          18),
+                                                              border: Border.all(
+                                                                  color: const Color(
+                                                                      0xff9da48b))))),
+                                                  Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      alignment:
+                                                          Alignment.center,
+                                                      decoration: BoxDecoration(
+                                                          color: _paper,
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(18),
+                                                          border: Border.all(
+                                                              color: const Color(
+                                                                  0xff9da48b))),
+                                                      child: Text(
+                                                          '${group.length}',
+                                                          style: discoverySerif(
+                                                              16)))
+                                                ]))))),
+                        Positioned(
+                            left: 22,
+                            top: 15,
+                            child: IgnorePointer(
+                                child: Text('N ↑',
+                                    style: discoverySans(12, color: _muted)))),
+                        Positioned(
+                            right: 17,
+                            bottom: 20,
+                            child: Container(
                                 color: _paper,
-                                border: Border.all(color: _line),
-                                borderRadius: BorderRadius.circular(3)),
-                            child: Column(children: [
-                              _tool('放大地图', '+',
-                                  () => _changeZoom(_zoom * 1.4, size)),
-                              _tool('缩小地图', '−',
-                                  () => _changeZoom(_zoom / 1.4, size)),
-                              _tool(
-                                  '查看全城',
-                                  '⛶',
-                                  () => setState(() {
-                                        _zoom = 1;
-                                        _pan = Offset.zero;
-                                      })),
-                            ]))),
-                  ]))));
+                                child: Column(children: [
+                                  _tool('放大地图', '+',
+                                      () => _changeZoom(_zoom * 1.5, size)),
+                                  _tool('缩小地图', '−',
+                                      () => _changeZoom(_zoom / 1.5, size)),
+                                  _tool(
+                                      '查看全城',
+                                      '⛶',
+                                      () => setState(() {
+                                            _zoom = 1;
+                                            _pan = Offset.zero;
+                                          }))
+                                ]))),
+                      ])))));
     });
   }
 
+  void _showGroup(List<RouteExperience> routes) => showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _paper,
+      builder: (c) => SafeArea(
+              child: ListView(shrinkWrap: true, children: [
+            for (final r in routes)
+              ListTile(
+                  title: Text(r.title, style: discoverySerif(19)),
+                  onTap: () {
+                    Navigator.pop(c);
+                    _select(r);
+                  })
+          ])));
+
   Widget _marker(RouteExperience route, Offset point, bool selected) {
-    final below = _labelBelow(route);
     final width =
         (route.title.characters.length * 11.0 + 12).clamp(44.0, 132.0);
     return Positioned(
         left: point.dx - width / 2,
-        top: point.dy - (below ? 22 : 38),
+        top: point.dy - 22,
         child: DiscoveryTouch(
           key: ValueKey('city-map-point-${route.id}'),
           selected: selected,
@@ -527,12 +774,12 @@ class _CityAtlasState extends State<CityAtlas>
           child: ExcludeSemantics(
               child: SizedBox(
                   width: width,
-                  height: below ? 70 : 60,
+                  height: 70,
                   child: Stack(children: [
                     Positioned(
                         left: 0,
                         right: 0,
-                        top: below ? 0 : 16,
+                        top: 0,
                         height: 44,
                         child: Center(
                             child: AnimatedContainer(
@@ -550,23 +797,24 @@ class _CityAtlasState extends State<CityAtlas>
                                       : const Color(0xff9c9e83),
                                   width: selected ? 2 : 1)),
                         ))),
-                    Positioned(
-                        left: 0,
-                        right: 0,
-                        top: below ? 43 : 0,
-                        child: Center(
-                            child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 4),
-                          decoration: BoxDecoration(
-                              color: selected ? _rust : _paper,
-                              borderRadius: BorderRadius.circular(2)),
-                          child: Text(route.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: discoverySans(11,
-                                  color: selected ? _paper : _ink)),
-                        ))),
+                    if (selected)
+                      Positioned(
+                          left: 0,
+                          right: 0,
+                          top: 43,
+                          child: Center(
+                              child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: _paper,
+                                borderRadius: BorderRadius.circular(2)),
+                            child: Text(route.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: discoverySans(11,
+                                    color: selected ? _rust : _ink)),
+                          ))),
                   ]))),
         ));
   }
@@ -597,95 +845,74 @@ class _CityAtlasState extends State<CityAtlas>
           key: ValueKey(route.id),
           child: Container(
               key: const ValueKey('city-map-place-sheet'),
-              margin: const EdgeInsets.symmetric(horizontal: 13),
-              padding: const EdgeInsets.fromLTRB(17, 9, 17, 0),
+              margin: EdgeInsets.symmetric(
+                  horizontal: MediaQuery.sizeOf(context).width < 350 ? 19 : 23),
+              padding: const EdgeInsets.only(top: 20),
               decoration: const BoxDecoration(
-                  color: _paper,
-                  borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(2))),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                        child: Container(width: 28, height: 2, color: _line)),
-                    const SizedBox(height: 10),
-                    Row(children: [
-                      ClipRRect(
-                          borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(36)),
-                          child: SizedBox(
-                              width: 76,
-                              height: 83,
-                              child: route.heroImage.isEmpty
-                                  ? _thumb(route)
-                                  : Image.network(route.heroImage,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          _thumb(route)))),
-                      const SizedBox(width: 15),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(
-                                '${route.district} / ${cityAtlasCategory(route)}',
-                                style: discoverySans(11, color: _muted)),
-                            Text(route.title,
-                                style: discoverySerif(25,
-                                    weight: FontWeight.w600,
-                                    color: _ink,
-                                    height: 1.5)),
-                            Text(
-                                '${route.durationMinutes} 分钟 · ${route.distanceKm.toStringAsFixed(1)} km · ${route.numberOfStops} 处故事',
-                                style: discoverySans(11, color: _muted)),
-                          ])),
-                    ]),
-                    Padding(
-                        padding: const EdgeInsets.only(top: 13, bottom: 10),
-                        child: ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 44),
-                            child: Text(
-                                route.description.isNotEmpty
-                                    ? route.description
-                                    : route.subtitle,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: discoverySans(12,
-                                    height: 1.85, color: _ink)))),
-                    Container(
-                        decoration: const BoxDecoration(
-                            border: Border(top: BorderSide(color: _line))),
-                        child: Row(children: [
-                          Expanded(
-                              child: DiscoveryTouch(
-                                  key: const ValueKey('city-map-open'),
-                                  label: '翻开${route.title}这段漫游',
-                                  onTap: () => widget.onOpen(route),
-                                  child: SizedBox(
-                                      height: 47,
-                                      child: Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Text('翻开这段漫游    ↗',
-                                              style: discoverySans(12,
-                                                  color: _rust)))))),
-                          IconButton(
-                              tooltip:
-                                  '${widget.saved.contains(route.id) ? '取消收藏' : '收藏'}${route.title}',
-                              onPressed: widget.busyFavorites.contains(route.id)
-                                  ? null
-                                  : () => widget.onFavorite(route),
-                              icon: DiscoveryIcon(DiscoveryMark.heart,
-                                  size: 20,
-                                  color: _rust,
-                                  filled: widget.saved.contains(route.id))),
-                        ])),
-                  ]))));
-  Widget _thumb(RouteExperience route) => ColoredBox(
-      color: const Color(0xffe0e5c5),
-      child: Center(
-          child: Text(route.title.characters.firstOrNull ?? '',
-              style: discoverySerif(38, color: const Color(0xff687355)))));
+                  border: Border(top: BorderSide(color: _line))),
+              child: Stack(children: [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(20)),
+                        child: SizedBox(
+                            width: 75, height: 85, child: _image(route))),
+                    const SizedBox(width: 16),
+                    Expanded(
+                        child: Padding(
+                            padding: const EdgeInsets.only(right: 23),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                      [route.district, cityAtlasCategory(route)]
+                                          .where((s) => s.isNotEmpty)
+                                          .join(' · '),
+                                      style: discoverySans(11, color: _muted)),
+                                  Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 6),
+                                      child: Text(route.title,
+                                          style: discoverySerif(23,
+                                              weight: FontWeight.w500))),
+                                  Text(noteDistanceLabel(_distance(route)),
+                                      style: discoverySans(11, color: _muted))
+                                ])))
+                  ]),
+                  Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                          route.description.isNotEmpty
+                              ? route.description
+                              : route.subtitle,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: discoverySans(12, height: 1.85))),
+                  Text(_admission(route),
+                      style: discoverySans(11, color: _muted)),
+                  DiscoveryTouch(
+                      key: const ValueKey('city-map-open'),
+                      label: '查看${route.title}详情',
+                      onTap: () => widget.onOpen(route),
+                      child: SizedBox(
+                          height: 48,
+                          child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                  route.travelPreparation.canBook
+                                      ? '查看景点与门票  ↗'
+                                      : '查看景点  ↗',
+                                  style: discoverySerif(17, color: _rust)))))
+                ]),
+                Positioned(
+                    top: 0,
+                    right: -10,
+                    child: IconButton(
+                        tooltip: '取消选中地点',
+                        onPressed: () => setState(() => _selected = null),
+                        icon: const Icon(Icons.close, size: 15, color: _muted)))
+              ]))));
 }
 
 Offset _mercator(Offset point) => Offset(point.dx * math.pi / 180,
@@ -810,7 +1037,7 @@ class _AtlasPainter extends CustomPainter {
           text: TextSpan(
               text: cityLabel,
               style: const TextStyle(
-                  fontFamily: 'Georgia',
+                  fontFamily: 'Noto Serif SC',
                   fontStyle: FontStyle.italic,
                   fontSize: 12,
                   letterSpacing: 2,
@@ -831,26 +1058,6 @@ class _AtlasPainter extends CustomPainter {
       old.pan != pan;
 }
 
-class _Leaders extends CustomPainter {
-  const _Leaders(this.lines);
-  final List<(Offset, Offset)> lines;
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final (anchor, point) in lines) {
-      canvas.drawLine(
-          anchor,
-          point,
-          Paint()
-            ..color = const Color(0xff9d9e88)
-            ..strokeWidth = .8);
-      canvas.drawCircle(anchor, 2, Paint()..color = const Color(0xff8e967a));
-    }
-  }
-
-  @override
-  bool shouldRepaint(_Leaders old) => old.lines != lines;
-}
-
 class _AtlasPlaceArrival extends StatelessWidget {
   const _AtlasPlaceArrival({required this.child, super.key});
   final Widget child;
@@ -867,4 +1074,41 @@ class _AtlasPlaceArrival extends StatelessWidget {
             child: Transform.translate(
                 offset: Offset(0, 8 * (1 - value)), child: child)),
       );
+}
+
+/// Built lazily by the sliver list; decoded images share Flutter's bounded LRU.
+class ScenicThumbnail extends StatefulWidget {
+  const ScenicThumbnail({super.key, required this.url, required this.label});
+  final String url, label;
+  @override
+  State<ScenicThumbnail> createState() => _ScenicThumbnailState();
+}
+
+class _ScenicThumbnailState extends State<ScenicThumbnail> {
+  int _attempt = 0;
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+      color: const Color(0xffe6e7d8),
+      child: widget.url.isEmpty
+          ? Center(
+              child: Text(widget.label.characters.firstOrNull ?? '',
+                  style: discoverySerif(28, color: _muted)))
+          : Image.network(widget.url,
+              key: ValueKey((widget.url, _attempt)),
+              fit: BoxFit.cover,
+              cacheWidth: (110 * MediaQuery.devicePixelRatioOf(context))
+                  .round()
+                  .clamp(110, 440),
+              frameBuilder: (c, child, frame, synchronous) =>
+                  frame != null || synchronous
+                      ? child
+                      : const SizedBox.expand(),
+              errorBuilder: (c, e, stack) => Center(
+                  child: IconButton(
+                      tooltip: '重新加载图片',
+                      icon: const Icon(Icons.refresh, size: 18),
+                      onPressed: () async {
+                        await NetworkImage(widget.url).evict();
+                        if (mounted) setState(() => _attempt++);
+                      }))));
 }

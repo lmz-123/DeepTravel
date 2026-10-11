@@ -160,12 +160,6 @@ class _DiscoveryCompanion extends ConsumerWidget {
                         style: _companionSans(11,
                             height: 1.8, color: AppColors.textMuted)),
                   ),
-                const SizedBox(height: 120),
-                if (selectedRoute != null && _supportsCompanion(selectedRoute))
-                  CompanionWalkSettingsEntry(
-                    route: selectedRoute,
-                    enabled: !running && !starting,
-                  ),
                 const SizedBox(height: 30),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

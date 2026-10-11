@@ -27,11 +27,6 @@ final appRouter = GoRouter(
         path: '/travel/:id',
         builder: (_, state) => TravelPlanPage(id: state.pathParameters['id']!)),
     GoRoute(
-        path: '/travel/:id/receipt/:receiptId',
-        builder: (_, state) => TravelReceiptPage(
-            planId: state.pathParameters['id']!,
-            receiptId: state.pathParameters['receiptId']!)),
-    GoRoute(
         path: '/community/write',
         builder: (context, state) => NoteComposePage(
             fragmentId: state.uri.queryParameters['fragment'],

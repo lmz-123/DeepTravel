@@ -173,13 +173,12 @@ void main() {
     await _pumpApp(tester, repository: repository);
     expect(find.text('旧港码头'), findsNothing);
     expect(find.text('山海栈道'), findsNothing);
-    final map = find.bySemanticsLabel(RegExp('城市地图，查看景点与介绍'));
+    final map = find.bySemanticsLabel(RegExp('全部景点，查看景点与介绍'));
     await Scrollable.ensureVisible(tester.element(map), alignment: .35);
     await tester.pumpAndSettle();
     await tester.tap(map);
     await tester.pumpAndSettle();
-    final second =
-        find.byKey(const ValueKey('city-map-point-route-mountain-coast'));
+    final second = find.text('山海之间的故事');
     await Scrollable.ensureVisible(tester.element(second), alignment: .35);
     await tester.pumpAndSettle();
     await tester.tap(second);
