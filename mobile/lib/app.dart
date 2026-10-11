@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/experience/data/api_experience_repository.dart';
 import 'features/experience/presentation/experience_providers.dart';
+import 'features/experience/presentation/discovery_controller.dart';
 import 'features/experience/presentation/active_tour_controller.dart';
 
 class JiandiApp extends ConsumerStatefulWidget {
@@ -51,6 +52,11 @@ class _JiandiAppState extends ConsumerState<JiandiApp> {
     ref.watch(tourOutboxSyncLifecycleProvider);
     final usesRemoteApi =
         ref.watch(experienceRepositoryProvider) is ApiExperienceRepository;
+    // Public catalog requests can run while the saved login is verified.
+    // Private pages remain behind AuthGate until verification completes.
+    if (usesRemoteApi) {
+      ref.watch(discoveryControllerProvider.select((_) => null));
+    }
     return MaterialApp.router(
       title: '见地',
       debugShowCheckedModeBanner: false,

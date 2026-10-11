@@ -330,7 +330,10 @@ class TravelerFavorite {
         kind: _text(json['target_kind']),
         targetId: _text(json['target_id']),
         available: json['available'] as bool? ?? false,
-        label: _text(json['label'], '内容暂不可用'),
+        label: _text(
+          json['target'] is Map ? (json['target'] as Map)['label'] : null,
+          _text(json['label'], '已收藏的内容'),
+        ),
       );
 }
 

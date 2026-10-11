@@ -16,6 +16,7 @@ import '../../features/experience/presentation/profile_page.dart';
 
 final appRouter = GoRouter(
   routes: [
+    GoRoute(path: '/favorites', builder: (_, __) => const FavoritesPage()),
     GoRoute(
         path: '/route/:slug/prepare',
         builder: (_, state) =>

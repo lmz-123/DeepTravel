@@ -14,7 +14,7 @@ class AuthGate extends ConsumerWidget {
     return ref.watch(authControllerProvider).when(
           loading: () => const ColoredBox(
             color: AppColors.paper,
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: BrandMark()),
           ),
           error: (error, _) => _AuthNavigator(initialError: error.toString()),
           data: (session) => session == null ? const _AuthNavigator() : child,

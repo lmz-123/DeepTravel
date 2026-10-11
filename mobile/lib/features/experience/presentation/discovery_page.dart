@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/router/route_back.dart';
+import '../../../core/widgets/discovery_placeholder.dart';
 import '../domain/city_story.dart';
 import '../domain/models.dart';
 import '../domain/community_models.dart';
@@ -867,14 +869,7 @@ class _DiscoveryLoading extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         children: [
           const _DiscoveryHeader(),
-          const Expanded(
-            child: Center(
-              child: CircularProgressIndicator(
-                color: AppColors.terracotta,
-                strokeWidth: 1.5,
-              ),
-            ),
-          ),
+          const Expanded(child: DiscoveryPlaceholder()),
         ],
       );
 }

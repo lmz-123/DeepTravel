@@ -1,5 +1,14 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:jiandi/app.dart';
+import 'package:jiandi/features/experience/data/api_experience_repository.dart';
+import 'package:jiandi/features/experience/domain/city_story.dart';
+import 'package:jiandi/features/experience/presentation/widgets/traveler_bottom_navigation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:jiandi/core/theme/app_theme.dart';
+import 'package:jiandi/core/widgets/discovery_placeholder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +24,132 @@ import 'package:jiandi/features/experience/presentation/experience_providers.dar
 import 'package:jiandi/features/experience/presentation/profile_page.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await (FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+        .load();
+    for (final entry in {
+      'Noto Serif SC': 'NotoSerifSC.ttf',
+      'Noto Sans SC': 'NotoSansSC.ttf',
+      'Inter': 'Inter.ttf',
+      'Georgia': 'Gelasio.ttf',
+    }.entries) {
+      await (FontLoader(entry.key)
+            ..addFont(rootBundle.load('assets/fonts/${entry.value}')))
+          .load();
+    }
+  });
+  testWidgets('discovery placeholder fits a small screen without a spinner',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.light,
+        home: const Scaffold(body: SafeArea(child: DiscoveryPlaceholder()))));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(tester.takeException(), isNull);
+    await expectLater(find.byType(Scaffold),
+        matchesGoldenFile('goldens/discovery-startup-placeholder.png'));
+  });
+
+  test('favorites read the actual API target label', () {
+    final favorite = TravelerFavorite.fromJson({
+      'target_kind': 'route',
+      'target_id': 'dameisha',
+      'available': true,
+      'target': {'label': '大梅沙', 'slug': 'dameisha'},
+    });
+    expect(favorite.label, '大梅沙');
+    expect(favorite.available, isTrue);
+  });
+
+  testWidgets('public discovery loads while login is still restoring',
+      (tester) async {
+    final auth = _PendingAuth();
+    final requests = <String>[];
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test'));
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+      requests.add(options.path);
+      handler.resolve(Response(requestOptions: options, data: {'data': []}));
+    }));
+    await tester.pumpWidget(ProviderScope(overrides: [
+      authRepositoryProvider.overrideWithValue(auth),
+      experienceRepositoryProvider
+          .overrideWithValue(ApiExperienceRepository(dio, auth)),
+      narrationPlayerProvider.overrideWithValue(_Player()),
+      tourStoreProvider.overrideWithValue(_Store()),
+    ], child: const JiandiApp()));
+    await tester.pumpAndSettle();
+    expect(requests, ['/cities']);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(DiscoveryPage), findsNothing);
+    auth.pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('auth-username')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final tab in ['journal', 'community', 'companion']) {
+    testWidgets('favorites return through profile to $tab', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final auth = _Auth();
+      final repository = DemoExperienceRepository(latency: Duration.zero);
+      final container = ProviderContainer(overrides: [
+        authRepositoryProvider.overrideWithValue(auth),
+        experienceRepositoryProvider.overrideWithValue(repository),
+        narrationPlayerProvider.overrideWithValue(_Player()),
+      ]);
+      addTearDown(container.dispose);
+      final router = GoRouter(initialLocation: '/?tab=$tab', routes: [
+        GoRoute(
+            path: '/',
+            builder: (_, state) =>
+                DiscoveryPage(initialTab: state.uri.queryParameters['tab'])),
+        GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
+        GoRoute(path: '/favorites', builder: (_, __) => const FavoritesPage()),
+      ]);
+      addTearDown(router.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child:
+              MaterialApp.router(theme: AppTheme.light, routerConfig: router)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel(RegExp('打开个人档案')));
+      await tester.pumpAndSettle();
+      expect(find.text('打开完整书架'), findsNothing);
+      if (tab == 'journal') {
+        await expectLater(find.byType(ProfilePage),
+            matchesGoldenFile('goldens/profile-favorites-entry.png'));
+      }
+      final favorites = find.text('我的收藏');
+      await tester.ensureVisible(favorites);
+      await tester.tap(favorites);
+      await tester.pumpAndSettle();
+      expect(find.byType(FavoritesPage), findsOneWidget);
+      expect(router.canPop(), isTrue);
+      expect(find.text('收藏的地点与见闻'), findsNothing);
+      expect(find.text('下一次想去哪里？'), findsOneWidget);
+      expect(find.byType(TravelerBottomNavigation), findsNothing);
+      if (tab == 'community') {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.text('我的'));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfilePage), findsOneWidget);
+      expect(find.byType(FavoritesPage), findsNothing);
+      await tester.scrollUntilVisible(find.byTooltip('返回主页'), -300);
+      await tester.tap(find.byTooltip('返回主页'));
+      await tester.pumpAndSettle();
+      expect(
+          router.routeInformationProvider.value.uri.toString(), '/?tab=$tab');
+      expect(find.byType(TravelerBottomNavigation), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('personal file owns navigation without a legacy drawer',
       (tester) async {
     final player = _Player();
@@ -234,4 +369,11 @@ class _Player implements NarrationPlayer {
 
   @override
   Future<void> stop() async {}
+}
+
+class _PendingAuth extends AuthRepository {
+  _PendingAuth() : super(Dio());
+  final pending = Completer<AuthSession?>();
+  @override
+  Future<AuthSession?> restore() => pending.future;
 }

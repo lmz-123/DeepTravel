@@ -5,11 +5,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jiandi/features/experience/data/demo_content.dart';
 import 'package:jiandi/features/experience/data/demo_experience_repository.dart';
 import 'package:jiandi/features/experience/domain/discovery_location.dart';
+import 'package:jiandi/features/experience/domain/city_story.dart';
 import 'package:jiandi/features/experience/domain/models.dart';
 import 'package:jiandi/features/experience/presentation/discovery_controller.dart';
 import 'package:jiandi/features/experience/presentation/experience_providers.dart';
 
 void main() {
+  test('startup loads city routes and stories concurrently', () async {
+    final repository = _ParallelCatalog();
+    final container = _container(_LocationSource(), repository: repository);
+    addTearDown(container.dispose);
+    final loading = container.read(discoveryControllerProvider.future);
+    await repository.storyStarted.future.timeout(const Duration(seconds: 2));
+    expect(repository.catalog.isCompleted, isFalse);
+    repository.catalog.complete(const CityDiscoveryCatalog(routes: []));
+    expect((await loading).catalog.routes, isEmpty);
+  });
+
   test('locality matching is generic and does not require city coordinates',
       () {
     const cities = [
@@ -509,5 +521,18 @@ class _QueuedLocationSource implements CurrentLocationSource {
     requests.add(requestPermission);
     if (!firstRequest.isCompleted) firstRequest.complete();
     return samples[_index++];
+  }
+}
+
+class _ParallelCatalog extends DemoExperienceRepository {
+  _ParallelCatalog() : super(latency: Duration.zero);
+  final catalog = Completer<CityDiscoveryCatalog>();
+  final storyStarted = Completer<void>();
+  @override
+  Future<CityDiscoveryCatalog> discoveryForCity(String slug) => catalog.future;
+  @override
+  Future<CityStoryHome> cityStoryHome(String slug) async {
+    storyStarted.complete();
+    return CityStoryHome.empty;
   }
 }

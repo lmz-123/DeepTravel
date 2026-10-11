@@ -94,11 +94,14 @@ class DiscoveryController extends AsyncNotifier<DiscoveryState> {
     try {
       final cities = await _repository.cities();
       final city = fallbackDiscoveryCity(cities);
-      final catalog = city == null
-          ? const CityDiscoveryCatalog(routes: [])
-          : await _repository.discoveryForCity(city.slug);
-      final storyHome =
-          city == null ? CityStoryHome.empty : await _loadStoryHome(city.slug);
+      final (catalog, storyHome) = await (
+        city == null
+            ? Future.value(const CityDiscoveryCatalog(routes: []))
+            : _repository.discoveryForCity(city.slug),
+        city == null
+            ? Future.value(CityStoryHome.empty)
+            : _loadStoryHome(city.slug),
+      ).wait;
       return DiscoveryState(
         cities: cities,
         city: city,

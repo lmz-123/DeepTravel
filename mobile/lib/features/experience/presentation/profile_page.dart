@@ -6,7 +6,6 @@ import '../../../core/config/app_config.dart';
 import '../../../core/router/route_back.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/presentation/auth_provider.dart';
-import '../domain/city_story.dart';
 import 'active_tour_controller.dart';
 import 'experience_providers.dart';
 import 'home_story_controller.dart';
@@ -40,7 +39,7 @@ class ProfilePage extends ConsumerWidget {
                   child: Row(
                     children: [
                       IconButton(
-                        tooltip: '返回随刊',
+                        tooltip: '返回主页',
                         onPressed: () => popOrGo(context, '/'),
                         icon: const Icon(Icons.arrow_back_rounded),
                       ),
@@ -71,7 +70,7 @@ class ProfilePage extends ConsumerWidget {
                               value: favorites == null
                                   ? '—'
                                   : savedCount.toString().padLeft(2, '0'),
-                              label: '书架'),
+                              label: '收藏'),
                           const SizedBox(width: 28),
                           _ProfileMetric(
                             value: footprints.when(
@@ -97,11 +96,11 @@ class ProfilePage extends ConsumerWidget {
                       const SizedBox(height: 30),
                       const _ProfileSectionLabel(label: '01 / KEPT FOR LATER'),
                       const SizedBox(height: 10),
-                      _ShelfSummary(
-                        favorites:
-                            favorites?.value ?? const <TravelerFavorite>[],
-                        loading: favorites?.isLoading == true,
-                        onOpenShelf: () => context.go('/?tab=shelf'),
+                      _ProfileLinkRow(
+                        icon: Icons.bookmark_outline,
+                        title: '我的收藏',
+                        subtitle: '收藏的地点与见闻',
+                        onTap: () => context.push('/favorites'),
                       ),
                       const SizedBox(height: 30),
                       const _ProfileSectionLabel(
@@ -263,55 +262,6 @@ class _ProfileSectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(label,
       style: discoverySans(9, color: AppColors.terracotta, spacing: 1.1));
-}
-
-class _ShelfSummary extends StatelessWidget {
-  const _ShelfSummary(
-      {required this.favorites,
-      required this.loading,
-      required this.onOpenShelf});
-  final List<TravelerFavorite> favorites;
-  final bool loading;
-  final VoidCallback onOpenShelf;
-  @override
-  Widget build(BuildContext context) {
-    final routes =
-        favorites.where((item) => item.kind == 'route').take(3).toList();
-    return Column(children: [
-      if (loading)
-        const LinearProgressIndicator(
-            minHeight: 2, color: AppColors.terracotta),
-      if (!loading && routes.isEmpty)
-        Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(15, 16, 15, 16),
-            decoration: const BoxDecoration(
-                color: AppColors.white,
-                border: Border(bottom: BorderSide(color: AppColors.line))),
-            child: Row(children: [
-              const DiscoveryIcon(DiscoveryMark.bookmark,
-                  size: 21, color: AppColors.terracotta),
-              const SizedBox(width: 11),
-              Expanded(
-                  child: Text('还没有收藏。去路线里留下一本想翻的城市手册。',
-                      style: discoverySans(11, height: 1.65))),
-              const Icon(Icons.arrow_forward,
-                  size: 17, color: AppColors.terracotta)
-            ])),
-      ...routes.map((item) => _ProfileLinkRow(
-          icon: Icons.bookmark_outline,
-          title: item.label,
-          subtitle: item.available ? '已收进私人书架' : '内容暂时不可用',
-          onTap: onOpenShelf)),
-      const SizedBox(height: 9),
-      Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-              onPressed: onOpenShelf,
-              icon: const Icon(Icons.arrow_outward, size: 16),
-              label: const Text('打开完整书架'))),
-    ]);
-  }
 }
 
 class _ProfileEmptyFootprints extends StatelessWidget {

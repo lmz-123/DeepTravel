@@ -124,7 +124,7 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
                           leadingIcon: true,
                           underline: false,
                           size: 13,
-                          onTap: () => context.push('/profile')))),
+                          onTap: () => popOrGo(context, '/profile')))),
               const SizedBox(height: 20),
               Text('KEPT FOR ANOTHER DAY', style: noteItalic(10)),
               const SizedBox(height: 8),
@@ -269,7 +269,10 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
                   NoteFailure(
                       '部分地点暂未载入', () => ref.invalidate(_shelfCatalogProvider)),
                 for (final favorite in widget.favorites)
-                  _place(favorite, entries[favorite.targetId]),
+                  _place(favorite, entries[favorite.targetId],
+                      loading: catalog?.isLoading == true,
+                      failed: catalog?.hasError == true ||
+                          (catalog?.value?.failedCities ?? 0) > 0),
               ],
             ])));
   }
@@ -285,46 +288,140 @@ class _DiscoveryShelfState extends ConsumerState<_DiscoveryShelf> {
             onTap:
                 notes ? () => context.go('/?tab=community') : widget.onBrowse)
       ]));
-  Widget _place(TravelerFavorite favorite, _ShelfEntry? entry) => Padding(
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (entry != null)
-          NoteButton(
-              label: '查看${entry.route.title}',
-              onTap: () => widget.onOpen(entry.route),
-              child: ClipRRect(
-                  borderRadius:
-                      const BorderRadius.only(topRight: Radius.circular(42)),
-                  child: SizedBox(
-                      height: 220,
-                      width: double.infinity,
-                      child: DiscoveryPhoto(
-                          source: entry.route.heroImage, saturation: .8)))),
-        Row(children: [
-          Expanded(
-              child: Text(entry?.route.title ?? favorite.label,
-                  style: noteSerif(25))),
-          IconButton(
-              tooltip: '取消收藏${favorite.label}',
-              onPressed: widget.busyFavorites.contains(favorite.targetId)
-                  ? null
-                  : () => widget.onRemove(favorite.targetId),
-              icon: const DiscoveryIcon(DiscoveryMark.bookmark,
-                  filled: true, color: noteRed, size: 18))
-        ]),
-        if (entry != null) ...[
-          Text('${entry.city.name} · ${entry.route.theme}',
-              style: noteSans(11, color: noteQuiet)),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-                child: Text(
-                    '${entry.route.durationMinutes} 分钟 · ${entry.route.distanceKm.toStringAsFixed(1)} km',
-                    style: noteSans(11, color: noteQuiet))),
-            NoteArrow('去随行',
-                onTap: () => context.go(companionLocation(entry.route.slug)))
-          ])
-        ] else
-          Text('内容暂不可用', style: noteSans(11, color: noteQuiet)),
-      ]));
+  Widget _place(TravelerFavorite favorite, _ShelfEntry? entry,
+          {required bool loading, required bool failed}) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 28),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (entry != null)
+              NoteButton(
+                  label: '查看${entry.route.title}',
+                  onTap: () => widget.onOpen(entry.route),
+                  child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(42)),
+                      child: SizedBox(
+                          height: 220,
+                          width: double.infinity,
+                          child: DiscoveryPhoto(
+                              source: entry.route.heroImage, saturation: .8)))),
+            Row(children: [
+              Expanded(
+                  child: Text(entry?.route.title ?? favorite.label,
+                      style: noteSerif(25))),
+              IconButton(
+                  tooltip: '取消收藏${favorite.label}',
+                  onPressed: widget.busyFavorites.contains(favorite.targetId)
+                      ? null
+                      : () => widget.onRemove(favorite.targetId),
+                  icon: const DiscoveryIcon(DiscoveryMark.bookmark,
+                      filled: true, color: noteRed, size: 18))
+            ]),
+            if (entry != null) ...[
+              Text('${entry.city.name} · ${entry.route.theme}',
+                  style: noteSans(11, color: noteQuiet)),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                    child: Text(
+                        '${entry.route.durationMinutes} 分钟 · ${entry.route.distanceKm.toStringAsFixed(1)} km',
+                        style: noteSans(11, color: noteQuiet))),
+                NoteArrow('去随行',
+                    onTap: () =>
+                        context.go(companionLocation(entry.route.slug)))
+              ])
+            ] else
+              Text(
+                  !favorite.available
+                      ? '内容已下架'
+                      : loading
+                          ? '地点信息正在载入'
+                          : failed
+                              ? '地点信息加载失败'
+                              : '地点暂不可用',
+                  style: noteSans(11, color: noteQuiet)),
+          ]));
+}
+
+/// A pushed personal destination, separate from the three main tabs.
+class FavoritesPage extends ConsumerStatefulWidget {
+  const FavoritesPage({super.key});
+  @override
+  ConsumerState<FavoritesPage> createState() => _FavoritesPageState();
+}
+
+class _FavoritesPageState extends ConsumerState<FavoritesPage> {
+  final _busy = <String>{};
+
+  Future<void> _remove(String id) async {
+    final user = ref.read(currentUserIdProvider);
+    if (user == null || !_busy.add(id)) return;
+    setState(() {});
+    try {
+      final repository = ref.read(experienceRepositoryProvider);
+      await repository.removeFavorite('route', id);
+      if (!mounted || user != ref.read(currentUserIdProvider)) return;
+      ref.invalidate(travelerFavoritesProvider(user));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('已取消收藏'),
+        action: SnackBarAction(
+            label: '撤销',
+            onPressed: () async {
+              if (!mounted || user != ref.read(currentUserIdProvider)) return;
+              try {
+                await repository.addFavorite('route', id);
+                if (mounted && user == ref.read(currentUserIdProvider)) {
+                  ref.invalidate(travelerFavoritesProvider(user));
+                }
+              } catch (_) {
+                if (mounted) noteNotice(context, '收藏未能恢复，请重试');
+              }
+            }),
+      ));
+    } catch (_) {
+      if (mounted) noteNotice(context, '收藏未能更新，请重试');
+    } finally {
+      if (mounted) setState(() => _busy.remove(id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(currentUserIdProvider);
+    final favorites = user == null
+        ? const AsyncData<List<TravelerFavorite>>([])
+        : ref.watch(travelerFavoritesProvider(user));
+    return RouteBackScope(
+      fallbackLocation: '/profile',
+      child: Scaffold(
+        backgroundColor: AppColors.paper,
+        body: SafeArea(
+          child: _DiscoveryShelf(
+            favorites: (favorites.value ?? const <TravelerFavorite>[])
+                .where((f) => f.kind == 'route')
+                .toList(),
+            favoritesLoading: favorites.isLoading,
+            favoritesError: favorites.hasError,
+            onRetryFavorites: () {
+              if (user != null) ref.invalidate(travelerFavoritesProvider(user));
+            },
+            state: const DiscoveryState(
+              cities: [],
+              city: null,
+              catalog: CityDiscoveryCatalog(routes: []),
+              cards: [],
+              revision: 0,
+            ),
+            visible: true,
+            busyFavorites: _busy,
+            onRemove: _remove,
+            onOpen: (route) => context.push('/route/${route.slug}'),
+            onCity: () => context.go('/'),
+            onBrowse: () => context.go('/'),
+          ),
+        ),
+      ),
+    );
+  }
 }
