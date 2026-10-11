@@ -1,0 +1,226 @@
+{
+  "package_id": "shenzhen-research-shenzhen-dafen",
+  "package_version": "2026.10.11-research.4",
+  "route": {
+    "id": "a56053d9-a428-5b0a-8e6a-8cef40fcbdb8",
+    "city_id": "2b2301c8-d36e-4aa5-a3a8-b1881cb3f002",
+    "city_name": null,
+    "slug": "shenzhen-dafen",
+    "title": "大芬油画村",
+    "subtitle": "画布背后的产业与村落",
+    "description": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。",
+    "duration_minutes": 120,
+    "distance_km": 1.0,
+    "difficulty": "轻松",
+    "theme": "画布背后的产业与村落",
+    "map_category": "streets",
+    "travel_preparation": {
+      "enabled": true,
+      "notices": "公共游览区域免费；场馆、演出、体验及消费项目可能另行收费，请查看各项目公告。",
+      "admission": "free",
+      "transport": "",
+      "source_url": "https://www.sz.gov.cn/cn/zjsz/szfy/intangible_news/content/post_11247753.html",
+      "extra_items": [
+        {
+          "url": "",
+          "body": "页面时长与步行距离为游览参考估计。请按体力与当日开放范围调整；不是实测导航路线。",
+          "title": "游览安排"
+        }
+      ],
+      "launch_mode": "in_app",
+      "notices_url": "",
+      "opening_url": "",
+      "verified_on": null,
+      "channel_name": "",
+      "purchase_url": "",
+      "opening_hours": "",
+      "transport_url": ""
+    },
+    "hero_image": "public/content/2026/10/f3a4b61d082700b360a9d16aade4d190235d2097ea5386197135426af51dec7e.jpg",
+    "is_featured": false,
+    "content_status": "published",
+    "published_at": "2026-10-11T11:38:55",
+    "is_public_visible": true,
+    "managed_package_id": "shenzhen-research-shenzhen-dafen",
+    "managed_package_version": "2026.10.11-research.4",
+    "stop_count": 0
+  },
+  "story_arc": {
+    "id": "20a4cafe-aada-5395-bcab-08b472004b48",
+    "title": "大芬油画村",
+    "central_question": "画布背后的产业与村落",
+    "complete_story": "大芬油画村的故事，不只是墙上挂满了画。这里原本是传统客家村落，一九八九年开始发展油画产业，逐渐形成生产、收购和集中外销相互衔接的体系。也就是说，一幅画背后可能连接着画师、画框、材料供应和销售等不同工作，村落因此成为一个紧密的艺术生产网络。深圳官方在二〇二四年介绍大芬时，也特别说明现有建筑大部分建于改革开放以后，所以看见“村”字，不必把每栋房子都理解成古建筑。逛巷子时，可以留意画廊与工作室怎样嵌入日常街道，看看成品展示与创作劳动之间的联系。临摹、装饰画与原创作品也不是同一回事，如果想购买，可以问清作者、创作方式和作品信息。拍摄工作中的画师前，先征得对方同意。",
+    "causal_model": [
+      {
+        "id": "a0d55639-8d65-58d6-8e8c-4c8471fe6a34",
+        "text": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。"
+      }
+    ],
+    "pronunciation_notes": [],
+    "script_version": "2026.10.11-research.2",
+    "review_state": "in_review",
+    "field_audit_state": "required",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "source_version": "2026.10.11-research.2",
+    "publication_decision": "field_test"
+  },
+  "home_story": null,
+  "fragments": [
+    {
+      "id": "016e21c6-5650-5c48-b097-96c178ffebef",
+      "position": 1,
+      "title": "画布背后的产业与村落",
+      "safe_preview": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。",
+      "narration_script": "大芬油画村的故事，不只是墙上挂满了画。这里原本是传统客家村落，一九八九年开始发展油画产业，逐渐形成生产、收购和集中外销相互衔接的体系。也就是说，一幅画背后可能连接着画师、画框、材料供应和销售等不同工作，村落因此成为一个紧密的艺术生产网络。深圳官方在二〇二四年介绍大芬时，也特别说明现有建筑大部分建于改革开放以后，所以看见“村”字，不必把每栋房子都理解成古建筑。逛巷子时，可以留意画廊与工作室怎样嵌入日常街道，看看成品展示与创作劳动之间的联系。临摹、装饰画与原创作品也不是同一回事，如果想购买，可以问清作者、创作方式和作品信息。拍摄工作中的画师前，先征得对方同意。",
+      "transcript": "大芬油画村的故事，不只是墙上挂满了画。这里原本是传统客家村落，一九八九年开始发展油画产业，逐渐形成生产、收购和集中外销相互衔接的体系。也就是说，一幅画背后可能连接着画师、画框、材料供应和销售等不同工作，村落因此成为一个紧密的艺术生产网络。深圳官方在二〇二四年介绍大芬时，也特别说明现有建筑大部分建于改革开放以后，所以看见“村”字，不必把每栋房子都理解成古建筑。逛巷子时，可以留意画廊与工作室怎样嵌入日常街道，看看成品展示与创作劳动之间的联系。临摹、装饰画与原创作品也不是同一回事，如果想购买，可以问清作者、创作方式和作品信息。拍摄工作中的画师前，先征得对方同意。",
+      "audio_path": "public/narration/016e21c6-5650-5c48-b097-96c178ffebef/shenzhen-warm-companion/038f29096b130090-2026.10.11-research.2-f2d7f7472d8a-76481f572ba5.mp3",
+      "audio_mime_type": "audio/mpeg",
+      "audio_size_bytes": 1001652,
+      "script_version": "2026.10.11-research.2",
+      "interaction_type": "passive",
+      "completion_threshold": 0.9,
+      "key_claim": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。",
+      "answers_question": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。",
+      "raises_question": "",
+      "authenticity_label": "field_audit_required",
+      "review_state": "in_review",
+      "experience_tags": [],
+      "footprint_editorial_summary": null,
+      "footprint_summary_options": [],
+      "dependency_ids": [],
+      "claim_ids": [
+        "0870ddf7-e1b3-52c9-8c0b-5cd187f94dc1",
+        "2013fe5d-9022-594d-8a4f-38551c15cfab",
+        "df6138c3-160d-5d31-b016-30122b26139b"
+      ],
+      "stop": {
+        "id": "eb4e37e6-135b-557f-8e65-3c900b8afd9f",
+        "title": "大芬油画村",
+        "kicker": "画布背后的产业与村落",
+        "address": "深圳市龙岗区布吉街道大芬油画村",
+        "latitude": 22.61236306,
+        "longitude": 114.13160111,
+        "arrival_radius_m": 150,
+        "story_title": "画布背后的产业与村落",
+        "story_body": "大芬油画村的故事，不只是墙上挂满了画。这里原本是传统客家村落，一九八九年开始发展油画产业，逐渐形成生产、收购和集中外销相互衔接的体系。也就是说，一幅画背后可能连接着画师、画框、材料供应和销售等不同工作，村落因此成为一个紧密的艺术生产网络。深圳官方在二〇二四年介绍大芬时，也特别说明现有建筑大部分建于改革开放以后，所以看见“村”字，不必把每栋房子都理解成古建筑。逛巷子时，可以留意画廊与工作室怎样嵌入日常街道，看看成品展示与创作劳动之间的联系。临摹、装饰画与原创作品也不是同一回事，如果想购买，可以问清作者、创作方式和作品信息。拍摄工作中的画师前，先征得对方同意。",
+        "audio_url": "public/narration/016e21c6-5650-5c48-b097-96c178ffebef/shenzhen-warm-companion/038f29096b130090-2026.10.11-research.2-f2d7f7472d8a-76481f572ba5.mp3",
+        "image": "public/content/2026/10/f3a4b61d082700b360a9d16aade4d190235d2097ea5386197135426af51dec7e.jpg",
+        "insight": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。",
+        "experience_tags": []
+      },
+      "trigger_region": {
+        "id": "3046b5f4-440f-5583-9a53-62a4511ae917",
+        "latitude": 22.61236306,
+        "longitude": 114.13160111,
+        "entry_radius_m": 150,
+        "exit_radius_m": 220,
+        "max_accuracy_m": 120,
+        "qualifying_samples": 2,
+        "sample_window_seconds": 15,
+        "cooldown_seconds": 120,
+        "audit_state": "required",
+        "coordinate_system": "WGS84",
+        "source_coordinate_system": "WGS84",
+        "coordinate_source": "https://en.wikipedia.org/wiki/Dafen_Village",
+        "field_notes": "Wikipedia 地点代表坐标，非入口或精确设施坐标。 未实地复核；单点介绍，不构造虚假的多站路线。到访前结合景区公开导览确认步行入口；触发范围需现场校准。"
+      },
+      "photo_mission": null
+    }
+  ],
+  "sources": [
+    {
+      "id": "64f54011-4626-5956-a852-a31f7b8af8a0",
+      "title": "候选坐标来源",
+      "publisher": "Wikimedia Commons / Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Dafen_Village",
+      "source_type": "map_reference",
+      "accessed_at": "2026-10-11T12:00:00",
+      "review_state": "in_review",
+      "summary": "Wikipedia 地点代表坐标，非入口或精确设施坐标。 未实地复核；单点介绍，不构造虚假的多站路线。到访前结合景区公开导览确认步行入口；触发范围需现场校准。"
+    },
+    {
+      "id": "d875cdce-b5ec-584b-a2a5-31299830e134",
+      "title": "File:SZ 深圳 大芬油畫村 Da Fen Oil Painting Village entrance sign Aug-2010.JPG",
+      "publisher": "Wikimedia Commons / Wikipedia",
+      "url": "https://commons.wikimedia.org/wiki/File:SZ_%E6%B7%B1%E5%9C%B3_%E5%A4%A7%E8%8A%AC%E6%B2%B9%E7%95%AB%E6%9D%91_Da_Fen_Oil_Painting_Village_entrance_sign_Aug-2010.JPG",
+      "source_type": "image_reference",
+      "accessed_at": "2026-10-11T12:00:00",
+      "review_state": "in_review",
+      "summary": "摄影：Szdapanwen；许可：CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0；原图缩放与CMS JPEG标准化。拍摄日期见文件页，不代表实时景况。"
+    },
+    {
+      "id": "e0c457d8-687d-5cf6-9273-bb7c3f69046e",
+      "title": "大芬油画村资料依据",
+      "publisher": "深圳市政府及相关政府部门",
+      "url": "https://www.sz.gov.cn/cn/zjsz/szfy/intangible_news/content/post_11247753.html",
+      "source_type": "reference",
+      "accessed_at": "2026-10-11T12:00:00",
+      "review_state": "in_review",
+      "summary": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "0870ddf7-e1b3-52c9-8c0b-5cd187f94dc1",
+      "canonical_text": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。",
+      "claim_kind": "documented_observation",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "公开资料交叉研究。讲解中的观察建议为编辑建议，不是来源原句；未现场复核。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "e0c457d8-687d-5cf6-9273-bb7c3f69046e"
+      ],
+      "support_notes": {
+        "e0c457d8-687d-5cf6-9273-bb7c3f69046e": "大芬由传统客家村落发展而来，1989年起形成油画产业及生产外销体系。"
+      }
+    },
+    {
+      "id": "2013fe5d-9022-594d-8a4f-38551c15cfab",
+      "canonical_text": "摄影：Szdapanwen；许可：CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0；原图缩放与CMS JPEG标准化。拍摄日期见文件页，不代表实时景况。",
+      "claim_kind": "media_attribution",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "图片署名或候选坐标记录，不作为历史叙述的证据。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "d875cdce-b5ec-584b-a2a5-31299830e134"
+      ],
+      "support_notes": {
+        "d875cdce-b5ec-584b-a2a5-31299830e134": "摄影：Szdapanwen；许可：CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0；原图缩放与CMS JPEG标准化。拍摄日期见文件页，不代表实时景况。"
+      }
+    },
+    {
+      "id": "df6138c3-160d-5d31-b016-30122b26139b",
+      "canonical_text": "Wikipedia 地点代表坐标，非入口或精确设施坐标。 未实地复核；单点介绍，不构造虚假的多站路线。到访前结合景区公开导览确认步行入口；触发范围需现场校准。",
+      "claim_kind": "coordinate_reference",
+      "certainty": "source_supported",
+      "review_state": "in_review",
+      "boundary_note": "图片署名或候选坐标记录，不作为历史叙述的证据。",
+      "supersedes_claim_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "source_ids": [
+        "64f54011-4626-5956-a852-a31f7b8af8a0"
+      ],
+      "support_notes": {
+        "64f54011-4626-5956-a852-a31f7b8af8a0": "Wikipedia 地点代表坐标，非入口或精确设施坐标。 未实地复核；单点介绍，不构造虚假的多站路线。到访前结合景区公开导览确认步行入口；触发范围需现场校准。"
+      }
+    }
+  ],
+  "required_photo_mission_count": 0,
+  "city": {
+    "id": "2b2301c8-d36e-4aa5-a3a8-b1881cb3f002",
+    "slug": "shenzhen",
+    "name": "深圳",
+    "subtitle": "在快速生长的城市里，寻找时间的叠层",
+    "hero_image": "images/route_shenzhen.png",
+    "latitude": 22.5394,
+    "longitude": 113.92305
+  }
+}

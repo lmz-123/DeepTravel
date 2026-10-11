@@ -1,0 +1,600 @@
+{
+  "verified_at": "2026-10-11",
+  "new_routes": 14,
+  "existing_routes_unchanged": 9,
+  "results": [
+    {
+      "title": "大芬油画村",
+      "slug": "shenzhen-dafen",
+      "route_id": "a56053d9-a428-5b0a-8e6a-8cef40fcbdb8",
+      "status": "published",
+      "map_category": "streets",
+      "admission": "free",
+      "narration_characters": 281,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/f3a4b61d082700b360a9d16aade4d190235d2097ea5386197135426af51dec7e.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 248127
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/016e21c6-5650-5c48-b097-96c178ffebef/shenzhen-warm-companion/038f29096b130090-2026.10.11-research.2-f2d7f7472d8a-76481f572ba5.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1001652
+        }
+      ]
+    },
+    {
+      "title": "大鹏所城",
+      "slug": "shenzhen-dapeng-fortress",
+      "route_id": "e6a945bc-ea8f-5f70-a064-4bb357ce631f",
+      "status": "published",
+      "map_category": "streets",
+      "admission": "free",
+      "narration_characters": 286,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/7d2e6c4b2c713968b98ac96c5cecc852aca07a1051bae2225ea9800123d486e1.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 402691
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/d53781c1-adab-563a-bde9-ab12851b1df8/shenzhen-warm-companion/bfc98e8d510157e7-2026.10.11-research.2-f2d7f7472d8a-dd40f08aaa6b.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1043700
+        }
+      ]
+    },
+    {
+      "title": "仙湖植物园",
+      "slug": "shenzhen-fairylake",
+      "route_id": "27e7d67e-a3bb-5943-8d50-0a382a520e9b",
+      "status": "published",
+      "map_category": "nature",
+      "admission": "ticket",
+      "narration_characters": 299,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/d3e92b0ff7f65a7b595b468c3088621391af6126a41a25e12d7dc4c56251f023.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 480050
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/1967e341-c879-5246-8cd3-b71c7f18c599/shenzhen-warm-companion/aa42cb6f196d368e-2026.10.11-research.2-f2d7f7472d8a-dbf766e5acc7.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1077108
+        }
+      ]
+    },
+    {
+      "title": "甘坑古镇",
+      "slug": "shenzhen-gankeng",
+      "route_id": "6a922be1-73b3-580c-ac32-5092bb49068b",
+      "status": "published",
+      "map_category": "streets",
+      "admission": "free",
+      "narration_characters": 275,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/a0b40e3f2bd697a8c578bad2c60feeb57631bab029938440e6be4cfd5bd8e3cb.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 451675
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/0ae0edc9-b9aa-5a83-80dd-8bd976badc08/shenzhen-warm-companion/1e2ec97f3cd0fcaa-2026.10.11-research.2-f2d7f7472d8a-245bf2f30009.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1010292
+        }
+      ]
+    },
+    {
+      "title": "深圳欢乐谷",
+      "slug": "shenzhen-happy-valley",
+      "route_id": "b1698510-22ec-5fdc-b36f-4831915d77db",
+      "status": "published",
+      "map_category": "park",
+      "admission": "ticket",
+      "narration_characters": 266,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/0e7ab5879b9e1a03eee46b4c56e289a347f17bca40eee8c7c678997f9f441eac.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 248023
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/6ef1822d-7cb6-5a90-ac1c-b7ac5a73caec/shenzhen-warm-companion/613d01a438d4c0f7-2026.10.11-research.2-f2d7f7472d8a-9ef464c8c328.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 987828
+        }
+      ]
+    },
+    {
+      "title": "莲花山公园",
+      "slug": "shenzhen-lianhuashan",
+      "route_id": "50740115-5e60-5c15-a3ae-c503e5ce3611",
+      "status": "published",
+      "map_category": "park",
+      "admission": "free",
+      "narration_characters": 280,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/5a640cd32f5b5cd5e0ec4555bc4ee39771048730e7f7ea6dc8189217fc2ecccb.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 320110
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/3f1399c6-7f7a-58bc-82c7-49c11569ff3e/shenzhen-warm-companion/e88d68c487fdc2b0-2026.10.11-research.2-f2d7f7472d8a-86cc4f901020.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1041972
+        }
+      ]
+    },
+    {
+      "title": "东部华侨城",
+      "slug": "shenzhen-oct-east",
+      "route_id": "aab06172-339a-592a-b724-e2401c366a96",
+      "status": "published",
+      "map_category": "park",
+      "admission": "ticket",
+      "narration_characters": 285,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/b250752ee1d8926a4c30ba2d2294b117b60598d3bc1634eb179703711aadc99a.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 200204
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/40396dc3-ee97-52f7-a043-582cee5d73fc/shenzhen-warm-companion/24a8a8b02d34b74e-2026.10.11-research.2-f2d7f7472d8a-9d319d2a6cad.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1022388
+        }
+      ]
+    },
+    {
+      "title": "欢乐海岸",
+      "slug": "shenzhen-oct-harbour",
+      "route_id": "40035a6d-090a-5903-88e4-e786bda89a1a",
+      "status": "published",
+      "map_category": "streets",
+      "admission": "free",
+      "narration_characters": 277,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/41d1d8b3a31cb9d725fcaf43756cd907943ebc9b1017b3bbe5faa62ab02c766e.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 219501
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/26cf0e01-f8ab-5556-852e-25128a39e1dc/shenzhen-warm-companion/594c1743c793968a-2026.10.11-research.2-f2d7f7472d8a-b3a49e095774.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1031604
+        }
+      ]
+    },
+    {
+      "title": "欢乐港湾",
+      "slug": "shenzhen-oh-bay",
+      "route_id": "f2b90047-07bc-588d-bb01-e7f6cdfb5161",
+      "status": "published",
+      "map_category": "coast",
+      "admission": "free",
+      "narration_characters": 286,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/f61141b98eb6b763415d5cd38161b1197b35556f4bb5f691d4a81b40a42968a4.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 275906
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/e3f752f3-230c-549f-8c0b-134e4f97b571/shenzhen-warm-companion/139f80740e8885e7-2026.10.11-research.2-f2d7f7472d8a-9434f30637b5.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1050612
+        }
+      ]
+    },
+    {
+      "title": "深圳野生动物园",
+      "slug": "shenzhen-safari-park",
+      "route_id": "b48b8e37-0276-5e07-b676-2475a841010a",
+      "status": "published",
+      "map_category": "park",
+      "admission": "ticket",
+      "narration_characters": 273,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/cc15985946bab6f75e870897e80ef2405f9b27c58f5e4d6ac66a6443e681ae09.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 446525
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/27e3ec1b-ab23-55d5-9e18-d45e2d4109aa/shenzhen-warm-companion/0b95d669ee5e3064-2026.10.11-research.2-f2d7f7472d8a-ae1332e7d0cb.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1012020
+        }
+      ]
+    },
+    {
+      "title": "海上世界",
+      "slug": "shenzhen-sea-world",
+      "route_id": "9c503f39-f9e1-5649-bcff-4460971a449e",
+      "status": "published",
+      "map_category": "streets",
+      "admission": "free",
+      "narration_characters": 294,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/6f36e93bfbf59cda08b0d85bb6271a22070ce3ea8378eb7c72c138585259755e.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 61571
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/0f5c18b4-0456-5c14-81e2-f1579807f9e2/shenzhen-warm-companion/98e66dd444554151-2026.10.11-research.2-f2d7f7472d8a-873f758c5fbf.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1035060
+        }
+      ]
+    },
+    {
+      "title": "深圳湾公园",
+      "slug": "shenzhen-shenzhen-bay",
+      "route_id": "bf2839ab-0f34-5bb9-ac7f-5708772aa908",
+      "status": "published",
+      "map_category": "coast",
+      "admission": "free",
+      "narration_characters": 280,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/3a876c8b0a792e62d8b4f4d4614d3b1886e526f8db94142587d0b4983848287f.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 388259
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/d3b308c9-4129-5777-8a25-94bb5ca16d01/shenzhen-warm-companion/d4cedf73c848ff56-2026.10.11-research.2-f2d7f7472d8a-78bd79748a72.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1005684
+        }
+      ]
+    },
+    {
+      "title": "锦绣中华·民俗村",
+      "slug": "shenzhen-splendid-china",
+      "route_id": "e6219bdb-4384-55cf-bb85-e1347307ca4f",
+      "status": "published",
+      "map_category": "park",
+      "admission": "ticket",
+      "narration_characters": 284,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/9e9eb232f16e8dedde60ec7f134b105b9afaa64b1bc55d2c8528186baf95b67c.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 534813
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/af9d9a43-7970-5372-a3e0-bcc0f39a2bb1/shenzhen-warm-companion/23eec2bcd5bd5306-2026.10.11-research.2-f2d7f7472d8a-316d378273f7.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 1033332
+        }
+      ]
+    },
+    {
+      "title": "世界之窗",
+      "slug": "shenzhen-window-world",
+      "route_id": "6a811349-073c-5161-b8d9-02b5cedcf9a1",
+      "status": "published",
+      "map_category": "park",
+      "admission": "ticket",
+      "narration_characters": 270,
+      "narration_ready": true,
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          {
+            "path": "fragments[0].trigger_region.audit_state",
+            "code": "field_review_required",
+            "message": "坐标仍需现场复核"
+          },
+          {
+            "path": "story_arc.review_state",
+            "code": "editorial_review_required",
+            "message": "故事内容仍待审核"
+          }
+        ]
+      },
+      "assets": [
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/content/2026/10/a0b560ed9d943d660a51c7738cd270cb1b7d55f426baa1e63a6cefec40f89786.jpg",
+          "status": 206,
+          "mime_type": "image/jpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 260783
+        },
+        {
+          "url": "https://jiandi-public-resource.oss-cn-hangzhou.aliyuncs.com/public/narration/577f72e3-7474-5344-ac04-affbb3f8bb1d/shenzhen-warm-companion/c0f866954402dfbd-2026.10.11-research.2-f2d7f7472d8a-79c1d14d18da.mp3",
+          "status": 206,
+          "mime_type": "audio/mpeg",
+          "bytes_checked": 1024,
+          "size_bytes": 988980
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "仅代表位置或照片地理位置，未实地验证自动触发。",
+    "未在真实手机上验证完整音频播放。",
+    "CMS发布与OSS媒体已验证；本轮未确认独立App API的最新隧道地址。"
+  ]
+}
