@@ -187,7 +187,9 @@ class CommunityPostKey {
 }
 
 class CommunityMediaKey {
-  const CommunityMediaKey(this.userId, this.media);
+  const CommunityMediaKey(this.userId, this.media,
+      [this.variant = CommunityImageVariant.full]);
+  final CommunityImageVariant variant;
   final String userId;
   final CommunityMedia media;
 
@@ -195,10 +197,11 @@ class CommunityMediaKey {
   bool operator ==(Object other) =>
       other is CommunityMediaKey &&
       other.userId == userId &&
-      other.media.id == media.id;
+      other.media.id == media.id &&
+      other.variant == variant;
 
   @override
-  int get hashCode => Object.hash(userId, media.id);
+  int get hashCode => Object.hash(userId, media.id, variant);
 }
 
 final journeyLibraryProvider =
@@ -235,8 +238,9 @@ final communityPolicyProvider = FutureProvider.family<CommunityPolicy, String>(
 
 final communityMediaBytesProvider =
     FutureProvider.autoDispose.family<Uint8List, CommunityMediaKey>(
-  (ref, key) =>
-      ref.watch(experienceRepositoryProvider).communityMediaBytes(key.media),
+  (ref, key) => ref
+      .watch(experienceRepositoryProvider)
+      .communityMediaBytes(key.media, variant: key.variant),
 );
 
 class CommunityFeedState {

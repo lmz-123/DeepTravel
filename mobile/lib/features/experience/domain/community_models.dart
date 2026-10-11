@@ -72,6 +72,8 @@ class CommunityAuthor {
       );
 }
 
+enum CommunityImageVariant { thumbnail, preview, full }
+
 class CommunityMedia {
   const CommunityMedia({
     required this.id,

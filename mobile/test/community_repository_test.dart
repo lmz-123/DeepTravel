@@ -196,6 +196,18 @@ void main() {
     );
     expect(publishedForm!.files.single.key, 'photos[]');
     expect(requests.last.responseType, ResponseType.bytes);
+    expect(requests.last.queryParameters.containsKey('variant'), isFalse);
+    for (final variant in [
+      CommunityImageVariant.thumbnail,
+      CommunityImageVariant.preview
+    ]) {
+      await repository.communityMediaBytes(detail.media.single,
+          variant: variant);
+      expect(requests.last.path, '/community-media/media-1');
+      expect(requests.last.queryParameters, {'variant': variant.name});
+      expect(requests.last.headers['Authorization'], 'Bearer community-token');
+      expect(requests.last.responseType, ResponseType.bytes);
+    }
   });
 }
 

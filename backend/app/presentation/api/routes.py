@@ -941,7 +941,9 @@ def report_community_comment(comment_id: str):
 @api.get("/community-media/<media_id>")
 @require_user
 def get_community_media(media_id: str):
-    stream, mime_type = _services()["community"].open_media(g.current_user.id, media_id)
+    stream, mime_type = _services()["community"].open_media(
+        g.current_user.id, media_id, variant=request.args.get("variant", "full")
+    )
     return send_file(stream, mimetype=mime_type, download_name=f"community-{media_id}")
 
 

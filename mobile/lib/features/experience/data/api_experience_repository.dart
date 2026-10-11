@@ -733,10 +733,14 @@ class ApiExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<Uint8List> communityMediaBytes(CommunityMedia media) async {
+  Future<Uint8List> communityMediaBytes(CommunityMedia media,
+      {CommunityImageVariant variant = CommunityImageVariant.full}) async {
     await _ensureAuth();
     final response = await _request(() => _dio.get<List<int>>(
           _privateMediaPath(media.url, '/community-media/${media.id}'),
+          queryParameters: {
+            if (variant != CommunityImageVariant.full) 'variant': variant.name
+          },
           options: _authorized.copyWith(responseType: ResponseType.bytes),
         ));
     return Uint8List.fromList(response.data ?? const <int>[]);

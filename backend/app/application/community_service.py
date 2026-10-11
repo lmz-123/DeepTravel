@@ -702,8 +702,10 @@ class CommunityService(CommunityDiscovery):
                     session.rollback()
             return {"target_type": target_type, "target_id": target_id, "reported": True}
 
-    def open_media(self, user_id: str, media_id: str):
+    def open_media(self, user_id: str, media_id: str, *, variant: str = "full"):
         self._require_enabled()
+        if variant not in {"full", *self.media_storage.variants}:
+            raise ValidationError("图片规格无效")
         with self.session_factory() as session:
             media = session.get(CommunityMediaModel, media_id)
             if media is None:
@@ -711,6 +713,8 @@ class CommunityService(CommunityDiscovery):
                     "community_media_not_found", "图片不存在", status_code=404
                 )
             self._visible_post(session, user_id, media.post_id)
+            if variant != "full":
+                return self.media_storage.open_variant(media.object_key, variant), "image/webp"
             return self.media_storage.open(media.object_key), media.mime_type
 
     def _post_payloads(

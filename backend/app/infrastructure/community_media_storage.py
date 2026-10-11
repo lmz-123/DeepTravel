@@ -30,6 +30,7 @@ class CommunityMediaUnavailableError(DomainError):
 
 
 class CommunityMediaStorage:
+    variants = {"thumbnail": (240, 82), "preview": (960, 85)}
     supported = {
         "JPEG": ("image/jpeg", ".jpg", "JPEG"),
         "PNG": ("image/png", ".png", "PNG"),
@@ -70,11 +71,16 @@ class CommunityMediaStorage:
                     raise CommunityMediaInvalidError("该图片格式当前未开放")
                 if declared_mime and declared_mime not in {output_mime, "application/octet-stream"}:
                     raise CommunityMediaInvalidError("文件内容与声明格式不一致")
+                # Keep transparency where present without storing large lossless PNGs.
+                if save_format == "PNG":
+                    output_mime, suffix, save_format = "image/webp", ".webp", "WEBP"
                 image = ImageOps.exif_transpose(opened)
                 image.load()
                 image.thumbnail((self.max_edge, self.max_edge), Image.Resampling.LANCZOS)
                 if save_format == "JPEG" and image.mode != "RGB":
                     image = image.convert("RGB")
+                elif image.mode == "P" and "transparency" in image.info:
+                    image = image.convert("RGBA")
                 elif image.mode not in {"RGB", "RGBA", "L"}:
                     image = image.convert("RGB")
                 normalized = BytesIO()
@@ -96,7 +102,16 @@ class CommunityMediaStorage:
         object_key = f"{self.prefix}/{safe_scope}/{uuid4().hex}{suffix}"
         try:
             self.object_storage.put(object_key, payload, output_mime)
+            for variant in self.variants:
+                preview = self._resize(payload, variant)
+                self.object_storage.put(
+                    self._variant_key(object_key, variant), preview, "image/webp"
+                )
         except Exception as exc:
+            try:
+                self.delete(object_key)
+            except Exception:
+                pass
             raise CommunityMediaUnavailableError() from exc
         return StoredEvidence(
             object_key, output_mime, len(payload), sha256(payload).hexdigest(), width, height
@@ -105,7 +120,37 @@ class CommunityMediaStorage:
     def open(self, object_key: str):
         return self.object_storage.open(object_key)
 
+    @staticmethod
+    def _variant_key(object_key: str, variant: str) -> str:
+        return f"{object_key}.{variant}-v1.webp"
+
+    def _resize(self, payload: bytes, variant: str) -> bytes:
+        edge, quality = self.variants[variant]
+        with Image.open(BytesIO(payload)) as source:
+            image = ImageOps.exif_transpose(source)
+            image.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+            image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+            output = BytesIO()
+            image.save(output, format="WEBP", quality=quality, method=4)
+            return output.getvalue()
+
+    def open_variant(self, object_key: str, variant: str):
+        key = self._variant_key(object_key, variant)
+        if not self.object_storage.exists(key):
+            # Older uploads gain derivatives on first access, retaining their source.
+            with self.open(object_key) as source:
+                payload = self._resize(source.read(), variant)
+            try:
+                self.object_storage.put(key, payload, "image/webp")
+            except Exception:
+                # Another reader may have generated this immutable variant first.
+                if not self.object_storage.exists(key):
+                    raise
+        return self.object_storage.open(key)
+
     def delete(self, object_key: str) -> None:
+        for variant in self.variants:
+            self.object_storage.delete(self._variant_key(object_key, variant))
         self.object_storage.delete(object_key)
 
     def canonical_reference(self, object_key: str) -> str:

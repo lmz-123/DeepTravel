@@ -16,6 +16,52 @@ class NotesPage extends ConsumerStatefulWidget {
 
 class _NotesPageState extends ConsumerState<NotesPage> {
   bool _more = false;
+  bool _pageFailed = false;
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_nearEnd);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _nearEnd() {
+    if (!_pageFailed &&
+        _scroll.hasClients &&
+        _scroll.position.extentAfter < 600) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_more ||
+        ref.read(notesFeedProvider).isLoading ||
+        ref.read(notesFeedProvider).value?.hasMore != true) {
+      return;
+    }
+    setState(() {
+      _more = true;
+      _pageFailed = false;
+    });
+    final cursor = ref.read(notesFeedProvider).value?.nextCursor;
+    try {
+      await ref.read(notesFeedProvider.notifier).loadMore();
+    } catch (_) {
+      if (mounted && ref.read(notesFeedProvider).value?.nextCursor == cursor) {
+        _pageFailed = true;
+        noteNotice(context, '加载失败，请重试');
+      }
+    } finally {
+      if (mounted) setState(() => _more = false);
+    }
+  }
+
   final _busy = <String>{};
   Future<void> _mutate(CommunityPost post, bool save) async {
     if (!_busy.add(post.id)) return;
@@ -53,71 +99,79 @@ class _NotesPageState extends ConsumerState<NotesPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(notesFeedProvider, (_, next) {
+      if (next.isLoading) _pageFailed = false;
+    });
     final feed = ref.watch(notesFeedProvider);
-    return NoteScaffold(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(
-          height: 72,
-          child: Row(children: [
-            DiscoveryBrand(title: '见闻', onTap: () => context.push('/profile'))
-          ])),
-      Padding(
-          padding: const EdgeInsets.only(top: 1, bottom: 18),
-          child: Row(children: [
-            Expanded(child: Text('NOTES FROM THE WAY', style: noteItalic(10))),
-            NoteArrow('留一则见闻',
-                size: 13,
-                icon: DiscoveryMark.pen,
-                leadingIcon: true, onTap: () async {
-              await context.push('/community/write');
-              if (mounted) ref.invalidate(notesFeedProvider);
-            })
-          ])),
-      const NotesFilterBar(),
+    return NoteScaffold(scrollController: _scroll, slivers: [
+      SliverToBoxAdapter(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(
+            height: 72,
+            child: Row(children: [
+              DiscoveryBrand(title: '见闻', onTap: () => context.push('/profile'))
+            ])),
+        Padding(
+            padding: const EdgeInsets.only(top: 1, bottom: 18),
+            child: Row(children: [
+              Expanded(
+                  child: Text('NOTES FROM THE WAY', style: noteItalic(10))),
+              NoteArrow('留一则见闻',
+                  size: 13,
+                  icon: DiscoveryMark.pen,
+                  leadingIcon: true, onTap: () async {
+                await context.push('/community/write');
+                if (mounted) ref.invalidate(notesFeedProvider);
+              })
+            ])),
+        const NotesFilterBar(),
+      ])),
       feed.when(
           skipLoadingOnRefresh: true,
-          data: (page) => Column(children: [
-                if (page.items.isEmpty)
-                  Padding(
+          data: (page) => page.items.isEmpty
+              ? SliverToBoxAdapter(
+                  child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 62),
                       child: Column(children: [
                         Text('这里还没有见闻。', style: noteSerif(23)),
                         const SizedBox(height: 10),
                         Text('留下你在路上的第一则记录。',
                             style: noteSans(12, color: noteQuiet))
-                      ])),
-                for (var i = 0; i < page.items.length; i++)
-                  _card(page.items[i], i),
-                if (page.hasMore)
-                  Padding(
+                      ])))
+              : SliverMainAxisGroup(slivers: [
+                  SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                    (context, index) => _card(page.items[index], index),
+                    childCount: page.items.length,
+                    addAutomaticKeepAlives: false,
+                  )),
+                  if (page.hasMore)
+                    SliverToBoxAdapter(
+                        child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 18),
-                      child: NoteArrow(_more ? '正在加载' : '更多见闻',
-                          onTap: _more
-                              ? null
-                              : () async {
-                                  setState(() => _more = true);
-                                  try {
-                                    await ref
-                                        .read(notesFeedProvider.notifier)
-                                        .loadMore();
-                                  } catch (_) {
-                                    if (context.mounted) {
-                                      noteNotice(context, '加载失败，请重试');
-                                    }
-                                  } finally {
-                                    if (mounted) setState(() => _more = false);
-                                  }
-                                }))
-              ]),
-          loading: () => const Padding(
-              padding: EdgeInsets.all(70),
-              child: Center(
-                  child: CircularProgressIndicator(
-                      strokeWidth: 1, color: noteQuiet))),
-          error: (_, __) =>
-              NoteFailure('见闻暂时无法读取', () => ref.invalidate(notesFeedProvider))),
-      const SizedBox(height: 24)
-    ]));
+                      child: Center(
+                          child: NoteArrow(
+                        _more
+                            ? '正在加载'
+                            : _pageFailed
+                                ? '加载失败，点击重试'
+                                : '更多见闻',
+                        onTap: _more ? null : _loadMore,
+                      )),
+                    )),
+                ]),
+          loading: () => const SliverToBoxAdapter(
+              child: Padding(
+                  padding: EdgeInsets.all(70),
+                  child: Center(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1, color: noteQuiet)))),
+          error: (_, __) => SliverToBoxAdapter(
+              child: NoteFailure(
+                  '见闻暂时无法读取', () => ref.invalidate(notesFeedProvider)))),
+      const SliverToBoxAdapter(child: SizedBox(height: 24))
+    ]);
   }
 
   Widget _card(CommunityPost post, int index) => Container(

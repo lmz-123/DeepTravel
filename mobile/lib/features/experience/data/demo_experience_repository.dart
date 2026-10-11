@@ -664,7 +664,8 @@ class DemoExperienceRepository implements ExperienceRepository {
   }
 
   @override
-  Future<Uint8List> communityMediaBytes(CommunityMedia media) async =>
+  Future<Uint8List> communityMediaBytes(CommunityMedia media,
+          {CommunityImageVariant variant = CommunityImageVariant.full}) async =>
       Uint8List(0);
 
   @override

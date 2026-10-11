@@ -113,11 +113,14 @@ class NoteArrow extends StatelessWidget {
 class NoteScaffold extends StatelessWidget {
   const NoteScaffold(
       {super.key,
-      required this.child,
+      this.child,
+      this.slivers,
       this.scrollController,
       this.navigationEnabled = true,
-      this.showNavigation = true});
-  final Widget child;
+      this.showNavigation = true})
+      : assert((child == null) != (slivers == null));
+  final Widget? child;
+  final List<Widget>? slivers;
   final ScrollController? scrollController;
   final bool navigationEnabled, showNavigation;
   @override
@@ -134,10 +137,21 @@ class NoteScaffold extends StatelessWidget {
                       active: TravelerSection.community, editorial: true))),
       body: SafeArea(
           bottom: false,
-          child: SingleChildScrollView(
-              controller: scrollController,
-              padding: EdgeInsets.symmetric(horizontal: noteInset(context)),
-              child: child)));
+          child: slivers != null
+              ? CustomScrollView(
+                  controller: scrollController,
+                  slivers: [
+                    SliverPadding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: noteInset(context)),
+                      sliver: SliverMainAxisGroup(slivers: slivers!),
+                    )
+                  ],
+                )
+              : SingleChildScrollView(
+                  controller: scrollController,
+                  padding: EdgeInsets.symmetric(horizontal: noteInset(context)),
+                  child: child)));
 }
 
 class NoteTop extends StatelessWidget {
@@ -233,13 +247,17 @@ class NoteAvatar extends StatelessWidget {
 }
 
 class NoteMediaImage extends ConsumerWidget {
-  const NoteMediaImage(this.media, {super.key, this.fit = BoxFit.cover});
+  const NoteMediaImage(this.media,
+      {super.key,
+      this.fit = BoxFit.cover,
+      this.variant = CommunityImageVariant.preview});
+  final CommunityImageVariant variant;
   final CommunityMedia media;
   final BoxFit fit;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final key =
-        CommunityMediaKey(ref.watch(currentUserIdProvider) ?? 'demo', media);
+    final key = CommunityMediaKey(
+        ref.watch(currentUserIdProvider) ?? 'demo', media, variant);
     final bytes = ref.watch(communityMediaBytesProvider(key));
     Widget retry() => ColoredBox(
         color: const Color(0xffe8e6d8),
@@ -416,7 +434,9 @@ class _NoteGalleryState extends State<NoteGallery> {
                       ? InteractiveViewer(
                           minScale: 1,
                           maxScale: 4,
-                          child: NoteMediaImage(media[i], fit: BoxFit.contain))
+                          child: NoteMediaImage(media[i],
+                              fit: BoxFit.contain,
+                              variant: CommunityImageVariant.full))
                       : NoteButton(
                           label: '查看大图',
                           onTap: () async {
@@ -494,7 +514,9 @@ class _NoteGalleryState extends State<NoteGallery> {
                                                 : Colors.transparent))),
                                 child: Opacity(
                                     opacity: i == _index ? 1 : .58,
-                                    child: NoteMediaImage(media[i]))))
+                                    child: NoteMediaImage(media[i],
+                                        variant:
+                                            CommunityImageVariant.thumbnail))))
                     ]))),
     ]);
   }

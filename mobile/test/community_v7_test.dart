@@ -102,12 +102,13 @@ void main() {
       WidgetTester tester, String page, double width,
       {double height = 1100,
       int photos = 1,
-      Map<String, dynamic>? draftData}) async {
+      Map<String, dynamic>? draftData,
+      _Repo? repository}) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final repo = _Repo(photo, street)..photoCount = photos;
+    final repo = (repository ?? _Repo(photo, street))..photoCount = photos;
     final store = _Store();
     if (draftData != null) store.values['community_draft_user-a'] = draftData;
     final router = GoRouter(initialLocation: page, routes: [
@@ -180,6 +181,80 @@ void main() {
     expect(tester.takeException(), isNull);
     return (router, repo, store);
   }
+
+  testWidgets(
+      'feed lazily requests previews and loads one next page near the bottom',
+      (tester) async {
+    final repo = _PagedRepo(photo, street);
+    await pump(tester, '/', 390, repository: repo);
+    expect(repo.cursors, [null]);
+    expect(repo.imageRequests.length, lessThan(12));
+    expect(
+        repo.imageRequests.every((r) => r.$2 == CommunityImageVariant.preview),
+        isTrue);
+    expect(find.byKey(const ValueKey('note-page-11')), findsNothing);
+    for (var i = 0; i < 25 && repo.cursors.length < 2; i++) {
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -450));
+      await tester.pumpAndSettle();
+    }
+    expect(repo.cursors, [null, 'page-2']);
+    expect(find.byKey(const ValueKey('note-page-0')), findsNothing);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -250));
+    await tester.pump();
+    expect(repo.cursors, [null, 'page-2']);
+    repo.pending.completeError(StateError('offline'));
+    await tester.pumpAndSettle();
+    ScaffoldMessenger.of(tester.element(find.byType(NotesPage)))
+        .clearSnackBars();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('加载失败，点击重试'), 300,
+        scrollable: find.byType(Scrollable).first);
+    repo.pending = Completer<CommunityPage<CommunityPost>>();
+    await tester.tap(find.text('加载失败，点击重试'));
+    await tester.pump();
+    expect(repo.cursors, [null, 'page-2', 'page-2']);
+    repo.pending
+        .complete(CommunityPage(items: repo.posts(12), nextCursor: null));
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(NotesPage));
+    final feed =
+        ProviderScope.containerOf(context).read(notesFeedProvider).requireValue;
+    expect(feed.items.length, 24);
+    expect(feed.hasMore, isFalse);
+    expect(find.byType(NotePhoto).evaluate().length, lessThan(8));
+    expect(repo.imageRequests.length, lessThan(24));
+    expect(
+        repo.imageRequests.every((r) => r.$2 == CommunityImageVariant.preview),
+        isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'nine-photo gallery uses thumbnails and only opens full image on demand',
+      (tester) async {
+    final (_, repo, _) =
+        await pump(tester, '/community/post/sea', 390, photos: 9);
+    expect(
+        repo.imageRequests
+            .where((r) => r.$2 == CommunityImageVariant.thumbnail)
+            .length,
+        9);
+    expect(
+        repo.imageRequests
+            .where((r) => r.$2 == CommunityImageVariant.preview)
+            .length,
+        lessThan(3));
+    expect(repo.imageRequests.where((r) => r.$2 == CommunityImageVariant.full),
+        isEmpty);
+    await tester.tap(find.bySemanticsLabel('查看大图').first);
+    await tester.pumpAndSettle();
+    expect(
+        repo.imageRequests
+            .where((r) => r.$2 == CommunityImageVariant.full)
+            .length,
+        inInclusiveRange(1, 2));
+    expect(tester.takeException(), isNull);
+  });
 
   for (final width in [390.0, 360.0, 320.0]) {
     for (final page in ['feed', 'cities', 'detail', 'compose']) {
@@ -420,6 +495,7 @@ void main() {
 class _Repo extends DemoExperienceRepository {
   _Repo(this.photo, this.street);
   final Uint8List photo, street;
+  final imageRequests = <(String, CommunityImageVariant)>[];
   int photoCount = 1;
   final saved = <String>{};
   final queries = <CommunityQuery>[];
@@ -498,8 +574,12 @@ class _Repo extends DemoExperienceRepository {
         comment('c2', '周周', '喜欢这种不用把行程排满的下午。')
       ]);
   @override
-  Future<Uint8List> communityMediaBytes(CommunityMedia media) async =>
-      media.id == 'street-photo' ? street : photo;
+  Future<Uint8List> communityMediaBytes(CommunityMedia media,
+      {CommunityImageVariant variant = CommunityImageVariant.full}) async {
+    imageRequests.add((media.id, variant));
+    return media.id == 'street-photo' ? street : photo;
+  }
+
   @override
   Future<CommunityPostDetail> shareCommunityPost(
       String fragmentId, CommunityPostDraft value) async {
@@ -530,4 +610,47 @@ class _Store implements TourStore {
 class _Location extends NotesLocation {
   @override
   Future<DiscoveryLocationSample?> build() async => null;
+}
+
+class _PagedRepo extends _Repo {
+  _PagedRepo(super.photo, super.street);
+  final cursors = <String?>[];
+  Completer<CommunityPage<CommunityPost>> pending = Completer();
+  List<CommunityPost> posts(int start) => List.generate(12, (index) {
+        final id = start + index;
+        return CommunityPost(
+          id: 'page-$id',
+          fragmentId: place.fragmentId,
+          category: CommunityCategory.onSite,
+          title: '见闻 $id',
+          body: '路上的记录',
+          place: place,
+          author: const CommunityAuthor(displayName: '旅人', avatar: 'default'),
+          media: [
+            CommunityMedia(
+                id: 'photo-$id',
+                url: '/community-media/$id',
+                mimeType: 'image/webp',
+                width: 960,
+                height: 640,
+                position: 0)
+          ],
+          likeCount: 0,
+          commentCount: 0,
+          viewerHasLiked: false,
+          viewerIsAuthor: false,
+          createdAt: DateTime(2026, 10, 11),
+        );
+      });
+  @override
+  Future<CommunityPage<CommunityPost>> discoverCommunity(
+      {String? citySlug,
+      String? cursor,
+      int limit = 12,
+      CommunityQuery query = const CommunityQuery()}) async {
+    cursors.add(cursor);
+    return cursor == null
+        ? CommunityPage(items: posts(0), nextCursor: 'page-2')
+        : pending.future;
+  }
 }

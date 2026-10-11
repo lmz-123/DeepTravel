@@ -171,7 +171,8 @@ abstract interface class ExperienceRepository {
     int limit = 20,
   });
 
-  Future<Uint8List> communityMediaBytes(CommunityMedia media);
+  Future<Uint8List> communityMediaBytes(CommunityMedia media,
+      {CommunityImageVariant variant = CommunityImageVariant.full});
 
   Future<CommunityLikeResult> setCommunityLike(String postId, bool liked);
 
